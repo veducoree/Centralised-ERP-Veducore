@@ -1,0 +1,40 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Teacher app: redesign all 5 existing screens with glassmorphism (deep purple gradient background + GlassCard), redesign the tab bar, and add 3 new teacher screens (Schedule, Students, Remarks). Depends on FEAT-001 (GlassCard, GLASS constants must exist first).",
+  "status": "completed",
+  "steps": [
+    "STEP 1 — Update teacher _layout.tsx: Change tabBarStyle.backgroundColor to 'rgba(15,5,30,0.95)', borderTopColor to GLASS.border (import GLASS from utils). Change tabBarActiveTintColor to GLASS.accent ('#A78BFA'). Change tabBarInactiveTintColor to GLASS.textDim. Add 3 new Tabs.Screen entries: name='schedule' (title='Schedule', icon 'calendar-outline'), name='students' (title='Students', icon 'people-outline'), name='remarks' (title='Remarks', icon 'chatbubble-outline'). File: app/src/app/(teacher)/_layout.tsx.",
+
+    "STEP 2 — Redesign dashboard.tsx: Replace the outermost SafeAreaView with <View style={{ flex: 1 }}><LinearGradient colors={[GLASS_BG.gradientStart, GLASS_BG.gradientMid, GLASS_BG.gradientEnd]} style={StyleSheet.absoluteFillObject} /><SafeAreaView style={{ flex: 1, backgroundColor: 'transparent' }}>. Replace all <Card> with <GlassCard>. Replace <Header> import+usage with an inline glass header View (paddingTop: insets.top+8, borderBottomWidth:1, borderBottomColor: GLASS.border, school name in GLASS.textDim, title in GLASS.text). Change all text colors: COLORS.text→GLASS.text, COLORS.textMuted→GLASS.textMuted, COLORS.textLight→GLASS.textDim. Change backgroundColor of quickActionIcon to GLASS.accentGlow. Update the welcomeCard LinearGradient to use glass accent colors: ['rgba(167,139,250,0.25)','rgba(109,63,255,0.15)']. Import useSafeAreaInsets. Remove Header import. Import GLASS_BG, GLASS, GlassCard. Add StatusBar style='light'. File: app/src/app/(teacher)/dashboard.tsx.",
+
+    "STEP 3 — Redesign attendance.tsx: Same background pattern as dashboard. Replace Card (listCard, dateBanner) with GlassCard. Update sectionChip styles: inactive: bg 'rgba(255,255,255,0.08)', border GLASS.border, text GLASS.textMuted; active: bg GLASS.accentGlow, border GLASS.accent, text GLASS.accent. Update status button colors to GLASS.present/absent/late. Update dateBanner text to GLASS.text. Replace Header with inline glass header. File: app/src/app/(teacher)/attendance.tsx.",
+
+    "STEP 4 — Redesign marks.tsx: Same background + GlassCard pattern. examCard → GlassCard. listCard → GlassCard. TextInput style: backgroundColor 'rgba(255,255,255,0.08)', color GLASS.text, borderColor GLASS.border, placeholderTextColor GLASS.textDim. gradeBadge background: GLASS.accentGlow. Replace Header. File: app/src/app/(teacher)/marks.tsx.",
+
+    "STEP 5 — Redesign my-classes.tsx: Same background + GlassCard pattern. classCard → GlassCard. summaryRow: GlassCard with GLASS stat values. Student avatar section in glass. Replace Header. File: app/src/app/(teacher)/my-classes.tsx.",
+
+    "STEP 6 — Redesign notifications.tsx: Same background. Each notifCard → GlassCard. Icon circle bg: config.color+'18'. Unread dot color: GLASS.accent. Text colors updated. Replace Header. File: app/src/app/(teacher)/notifications.tsx.",
+
+    "STEP 7 — Create schedule.tsx: New screen at app/src/app/(teacher)/schedule.tsx. Load all teacher_schedules with teacher_id 'teacher-001' from mockDb. Group by day_of_week (1-5 = Mon-Fri). Get class/section/subject names by cross-referencing classes/sections/subjects tables. Render: glass background, inline glass header titled 'My Schedule', then a ScrollView with 5 day GlassCards (Monday–Friday). Each day card shows the day name (GLASS.text, fontWeight 800) and lists time slot rows: time range, class-section, subject, room. Today's day (compare with new Date().getDay() mapped to 1–5 for Mon–Fri) gets GLASS.accentGlow border. Empty day shows 'No classes' in GLASS.textDim. Seed data: ts-001 Monday 08:00-09:00 Room 101, ts-002 Wednesday 10:00-11:00 Room 101.",
+
+    "STEP 8 — Create students.tsx: New screen at app/src/app/(teacher)/students.tsx. Loads class_assignments for teacher-001, builds unique section list (deduped by section_id), renders horizontal chip selector. On section change, loads students for that section_id. TextInput search bar filters by full_name or admission_number (case-insensitive). Renders student list in GlassCard rows: Avatar, name, admission_number, gender capitalized, active/inactive badge (GLASS.success / GLASS.textDim). Inline glass header titled 'My Students'. Pull-to-refresh.",
+
+    "STEP 9 — Create remarks.tsx: New screen at app/src/app/(teacher)/remarks.tsx. Loads all remarks from mockDb where teacher_id = TEACHER_ID. Shows each remark in a GlassCard: student name (look up from students table by student_id), category badge (GLASS.accent bg), visibility label, remark text (GLASS.textMuted), date (GLASS.textDim). 'Add Remark' button (glass styled, GLASS.accent text) opens a React Native Modal with dark glass background. Modal form: student selector (scrollable TouchableOpacity list of students from teacher's sections — load uniquely), category picker (5 options as chip row), remark TextInput (multiline, glass style), visibility picker (3 options as chips). Save calls mockDb.insert<Remark>('remarks', { school_id, student_id, teacher_id, category, remark, visibility }). Delete: press delete icon → Alert.alert confirm → mockDb.delete. All Remark inserts include category and visibility (added to type in FEAT-001)."
+  ],
+  "acceptance_criteria": [
+    "npx tsc --noEmit passes with 0 errors after all steps",
+    "All 5 existing teacher screens display glass UI with white text on deep purple gradient background",
+    "Teacher tab bar shows glass dark background with purple-tinted active tab",
+    "Tab bar has 8 tabs: Dashboard, Classes, Attendance, Marks, Alerts, Schedule, Students, Remarks",
+    "schedule.tsx renders ts-001 (Monday) and ts-002 (Wednesday) from seed data",
+    "students.tsx shows section selector chip, loads students for sec-001 (Aakash Verma, Kabir Singh), search filters work",
+    "remarks.tsx shows empty list with Add Remark button; adding a remark persists it to mockDb"
+  ],
+  "verification": [
+    "cd /Users/aryansinghthakur/Downloads/Veducore/app && npx tsc --noEmit — must complete with 0 errors",
+    "Start app with expo start. Log in as teacher1@greenwood.edu / Teacher@123. Verify: purple gradient background visible on dashboard. Tab bar is dark glass. Schedule tab shows Monday and Wednesday entries. Students tab shows students. Remarks tab shows empty state with Add button."
+  ],
+  "blocked_reason": null,
+  "findings": "1) StyleSheet.absoluteFillObject is not in the React Native 0.86 type definitions — only StyleSheet.absoluteFill exists. All new screens use StyleSheet.absoluteFill. 2) GlassCard's style prop is typed as ViewStyle (not StyleSheet array), so conditional style arrays like [styles.a, condition && styles.b] cause a TS error. Fixed by spreading: isToday ? { ...styles.a, ...styles.b } : styles.a. 3) SafeAreaView re-imported from react-native-safe-area-context (rather than react-native) since useSafeAreaInsets also comes from that package — avoids dual import. 4) router.d.ts manually patched to add schedule, students, remarks teacher routes (same technique as FEAT-001 parent routes). 5) dashboard.tsx: duplicate SafeAreaView import (react-native + react-native-safe-area-context) removed — all screens use react-native-safe-area-context version only."
+}
