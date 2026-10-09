@@ -1,0 +1,37 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Redesign TeacherRecords.tsx: replace the flat per-record table with a per-student summary table showing one row per student with dynamic exam columns, overall %, Pass/Fail badge, and Promoted status. Add Promote All to Next Class button in the PageHeader that is active only when final exam marks exist and disabled when all students are already promoted. Depends on FEAT-001 for data availability but the code change is independent.",
+  "status": "completed",
+  "steps": [
+    "Replace the import block at the top of src/pages/teacher/TeacherRecords.tsx with: `import { useEffect, useState, useCallback } from 'react'; import { FileText, TrendingUp, CheckCircle, ArrowUpCircle } from 'lucide-react'; import { DashboardLayout } from '@/components/layout/DashboardLayout'; import { Card } from '@/components/ui/Card'; import { Select } from '@/components/ui/Form'; import { Button } from '@/components/ui/Button'; import { PageHeader, LoadingSpinner } from '@/components/ui/Primitives'; import { ConfirmDialog } from '@/components/ui/Modal'; import { useToast } from '@/components/ui/Toast'; import { useAuth } from '@/auth/AuthContext'; import { fetchTeacherByUserId, fetchTeacherAssignments, fetchStudentRecords, fetchStudentsBySection, fetchClasses, updateStudent } from '@/services/api'; import type { Teacher, ClassAssignment, StudentRecord, Student, Class, Section } from '@/types';` — Note: first check how toast is called in TeacherExamMarks.tsx (around line 40) to confirm the exact toast() call signature before implementing handlePromoteAll.",
+    "Add new state variables inside the component: `const toast = useToast(); const [students, setStudents] = useState<Student[]>([]); const [allClasses, setAllClasses] = useState<(Class & { sections: Section[] })[]>([]); const [promoting, setPromoting] = useState(false); const [confirmPromoteOpen, setConfirmPromoteOpen] = useState(false);`",
+    "Replace loadData callback body: after `fetchTeacherAssignments` get the first sectionId, call `fetchStudentsBySection(firstSectionId)` to set students, and call `fetchClasses(t.school_id)` to set allClasses. Keep the rest of the existing pattern.",
+    "Add a separate useEffect that re-fetches students when selectedSection changes: `useEffect(() => { if (!selectedSection) return; fetchStudentsBySection(selectedSection).then(setStudents).catch(() => {}); }, [selectedSection]);`",
+    "Add derived data after the uniqueSections block: (a) filteredRecords filtered by section_id cast as Student. (b) uniqueExams: array of {exam_name, record_type, date} built from filteredRecords, deduped by exam_name, sorted by date string ascending. (c) sectionClassId: find the assignment where a.section_id === selectedSection, take a.class_id or ''. (d) studentRows: map over students array, for each student find matching records, per exam aggregate marks/max_marks (sum across subjects), compute overallPct (1 decimal), result ('Pass' if >=33 else 'Fail' else null), isPromoted = sectionClassId !== '' && s.class_id !== sectionClassId. (e) hasFinalExam: filteredRecords.some(r => r.record_type === 'final_exam'). (f) allPromoted: studentRows.length > 0 && studentRows.every(r => r.isPromoted).",
+    "Add helper functions: `function overallPctPill(pct: number | null): string` returning Tailwind classes (emerald >=75, yellow 50-74, red <50, gray null). `function getSectionLabel(): string` that looks up the selected assignment's class.name + section.name. `function getTypeLabel(rt: string): string` (keep existing implementation).",
+    "Add handlePromoteAll async function: (1) close dialog, (2) find currentClass from allClasses by sectionClassId, (3) sort allClasses by grade_level, find nextClass with higher grade_level, (4) if no nextClass → toast error 'No next class found', (5) if nextClass.sections.length === 0 → toast error, (6) setPromoting(true), (7) await Promise.all over non-promoted students calling updateStudent(id, {class_id, section_id}), (8) await loadData(), (9) toast success, (10) setPromoting(false) in finally.",
+    "Build the promoteBtn JSX element (Button variant='primary' size='sm', disabled when !hasFinalExam||allPromoted||promoting||studentRows.length===0, loading={promoting}, ArrowUpCircle icon, label 'All Promoted ✓' when allPromoted else 'Promote All to Next Class').",
+    "Replace the JSX return with the new layout: PageHeader with action={promoteBtn}; section selector Card; empty state (same as before) when filteredRecords.length===0; otherwise a table with fixed columns (Student, one column per uniqueExam, Overall %, Result, Status). Student cell shows full_name + roll number. Exam cell shows 'marks/max (pct%)' or '—'. Overall % is a pill using overallPctPill classes. Result is emerald 'Pass' badge (with CheckCircle icon) or red 'Fail' badge or '—'. Status cell shows blue 'Promoted ↑' badge with TrendingUp icon when isPromoted, empty otherwise. After the main div, render ConfirmDialog (open={confirmPromoteOpen}, onClose={() => setConfirmPromoteOpen(false)}, onConfirm={handlePromoteAll}, title='Promote All Students', message=`Promote all ${nonPromotedCount} students in ${getSectionLabel()} to next class?`, confirmText='Promote All', variant='default').",
+    "Remove any unused imports (formatDate was in old import list, remove it). Run `cd /Users/aryansinghthakur/Downloads/Veducore && npx tsc --noEmit -p tsconfig.app.json` and fix all type errors.",
+    "Run `cd /Users/aryansinghthakur/Downloads/Veducore && npm run build` and fix any build errors.",
+    "Update this FEAT file: set status to 'completed', record in findings what was changed and whether any deviations from the plan were needed."
+  ],
+  "acceptance_criteria": [
+    "TeacherRecords.tsx renders a per-student table (not flat per-record table) with dynamic exam columns",
+    "Each student row shows marks per exam, overall %, Pass/Fail badge",
+    "When final_exam records exist in the section, the Promote All button in the page header is enabled",
+    "When all students are already promoted (class_id changed), the button shows 'All Promoted ✓' and is disabled",
+    "Clicking Promote All opens a confirm dialog showing the count of non-promoted students and the target class",
+    "Confirming promotion calls updateStudent for each non-promoted student with the next class's id and its first section's id",
+    "After promotion, promoted students show a blue 'Promoted ↑' badge in the Status column",
+    "`npx tsc --noEmit -p tsconfig.app.json` exits 0",
+    "`npm run build` exits 0"
+  ],
+  "verification": [
+    "cd /Users/aryansinghthakur/Downloads/Veducore && npx tsc --noEmit -p tsconfig.app.json",
+    "cd /Users/aryansinghthakur/Downloads/Veducore && npm run build"
+  ],
+  "blocked_reason": null,
+  "findings": "Implemented full redesign of TeacherRecords.tsx. Key deviations from plan: (1) toast() call signature is toast(message, type) not toast({title, message, type}) — matched TeacherExamMarks.tsx pattern. (2) ConfirmDialog already calls onClose() internally after onConfirm(), so handlePromoteAll does not call setConfirmPromoteOpen(false) to avoid double-close. (3) The Button icon prop is not used — ArrowUpCircle is rendered as a child element to appear alongside the label text (the icon prop replaces children when loading). Both npx tsc --noEmit -p tsconfig.app.json and npm run build exit 0."
+}
