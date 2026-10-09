@@ -1,0 +1,7 @@
+{
+  "task_id": "task-veducore-mobile-redesign",
+  "task_description": "Redesign the Veducore React Native mobile app with glassmorphism UI (deep purple gradient backgrounds + frosted glass cards), add 3 missing teacher screens (Schedule, Students, Remarks), and create a complete Parent app from scratch with 5 screens (Dashboard, Attendance, Fees, Records, Remarks). Also fix data layer: add parent MockUser, bump seed key, add ps-003 linking parent-001 to student-006.",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}
