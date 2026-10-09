@@ -16,13 +16,12 @@ import {
   fetchClasses,
   updateStudent,
 } from '@/services/api';
-import type { Teacher, ClassAssignment, StudentRecord, Student, Class, Section } from '@/types';
+import type { ClassAssignment, StudentRecord, Student, Class, Section } from '@/types';
 
 export default function TeacherRecords() {
   const { profile } = useAuth();
   const toast = useToast();
 
-  const [teacher, setTeacher] = useState<Teacher | null>(null);
   const [assignments, setAssignments] = useState<ClassAssignment[]>([]);
   const [records, setRecords] = useState<StudentRecord[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
@@ -38,7 +37,6 @@ export default function TeacherRecords() {
     try {
       const t = await fetchTeacherByUserId(profile.id);
       if (t) {
-        setTeacher(t);
         const a = await fetchTeacherAssignments(t.id);
         setAssignments(a);
         const firstSection = a.length > 0 ? a[0].section_id : '';
