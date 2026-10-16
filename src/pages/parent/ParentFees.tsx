@@ -46,6 +46,7 @@ export default function ParentFees() {
   const [lastPaymentId, setLastPaymentId] = useState<string>('');
   const [lastPaymentMethod, setLastPaymentMethod] = useState<string>('');
   const [invoiceFee, setInvoiceFee] = useState<Fee | null>(null);
+  const [invoiceSessionAmount, setInvoiceSessionAmount] = useState<number>(0);
 
   const loadData = useCallback(async () => {
     if (!profile?.id) return;
@@ -102,13 +103,13 @@ export default function ParentFees() {
     return Math.ceil(Number(fee.remaining_amount) / 3);
   }
 
-  async function handlePaymentSuccess(paymentId: string, method: string, fee: Fee) {
+  async function handlePaymentSuccess(paymentId: string, method: string, fee: Fee, sessionAmount: number) {
     const today = new Date().toISOString().split('T')[0];
     try {
       await recordFeePayment(fee.id, {
         school_id: fee.school_id,
         student_id: fee.student_id,
-        amount: getPayAmount(fee, selectedPlan),
+        amount: sessionAmount,
         payment_date: today,
         payment_method: method,
         receipt_number: paymentId,
@@ -117,6 +118,7 @@ export default function ParentFees() {
       setLastPaymentId(paymentId);
       setLastPaymentMethod(method);
       setInvoiceFee(fee);
+      setInvoiceSessionAmount(sessionAmount);
       setPaymentModalOpen(false);
       setPaymentLoading(false);
       setInvoiceModalOpen(true);
@@ -142,7 +144,7 @@ export default function ParentFees() {
 
     if (isMock) {
       const mockPaymentId = 'pay_mock_' + Date.now();
-      await handlePaymentSuccess(mockPaymentId, 'Online (Simulated)', selectedFee);
+      await handlePaymentSuccess(mockPaymentId, 'Online (Simulated)', selectedFee, payAmount);
       return;
     }
 
@@ -156,7 +158,7 @@ export default function ParentFees() {
       name: school?.name || 'School Fees',
       description: selectedFee.fee_type,
       handler: (response: RazorpayResponse) => {
-        handlePaymentSuccess(response.razorpay_payment_id, 'Online (Razorpay)', selectedFee);
+        handlePaymentSuccess(response.razorpay_payment_id, 'Online (Razorpay)', selectedFee, payAmount);
       },
       prefill: {
         name: parent?.full_name,
@@ -177,6 +179,7 @@ export default function ParentFees() {
 
   function openInvoiceForFee(fee: Fee) {
     setInvoiceFee(fee);
+    setInvoiceSessionAmount(Number(fee.paid_amount));
     setLastPaymentId(fee.receipt_number || '');
     setLastPaymentMethod(fee.payment_method || '');
     setInvoiceModalOpen(true);
@@ -420,7 +423,7 @@ export default function ParentFees() {
               </div>
             </div>
 
-            {/* Fee table */}
+            {/* Fee table — invoiceSessionAmount is the amount paid in this specific session */}
             <table className="w-full text-left text-sm border border-gray-200 rounded-xl overflow-hidden">
               <thead className="bg-gray-50">
                 <tr>
@@ -433,14 +436,14 @@ export default function ParentFees() {
               <tbody>
                 <tr className="border-t border-gray-200">
                   <td className="px-3 py-2 text-gray-900">{invoiceFee.fee_type}</td>
-                  <td className="px-3 py-2 text-right text-gray-700">{formatCurrency(invoiceFee.paid_amount, '₹')}</td>
+                  <td className="px-3 py-2 text-right text-gray-700">{formatCurrency(invoiceSessionAmount || invoiceFee.paid_amount, '₹')}</td>
                   <td className="px-3 py-2 text-right text-gray-700">
                     {lastPaymentMethod.includes('Razorpay') || lastPaymentMethod.includes('Simulated') ? '₹5' : '—'}
                   </td>
                   <td className="px-3 py-2 text-right font-semibold text-gray-900">
                     {lastPaymentMethod.includes('Razorpay') || lastPaymentMethod.includes('Simulated')
-                      ? formatCurrency(invoiceFee.paid_amount + 5, '₹')
-                      : formatCurrency(invoiceFee.paid_amount, '₹')}
+                      ? formatCurrency((invoiceSessionAmount || invoiceFee.paid_amount) + 5, '₹')
+                      : formatCurrency(invoiceSessionAmount || invoiceFee.paid_amount, '₹')}
                   </td>
                 </tr>
               </tbody>

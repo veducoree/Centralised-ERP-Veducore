@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, IndianRupee, Trash2, CreditCard, Eye, EyeOff, CheckCircle } from 'lucide-react';
+import { Plus, IndianRupee, Trash2, CreditCard, Eye, EyeOff, CheckCircle, Info } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -60,11 +60,10 @@ export default function AdminFees() {
 
   // ── Tab 3: Payment Setup ──
   const [setupForm, setSetupForm] = useState<Omit<PaymentSetup, 'id' | 'school_id' | 'is_verified' | 'created_at' | 'updated_at'>>({
-    razorpay_key_id: '', razorpay_key_secret: '', account_holder_name: '',
+    razorpay_key_id: '', account_holder_name: '',
     bank_name: '', account_number: '', ifsc_code: '',
   });
   const [setupSaved, setSetupSaved] = useState(false);
-  const [showSecret, setShowSecret] = useState(false);
   const [showAccountNo, setShowAccountNo] = useState(false);
   const [setupErrors, setSetupErrors] = useState<Record<string, string>>({});
 
@@ -107,7 +106,6 @@ export default function AdminFees() {
         const parsed = JSON.parse(stored) as PaymentSetup;
         setSetupForm({
           razorpay_key_id: parsed.razorpay_key_id || '',
-          razorpay_key_secret: parsed.razorpay_key_secret || '',
           account_holder_name: parsed.account_holder_name || '',
           bank_name: parsed.bank_name || '',
           account_number: parsed.account_number || '',
@@ -427,6 +425,12 @@ export default function AdminFees() {
         {/* ══════════════ TAB 2: FEE STRUCTURE ══════════════ */}
         {activeTab === 'structure' && (
           <>
+            <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 flex items-start gap-2">
+              <span className="text-amber-500 mt-0.5">⚠</span>
+              <p className="text-sm text-amber-800">
+                Fee structures are stored in-session only and will reset on page reload. Use "Assign to Students" to create persistent fee records for each student.
+              </p>
+            </div>
             <div className="flex justify-end">
               <Button icon={<Plus className="h-4 w-4" />} onClick={openAddStructure}>Add Fee Structure</Button>
             </div>
@@ -515,21 +519,11 @@ export default function AdminFees() {
                   />
                   {setupErrors.razorpay_key_id && <p className="mt-1 text-xs text-red-600">{setupErrors.razorpay_key_id}</p>}
                 </div>
-                <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Razorpay Key Secret</label>
-                  <div className="relative">
-                    <input
-                      type={showSecret ? 'text' : 'password'}
-                      value={setupForm.razorpay_key_secret}
-                      onChange={(e) => setSetupForm({ ...setupForm, razorpay_key_secret: e.target.value })}
-                      className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 pr-10 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                      placeholder="Your key secret"
-                    />
-                    <button type="button" onClick={() => setShowSecret((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                      {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  {setupErrors.razorpay_key_secret && <p className="mt-1 text-xs text-red-600">{setupErrors.razorpay_key_secret}</p>}
+                <div className="flex items-start gap-2 rounded-xl bg-blue-50 border border-blue-100 p-3 sm:col-span-2">
+                  <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-blue-700">
+                    Only your Razorpay <strong>Key ID</strong> (publishable key) is stored here. Your <strong>Key Secret</strong> should never be entered into a browser — keep it only on your server or Razorpay dashboard.
+                  </p>
                 </div>
                 <div>
                   <Input

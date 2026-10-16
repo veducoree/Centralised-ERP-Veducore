@@ -295,7 +295,7 @@ export interface PaymentSetup {
   id: string;
   school_id: string;
   razorpay_key_id: string;
-  razorpay_key_secret: string;
+  // razorpay_key_secret is intentionally omitted — secrets must not be stored client-side
   account_holder_name: string;
   bank_name: string;
   account_number: string;
@@ -325,6 +325,7 @@ export interface FeeStructure {
 export type PaymentPlan = 'full' | 'emi' | 'quarterly';
 export type OnlinePaymentStatus = 'pending' | 'completed' | 'failed';
 
+// Reserved for future DB implementation — online_payments table not yet created
 export interface OnlinePayment {
   id: string;
   school_id: string;
