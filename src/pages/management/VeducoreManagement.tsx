@@ -1,10 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Building2, Users, GraduationCap, BarChart3, Eye, EyeOff,
   Upload, CheckCircle, Plus, ChevronDown, ChevronRight, Globe,
   LogOut, TrendingUp,
 } from 'lucide-react';
 import veducoreLogo from '@/assets/veducore-logo.png';
+import { supabase } from '@/lib/supabase';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -430,6 +431,8 @@ function AddSchoolSection({ onAdd }: { onAdd: (school: SchoolRecord) => void }) 
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState<Partial<NewSchoolForm>>({});
   const [successData, setSuccessData] = useState<{ email: string; password: string; name: string } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   function validate(): boolean {
     const errs: Partial<NewSchoolForm> = {};
@@ -441,29 +444,115 @@ function AddSchoolSection({ onAdd }: { onAdd: (school: SchoolRecord) => void }) 
     return Object.keys(errs).length === 0;
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!validate()) return;
+    setSubmitting(true);
+    setSubmitError('');
 
-    const newSchool: SchoolRecord = {
-      id: `SCH${String(Date.now()).slice(-4)}`,
-      name: form.name,
-      city: form.city || 'N/A',
-      adminEmail: form.email,
+    if (import.meta.env.VITE_MOCK_AUTH === 'true') {
+      // Mock mode: just add to local state
+      const newSchool: SchoolRecord = {
+        id: `SCH${String(Date.now()).slice(-4)}`,
+        name: form.name,
+        city: form.city || 'N/A',
+        adminEmail: form.email,
+        adminName: form.adminName,
+        students: 0,
+        teachers: 0,
+        status: 'Active',
+        joinedDate: new Date().toISOString().split('T')[0],
+        lastLogin: 'Never',
+        academicYear: form.academicYear,
+        idCardTemplate: null,
+      };
+      onAdd(newSchool);
+      setSuccessData({ email: form.email, password: form.adminPassword, name: form.name });
+      setForm(EMPTY_FORM);
+      setErrors({});
+      setSubmitting(false);
+      return;
+    }
+
+    // Step 1: Insert school into Supabase
+    const { data: newSchool, error: schoolError } = await supabase
+      .from('schools')
+      .insert({
+        name: form.name,
+        address: form.address || null,
+        contact_number: form.contactNumber || null,
+        email: form.email,
+        academic_year: form.academicYear || '2024-25',
+        logo_url: null,
+        timezone: 'Asia/Kolkata',
+        currency: 'INR',
+        currency_symbol: '₹',
+      })
+      .select()
+      .maybeSingle();
+
+    if (schoolError || !newSchool) {
+      setSubmitError(schoolError?.message || 'Failed to create school record');
+      setSubmitting(false);
+      return;
+    }
+
+    // Step 2: Create admin user via edge function using anon key
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    let userCreationWarning = '';
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${anonKey}`,
+          },
+          body: JSON.stringify({
+            email: form.email,
+            password: form.adminPassword,
+            full_name: form.adminName,
+            role: 'admin',
+            school_id: newSchool.id,
+          }),
+        }
+      );
+      if (!response.ok) {
+        const errBody = await response.text();
+        userCreationWarning = `School created but admin account setup failed: ${errBody}`;
+      }
+    } catch (fetchErr: unknown) {
+      userCreationWarning = `School created but admin account setup failed: ${
+        fetchErr instanceof Error ? fetchErr.message : String(fetchErr)
+      }`;
+    }
+
+    // Step 3: Add to local state (optimistic)
+    const mappedSchool: SchoolRecord = {
+      id: newSchool.id,
+      name: newSchool.name,
+      city: newSchool.address || '',
+      adminEmail: newSchool.email || form.email,
       adminName: form.adminName,
       students: 0,
       teachers: 0,
       status: 'Active',
-      joinedDate: new Date().toISOString().split('T')[0],
-      lastLogin: 'Never',
-      academicYear: form.academicYear,
+      joinedDate: newSchool.created_at ? newSchool.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+      lastLogin: 'N/A',
+      academicYear: newSchool.academic_year || form.academicYear,
       idCardTemplate: null,
     };
+    onAdd(mappedSchool);
 
-    onAdd(newSchool);
+    if (userCreationWarning) {
+      setSubmitError(userCreationWarning);
+    }
+
     setSuccessData({ email: form.email, password: form.adminPassword, name: form.name });
     setForm(EMPTY_FORM);
     setErrors({});
+    setSubmitting(false);
   }
 
   return (
@@ -495,6 +584,12 @@ function AddSchoolSection({ onAdd }: { onAdd: (school: SchoolRecord) => void }) 
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {submitError && (
+        <div className="rounded-xl border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
+          {submitError}
         </div>
       )}
 
@@ -606,10 +701,11 @@ function AddSchoolSection({ onAdd }: { onAdd: (school: SchoolRecord) => void }) 
           <div className="pt-2">
             <button
               type="submit"
-              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors shadow-sm"
+              disabled={submitting}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-60"
             >
               <Plus className="h-4 w-4" />
-              Add School
+              {submitting ? 'Adding...' : 'Add School'}
             </button>
           </div>
         </form>
@@ -625,19 +721,97 @@ type Section = 'overview' | 'schools' | 'add-school';
 export default function VeducoreManagement() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [activeSection, setActiveSection] = useState<Section>('overview');
-  const [schools, setSchools] = useState<SchoolRecord[]>(INITIAL_SCHOOLS);
+  const [schools, setSchools] = useState<SchoolRecord[]>(
+    import.meta.env.VITE_MOCK_AUTH === 'true' ? INITIAL_SCHOOLS : []
+  );
+  const [loading, setLoading] = useState(false);
+  const [fetchError, setFetchError] = useState('');
+  const [idCardTemplates, setIdCardTemplates] = useState<Record<string, string>>({});
+
+  async function fetchSchoolsData() {
+    setLoading(true);
+    setFetchError('');
+    try {
+      // Fetch all schools
+      const { data: schoolsData, error: schoolsError } = await supabase
+        .from('schools')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (schoolsError) throw schoolsError;
+
+      // Fetch all student school_ids in one query
+      const { data: studentsData } = await supabase
+        .from('students')
+        .select('school_id');
+      // Fetch all teacher school_ids in one query
+      const { data: teachersData } = await supabase
+        .from('teachers')
+        .select('school_id');
+
+      // Group counts by school_id
+      const studentCounts: Record<string, number> = {};
+      const teacherCounts: Record<string, number> = {};
+      (studentsData || []).forEach((r: { school_id: string }) => {
+        studentCounts[r.school_id] = (studentCounts[r.school_id] || 0) + 1;
+      });
+      (teachersData || []).forEach((r: { school_id: string }) => {
+        teacherCounts[r.school_id] = (teacherCounts[r.school_id] || 0) + 1;
+      });
+
+      // Map to SchoolRecord
+      const mapped: SchoolRecord[] = (schoolsData || []).map((s: {
+        id: string;
+        name: string;
+        address: string | null;
+        contact_number: string | null;
+        email: string | null;
+        academic_year: string | null;
+        created_at: string;
+      }) => ({
+        id: s.id,
+        name: s.name,
+        city: s.address || '',
+        adminEmail: s.email || '',
+        adminName: '',
+        students: studentCounts[s.id] || 0,
+        teachers: teacherCounts[s.id] || 0,
+        status: 'Active' as const,
+        joinedDate: s.created_at ? s.created_at.split('T')[0] : '',
+        lastLogin: 'N/A',
+        academicYear: s.academic_year || '',
+        idCardTemplate: null,
+      }));
+
+      setSchools(mapped);
+    } catch (err: unknown) {
+      setFetchError(err instanceof Error ? err.message : 'Failed to load schools');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!loggedIn) return;
+    if (import.meta.env.VITE_MOCK_AUTH === 'true') return;
+    fetchSchoolsData();
+  }, [loggedIn]);
 
   if (!loggedIn) {
     return <LoginScreen onLogin={() => setLoggedIn(true)} />;
   }
 
   function handleTemplateUpload(schoolId: string, filename: string) {
-    setSchools(prev => prev.map(s => s.id === schoolId ? { ...s, idCardTemplate: filename } : s));
+    setIdCardTemplates(prev => ({ ...prev, [schoolId]: filename }));
   }
 
   function handleAddSchool(school: SchoolRecord) {
     setSchools(prev => [school, ...prev]);
   }
+
+  const schoolsWithTemplates = schools.map(s => ({
+    ...s,
+    idCardTemplate: idCardTemplates[s.id] || s.idCardTemplate,
+  }));
 
   const navItems: { id: Section; label: string; icon: React.ReactNode }[] = [
     { id: 'overview', label: 'Overview', icon: <BarChart3 className="h-4 w-4" /> },
@@ -697,12 +871,27 @@ export default function VeducoreManagement() {
           </div>
         </header>
 
-        <div className="p-6">
-          {activeSection === 'overview' && <OverviewSection schools={schools} />}
-          {activeSection === 'schools' && (
-            <SchoolsSection schools={schools} onTemplateUpload={handleTemplateUpload} />
+        <div className="p-6 space-y-4">
+          {loading && (
+            <div className="flex items-center justify-center py-16">
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+              <span className="ml-3 text-sm text-gray-500">Loading schools...</span>
+            </div>
           )}
-          {activeSection === 'add-school' && <AddSchoolSection onAdd={handleAddSchool} />}
+          {fetchError && !loading && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+              {fetchError}
+            </div>
+          )}
+          {!loading && (
+            <>
+              {activeSection === 'overview' && <OverviewSection schools={schoolsWithTemplates} />}
+              {activeSection === 'schools' && (
+                <SchoolsSection schools={schoolsWithTemplates} onTemplateUpload={handleTemplateUpload} />
+              )}
+              {activeSection === 'add-school' && <AddSchoolSection onAdd={handleAddSchool} />}
+            </>
+          )}
         </div>
       </main>
     </div>

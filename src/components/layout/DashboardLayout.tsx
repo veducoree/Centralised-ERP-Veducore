@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, ClipboardList,
   IndianRupee, FileText, Bell, Settings, LogOut,
   Menu, X, UserCircle, ChevronDown, Shield, User,
-  Megaphone, UserPlus, ClipboardCheck, CreditCard, Globe,
+  Megaphone, UserPlus, ClipboardCheck, CreditCard,
 } from 'lucide-react';
 import { useAuth } from '@/auth/AuthContext';
 import { fetchSchool } from '@/services/api';
@@ -169,17 +169,7 @@ export function DashboardLayout({ children, title }: { children: ReactNode; titl
           Sign Out
         </button>
 
-        {profile?.role === 'admin' && (
-          <a
-            href="/veducore/management"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs font-medium text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
-          >
-            <Globe className="h-[16px] w-[16px]" />
-            Veducore Management
-          </a>
-        )}
+
       </div>
     </>
   );
