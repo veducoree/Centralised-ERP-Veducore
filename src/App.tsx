@@ -8,6 +8,9 @@ import LoginPage from '@/pages/LoginPage';
 const isMockAuth = import.meta.env.VITE_MOCK_AUTH === 'true';
 const ActiveAuthProvider = isMockAuth ? MockAuthProvider : AuthProvider;
 
+// Management portal
+import VeducoreManagement from '@/pages/management/VeducoreManagement';
+
 // Admin pages
 import AdminDashboard from '@/pages/admin/AdminDashboard';
 import AdminStudents from '@/pages/admin/AdminStudents';
@@ -102,6 +105,8 @@ function App() {
             <Route path="/parent/records" element={<ProtectedRoute allowedRoles={['parent']}><ParentRecords /></ProtectedRoute>} />
             <Route path="/parent/remarks" element={<ProtectedRoute allowedRoles={['parent']}><ParentRemarks /></ProtectedRoute>} />
             <Route path="/parent/profile" element={<ProtectedRoute allowedRoles={['parent']}><ProfilePage /></ProtectedRoute>} />
+
+            <Route path="/veducore/management" element={<VeducoreManagement />} />
 
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
