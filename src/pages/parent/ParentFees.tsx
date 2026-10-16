@@ -47,6 +47,8 @@ export default function ParentFees() {
   const [lastPaymentMethod, setLastPaymentMethod] = useState<string>('');
   const [invoiceFee, setInvoiceFee] = useState<Fee | null>(null);
   const [invoiceSessionAmount, setInvoiceSessionAmount] = useState<number>(0);
+  // true when opening a settled fee summary (not a fresh payment receipt)
+  const [invoiceIsFeeSummary, setInvoiceIsFeeSummary] = useState<boolean>(false);
 
   const loadData = useCallback(async () => {
     if (!profile?.id) return;
@@ -119,6 +121,7 @@ export default function ParentFees() {
       setLastPaymentMethod(method);
       setInvoiceFee(fee);
       setInvoiceSessionAmount(sessionAmount);
+      setInvoiceIsFeeSummary(false);
       setPaymentModalOpen(false);
       setPaymentLoading(false);
       setInvoiceModalOpen(true);
@@ -182,6 +185,7 @@ export default function ParentFees() {
     setInvoiceSessionAmount(Number(fee.paid_amount));
     setLastPaymentId(fee.receipt_number || '');
     setLastPaymentMethod(fee.payment_method || '');
+    setInvoiceIsFeeSummary(true);
     setInvoiceModalOpen(true);
   }
 
@@ -369,7 +373,7 @@ export default function ParentFees() {
         <Modal
           open={invoiceModalOpen}
           onClose={() => setInvoiceModalOpen(false)}
-          title="Payment Invoice"
+          title={invoiceIsFeeSummary ? 'Fee Payment Summary' : 'Payment Invoice'}
           size="lg"
           footer={
             <div className="flex items-center gap-3 no-print">
@@ -453,7 +457,9 @@ export default function ParentFees() {
             <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 space-y-1">
               <div className="flex items-center gap-1.5 mb-2">
                 <CheckCircle className="h-4 w-4 text-emerald-600" />
-                <span className="font-medium text-emerald-800 text-sm">Payment Successful</span>
+                <span className="font-medium text-emerald-800 text-sm">
+                  {invoiceIsFeeSummary ? 'Fee Paid in Full' : 'Payment Successful'}
+                </span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-500">Payment Date</span>

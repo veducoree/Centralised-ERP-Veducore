@@ -116,7 +116,30 @@ export default function AdminFees() {
     }
   }, [profile?.school_id]);
 
-  // ── Tab 1: Filters ──
+  // Load fee structures from localStorage (falls back to SAMPLE_STRUCTURES)
+  useEffect(() => {
+    if (!profile?.school_id) return;
+    const stored = localStorage.getItem(`veducore_fee_structures_${profile.school_id}`);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored) as FeeStructure[];
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setFeeStructures(parsed);
+        }
+      } catch { /* ignore — use sample defaults */ }
+    }
+  }, [profile?.school_id]);
+
+  // Persist fee structures to localStorage whenever they change (after initial load)
+  useEffect(() => {
+    if (!profile?.school_id) return;
+    // Don't persist the blank-school_id sample state that exists before profile loads
+    if (feeStructures.every((s) => s.school_id === '')) return;
+    localStorage.setItem(
+      `veducore_fee_structures_${profile.school_id}`,
+      JSON.stringify(feeStructures),
+    );
+  }, [feeStructures, profile?.school_id]);  // ── Tab 1: Filters ──
   const isOnlinePayment = (pm: string | null) =>
     !!pm && (pm.includes('Razorpay') || pm.includes('Simulated') || pm.includes('Online'));
 
@@ -428,7 +451,7 @@ export default function AdminFees() {
             <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 flex items-start gap-2">
               <span className="text-amber-500 mt-0.5">⚠</span>
               <p className="text-sm text-amber-800">
-                Fee structures are stored in-session only and will reset on page reload. Use "Assign to Students" to create persistent fee records for each student.
+                Fee structures are saved in your browser's local storage. Use "Assign to Students" to create persistent fee records for each student in your school's database.
               </p>
             </div>
             <div className="flex justify-end">
