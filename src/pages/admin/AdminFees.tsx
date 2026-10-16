@@ -59,6 +59,9 @@ export default function AdminFees() {
   const [assignLoading, setAssignLoading] = useState(false);
 
   // ── Tab 3: Payment Setup ──
+  // NOTE (Finding 2): Only razorpay_key_id (a publishable key) is stored in localStorage.
+  // account_number and ifsc_code have no role in the client-side Razorpay checkout flow
+  // and are kept in-memory only — they are NOT persisted to localStorage.
   const [setupForm, setSetupForm] = useState<Omit<PaymentSetup, 'id' | 'school_id' | 'is_verified' | 'created_at' | 'updated_at'>>({
     razorpay_key_id: '', account_holder_name: '',
     bank_name: '', account_number: '', ifsc_code: '',
@@ -97,20 +100,21 @@ export default function AdminFees() {
     }
   }, [profile?.school_id]);
 
-  // Load payment setup from localStorage on mount
+  // Load payment setup from localStorage on mount.
+  // NOTE (Finding 2): Only razorpay_key_id is persisted to localStorage.
+  // account_number and ifsc_code are sensitive banking credentials that have no
+  // role in the client-side Razorpay flow and are intentionally NOT stored in
+  // localStorage where any XSS payload or browser extension could read them.
   useEffect(() => {
     if (!profile?.school_id) return;
     const stored = localStorage.getItem(`veducore_payment_setup_${profile.school_id}`);
     if (stored) {
       try {
-        const parsed = JSON.parse(stored) as PaymentSetup;
-        setSetupForm({
+        const parsed = JSON.parse(stored) as { razorpay_key_id?: string };
+        setSetupForm((prev) => ({
+          ...prev,
           razorpay_key_id: parsed.razorpay_key_id || '',
-          account_holder_name: parsed.account_holder_name || '',
-          bank_name: parsed.bank_name || '',
-          account_number: parsed.account_number || '',
-          ifsc_code: parsed.ifsc_code || '',
-        });
+        }));
         setSetupSaved(true);
       } catch { /* ignore */ }
     }
@@ -284,20 +288,19 @@ export default function AdminFees() {
     if (!profile?.school_id) return;
     const errors: Record<string, string> = {};
     if (!setupForm.razorpay_key_id.startsWith('rzp_')) errors.razorpay_key_id = 'Key must start with rzp_';
-    if (setupForm.ifsc_code.length !== 11) errors.ifsc_code = 'IFSC must be exactly 11 characters';
-    if (!setupForm.account_holder_name) errors.account_holder_name = 'Required';
-    if (!setupForm.bank_name) errors.bank_name = 'Required';
-    if (!setupForm.account_number) errors.account_number = 'Required';
+    // NOTE (Finding 2): IFSC and account number are validated for the admin's reference
+    // but are NOT persisted to localStorage — only razorpay_key_id is stored there.
+    if (setupForm.ifsc_code && setupForm.ifsc_code.length !== 11) errors.ifsc_code = 'IFSC must be exactly 11 characters';
     setSetupErrors(errors);
     if (Object.keys(errors).length > 0) {
       toast('Please fix the errors before saving', 'error');
       return;
     }
-    const data: PaymentSetup = {
+    // Only store the publishable Key ID in localStorage — no sensitive banking credentials.
+    const data: Pick<PaymentSetup, 'id' | 'school_id' | 'razorpay_key_id' | 'is_verified' | 'created_at' | 'updated_at'> = {
       id: `setup-${profile.school_id}`,
       school_id: profile.school_id,
-      ...setupForm,
-      ifsc_code: setupForm.ifsc_code.toUpperCase(),
+      razorpay_key_id: setupForm.razorpay_key_id,
       is_verified: true,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -607,13 +610,23 @@ export default function AdminFees() {
             </Card>
 
             {/* Platform fees collected stat */}
+            {/* NOTE (Finding 1): This stat reflects estimated platform fees based on online
+                payment count × ₹5. Actual routing of the ₹5 to Veducore's account requires
+                a server-side Razorpay Route or transfer webhook — that backend infrastructure
+                is not yet implemented. Until it is, the ₹5 lands in the school's Razorpay
+                account and this number is an estimate only. */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <StatCard
-                label="Platform Fees Collected"
+                label="Est. Platform Fees"
                 value={formatCurrency(platformFeesTotal, '₹')}
                 icon={<IndianRupee className="h-5 w-5" />}
                 color="violet"
               />
+              <div className="sm:col-span-2 flex items-center rounded-xl bg-amber-50 border border-amber-100 p-3">
+                <p className="text-xs text-amber-800">
+                  <strong>Estimated only.</strong> Actual collection of ₹5/transaction to Veducore requires server-side Razorpay Route setup (not yet implemented).
+                </p>
+              </div>
             </div>
           </div>
         )}

@@ -45,11 +45,14 @@ export default function ParentFees() {
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [lastPaymentId, setLastPaymentId] = useState<string>('');
   const [lastPaymentMethod, setLastPaymentMethod] = useState<string>('');
+  const [lastPaymentDate, setLastPaymentDate] = useState<string>('');
   const [invoiceFee, setInvoiceFee] = useState<Fee | null>(null);
   const [invoiceSessionAmount, setInvoiceSessionAmount] = useState<number>(0);
   // true when opening a settled fee summary (not a fresh payment receipt)
   const [invoiceIsFeeSummary, setInvoiceIsFeeSummary] = useState<boolean>(false);
 
+  // Fix (Finding 5): loadData no longer closes over or mutates selectedChildId.
+  // Initial child selection is handled in a separate useEffect below.
   const loadData = useCallback(async () => {
     if (!profile?.id) return;
     setLoading(true);
@@ -60,20 +63,19 @@ export default function ParentFees() {
         const links = await fetchParentStudents(p.id);
         const kids = links.map((l) => l.student).filter(Boolean) as Student[];
         setChildren(kids);
-        if (kids.length > 0 && !selectedChildId) {
-          setSelectedChildId(kids[0].id);
-          // Load school from first child
-          if (kids[0].school_id) {
-            const s = await fetchSchool(kids[0].school_id);
-            setSchool(s);
-          }
-        }
       }
     } catch { /* handled */ }
     finally { setLoading(false); }
-  }, [profile?.id, selectedChildId]);
+  }, [profile?.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Select the first child once children are loaded (runs only when children array goes from empty to non-empty)
+  useEffect(() => {
+    if (children.length > 0 && !selectedChildId) {
+      setSelectedChildId(children[0].id);
+    }
+  }, [children, selectedChildId]);
 
   const loadFees = useCallback(async () => {
     if (!selectedChildId) return;
@@ -119,6 +121,7 @@ export default function ParentFees() {
       });
       setLastPaymentId(paymentId);
       setLastPaymentMethod(method);
+      setLastPaymentDate(today); // Fix (Finding 4): store actual payment date for invoice
       setInvoiceFee(fee);
       setInvoiceSessionAmount(sessionAmount);
       setInvoiceIsFeeSummary(false);
@@ -151,9 +154,15 @@ export default function ParentFees() {
       return;
     }
 
-    const setup = JSON.parse(stored!) as PaymentSetup;
+    const setup = JSON.parse(stored!) as Pick<PaymentSetup, 'razorpay_key_id'>;
     setPaymentLoading(true);
 
+    // SECURITY NOTE (Finding 3): The handler below receives razorpay_payment_id from the
+    // client-side SDK and calls recordFeePayment directly. WITHOUT server-side signature
+    // verification, a malicious actor could replay a valid payment ID from another transaction
+    // to mark a different fee as paid. The correct fix is a backend endpoint that verifies:
+    //   HMAC-SHA256(razorpay_order_id + "|" + razorpay_payment_id, key_secret) === razorpay_signature
+    // This requires an order_id (server-side order creation) and a backend API — not yet implemented.
     const rzp = new window.Razorpay({
       key: setup.razorpay_key_id,
       amount: (payAmount + 5) * 100,
@@ -185,6 +194,8 @@ export default function ParentFees() {
     setInvoiceSessionAmount(Number(fee.paid_amount));
     setLastPaymentId(fee.receipt_number || '');
     setLastPaymentMethod(fee.payment_method || '');
+    // Fix (Finding 4): use actual payment_date from the fee record, not today's date
+    setLastPaymentDate(fee.payment_date || new Date().toISOString().split('T')[0]);
     setInvoiceIsFeeSummary(true);
     setInvoiceModalOpen(true);
   }
@@ -463,7 +474,8 @@ export default function ParentFees() {
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-500">Payment Date</span>
-                <span className="font-medium">{new Date().toLocaleDateString('en-IN')}</span>
+                {/* Fix (Finding 4): render the actual recorded payment date, not today */}
+                <span className="font-medium">{lastPaymentDate ? new Date(lastPaymentDate).toLocaleDateString('en-IN') : '—'}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span className="text-gray-500">Payment Method</span>
