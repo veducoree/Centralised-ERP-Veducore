@@ -123,7 +123,6 @@ export default function AdminDashboard() {
   // Greeting
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   const currencySymbol = '₹';
 
@@ -151,13 +150,10 @@ export default function AdminDashboard() {
           </div>
         ) : (
           <>
-            {/* Greeting card */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl p-5 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold">{greeting}, {profile?.full_name || 'Admin'} 👋</h2>
-                <p className="mt-1 text-sm text-blue-100">Here's what's happening at your school today.</p>
-              </div>
-              <p className="hidden sm:block text-xs text-blue-200 text-right">{todayStr}</p>
+            {/* Greeting */}
+            <div className="rounded-2xl border border-gray-100 bg-white px-5 py-4 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-900">{greeting}, {profile?.full_name || 'Admin'} 👋</h2>
+              <p className="mt-0.5 text-sm text-gray-500">Here's what's happening at your school today.</p>
             </div>
 
             {/* Row 1: 4 stat cards */}

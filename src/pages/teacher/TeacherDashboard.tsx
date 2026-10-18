@@ -42,7 +42,6 @@ export default function TeacherDashboard() {
   // Greeting
   const hour = new Date().getHours();
   const greetingTeacher = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-  const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   // Weekly overview
   const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
@@ -77,16 +76,10 @@ export default function TeacherDashboard() {
   return (
     <DashboardLayout title="Dashboard">
       <div className="space-y-6">
-        {/* Greeting banner */}
-        <div className="rounded-2xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white p-5 flex items-center justify-between">
-          <div>
-            <h2 className="text-xl font-bold">{greetingTeacher}, {teacher?.full_name || profile?.full_name || 'Teacher'} 👋</h2>
-            <p className="mt-1 text-sm text-indigo-100">Ready for today's classes?</p>
-          </div>
-          <div className="hidden sm:block text-right">
-            <p className="text-xs text-indigo-200">{todayStr}</p>
-            <p className="mt-0.5 text-sm font-semibold">{todaySchedule.length} {todaySchedule.length === 1 ? 'class' : 'classes'} today</p>
-          </div>
+        {/* Greeting */}
+        <div className="rounded-2xl border border-gray-100 bg-white px-5 py-4 shadow-sm">
+          <h2 className="text-lg font-semibold text-gray-900">{greetingTeacher}, {teacher?.full_name || profile?.full_name || 'Teacher'} 👋</h2>
+          <p className="mt-0.5 text-sm text-gray-500">Here's your schedule for today.</p>
         </div>
 
         {/* Stat cards */}

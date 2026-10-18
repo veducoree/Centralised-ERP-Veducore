@@ -27,6 +27,7 @@ import AdminIDCard from '@/pages/admin/AdminIDCard';
 import AdminIDCardGenerator from '@/pages/admin/AdminIDCardGenerator';
 import AdminDocuments from '@/pages/admin/AdminDocuments';
 import AdminDocumentGenerator from '@/pages/admin/AdminDocumentGenerator';
+import AdminHolidays from '@/pages/admin/AdminHolidays';
 import ProfilePage from '@/pages/shared/ProfilePage';
 import StudentDetailPage from '@/pages/admin/StudentDetailPage';
 import NewAdmissionPage from '@/pages/admin/NewAdmissionPage';
@@ -78,6 +79,7 @@ function App() {
             <Route path="/admin/id-cards/generate" element={<ProtectedRoute allowedRoles={['admin']}><AdminIDCardGenerator /></ProtectedRoute>} />
             <Route path="/admin/documents" element={<ProtectedRoute allowedRoles={['admin']}><AdminDocuments /></ProtectedRoute>} />
             <Route path="/admin/documents/generate" element={<ProtectedRoute allowedRoles={['admin']}><AdminDocumentGenerator /></ProtectedRoute>} />
+            <Route path="/admin/holidays" element={<ProtectedRoute allowedRoles={['admin']}><AdminHolidays /></ProtectedRoute>} />
             <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={['admin']}><AdminNotifications /></ProtectedRoute>} />
             <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['admin']}><AdminSettings /></ProtectedRoute>} />
             <Route path="/admin/profile" element={<ProtectedRoute allowedRoles={['admin']}><ProfilePage /></ProtectedRoute>} />

@@ -34,6 +34,68 @@ function parseMonthlyFee(fee: { fee_type: string }): { baseName: string; month: 
   return { baseName: match[1], month: match[2] as MonthName };
 }
 
+// ── MonthlyFeeGroup — defined at module level to prevent remounts on every render ──
+function MonthlyFeeGroup({
+  baseName,
+  entries,
+  onPayMonth,
+}: {
+  baseName: string;
+  entries: { month: MonthName; fee: Fee }[];
+  onPayMonth: (fee: Fee) => void;
+}) {
+  const byMonth = new Map(entries.map((e) => [e.month, e.fee]));
+  const paidCount = entries.filter((e) => e.fee.status === 'paid').length;
+  const totalYearAmount = entries.reduce((s, e) => s + Number(e.fee.amount), 0);
+  const totalPaidAmount = entries.reduce((s, e) => s + Number(e.fee.paid_amount), 0);
+
+  function chipStyle(month: MonthName): string {
+    const fee = byMonth.get(month);
+    if (!fee) return 'bg-gray-100 text-gray-400';
+    if (fee.status === 'paid') return 'bg-green-100 text-green-700';
+    if (fee.status === 'overdue' || (fee.due_date && new Date(fee.due_date) < new Date() && fee.status !== 'paid'))
+      return 'bg-red-100 text-red-600';
+    return 'bg-amber-100 text-amber-700';
+  }
+
+  return (
+    <Card className="p-4">
+      <p className="font-semibold text-gray-900 mb-3">{baseName}</p>
+      {/* Month chips */}
+      <div className="flex gap-2 overflow-x-auto pb-1 mb-3">
+        {MONTH_ORDER.map((month) => {
+          const fee = byMonth.get(month);
+          return (
+            <button
+              key={month}
+              disabled={!fee || fee.status === 'paid'}
+              onClick={() => fee && fee.status !== 'paid' && onPayMonth(fee)}
+              className={`flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-opacity ${chipStyle(month)} ${
+                fee && fee.status !== 'paid' ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
+              }`}
+            >
+              {MONTH_ABBR[month]}
+            </button>
+          );
+        })}
+      </div>
+      {/* Progress bar */}
+      <div className="mb-2">
+        <div className="flex justify-between text-xs text-gray-500 mb-1">
+          <span>{paidCount} / {entries.length} months paid</span>
+          <span>{formatCurrency(totalPaidAmount, '₹')} / {formatCurrency(totalYearAmount, '₹')}</span>
+        </div>
+        <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-emerald-500 transition-all"
+            style={{ width: `${entries.length > 0 ? (paidCount / entries.length) * 100 : 0}%` }}
+          />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 const printStyles = `
 @media print {
   body * { visibility: hidden; }
@@ -244,59 +306,6 @@ export default function ParentFees() {
     }
   }
 
-  // ── Monthly group card (inner component that closes over openPayModal) ──
-  function MonthlyFeeGroup({ baseName, entries }: { baseName: string; entries: { month: MonthName; fee: Fee }[] }) {
-    const byMonth = new Map(entries.map((e) => [e.month, e.fee]));
-    const paidCount = entries.filter((e) => e.fee.status === 'paid').length;
-    const totalYearAmount = entries.reduce((s, e) => s + Number(e.fee.amount), 0);
-    const totalPaidAmount = entries.reduce((s, e) => s + Number(e.fee.paid_amount), 0);
-
-    function chipStyle(month: MonthName): string {
-      const fee = byMonth.get(month);
-      if (!fee) return 'bg-gray-100 text-gray-400';
-      if (fee.status === 'paid') return 'bg-green-100 text-green-700';
-      if (fee.status === 'overdue' || (fee.due_date && new Date(fee.due_date) < new Date() && fee.status !== 'paid'))
-        return 'bg-red-100 text-red-600';
-      return 'bg-amber-100 text-amber-700';
-    }
-
-    return (
-      <Card className="p-4">
-        <p className="font-semibold text-gray-900 mb-3">{baseName}</p>
-        {/* Month chips */}
-        <div className="flex gap-2 overflow-x-auto pb-1 mb-3">
-          {MONTH_ORDER.map((month) => {
-            const fee = byMonth.get(month);
-            return (
-              <button
-                key={month}
-                disabled={!fee || fee.status === 'paid'}
-                onClick={() => fee && fee.status !== 'paid' && openPayModal(fee)}
-                className={`flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-opacity ${chipStyle(month)} ${
-                  fee && fee.status !== 'paid' ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
-                }`}
-              >
-                {MONTH_ABBR[month]}
-              </button>
-            );
-          })}
-        </div>
-        {/* Progress bar */}
-        <div className="mb-2">
-          <div className="flex justify-between text-xs text-gray-500 mb-1">
-            <span>{paidCount} / {entries.length} months paid</span>
-            <span>{formatCurrency(totalPaidAmount, '₹')} / {formatCurrency(totalYearAmount, '₹')}</span>
-          </div>
-          <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-emerald-500 transition-all"
-              style={{ width: `${entries.length > 0 ? (paidCount / entries.length) * 100 : 0}%` }}
-            />
-          </div>
-        </div>
-      </Card>
-    );
-  }
 
   if (loading) return <DashboardLayout title="Fees"><LoadingSpinner /></DashboardLayout>;
 
@@ -329,7 +338,7 @@ export default function ParentFees() {
           <div className="space-y-4">
             {/* Monthly fee groups */}
             {Array.from(monthlyGroups.entries()).map(([baseName, entries]) => (
-              <MonthlyFeeGroup key={baseName} baseName={baseName} entries={entries} />
+              <MonthlyFeeGroup key={baseName} baseName={baseName} entries={entries} onPayMonth={openPayModal} />
             ))}
             {/* Standalone (non-monthly) fees */}
             {standaloneFees.map((f) => (
@@ -527,22 +536,18 @@ export default function ParentFees() {
               </div>
             </div>
 
-            {/* Fee table — invoiceSessionAmount is the amount paid in this specific session */}
+            {/* Fee table */}
             <table className="w-full text-left text-sm border border-gray-200 rounded-xl overflow-hidden">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-3 py-2 font-semibold text-gray-600">Fee Type</th>
-                  <th className="px-3 py-2 font-semibold text-gray-600 text-right">Amount</th>
-                  <th className="px-3 py-2 font-semibold text-gray-600 text-right">Total</th>
+                  <th className="px-3 py-2 font-semibold text-gray-600 text-right">Amount Paid</th>
                 </tr>
               </thead>
               <tbody>
                 <tr className="border-t border-gray-200">
                   <td className="px-3 py-2 text-gray-900">{invoiceFee.fee_type}</td>
-                  <td className="px-3 py-2 text-right text-gray-700">{formatCurrency(invoiceSessionAmount || invoiceFee.paid_amount, '₹')}</td>
-                  <td className="px-3 py-2 text-right font-semibold text-gray-900">
-                    {formatCurrency(invoiceSessionAmount || invoiceFee.paid_amount, '₹')}
-                  </td>
+                  <td className="px-3 py-2 text-right font-semibold text-gray-900">{formatCurrency(invoiceSessionAmount || invoiceFee.paid_amount, '₹')}</td>
                 </tr>
               </tbody>
             </table>

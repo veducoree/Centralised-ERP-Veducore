@@ -80,6 +80,18 @@ export default function ParentDashboard() {
   return (
     <DashboardLayout title="Dashboard">
       <div className="space-y-6">
+        {/* Greeting */}
+        {(() => {
+          const h = new Date().getHours();
+          const g = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+          return (
+            <div className="rounded-2xl border border-gray-100 bg-white px-5 py-4 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-900">{g}, {parent?.full_name || profile?.full_name || 'Parent'} 👋</h2>
+              <p className="mt-0.5 text-sm text-gray-500">Here's an overview of your child's progress.</p>
+            </div>
+          );
+        })()}
+
         {/* Child selector for multiple children */}
         {children.length > 1 && (
           <Card className="p-4">

@@ -1,7 +1,0 @@
-{
-  "task_id": "task-records-promotion",
-  "task_description": "Implement complete Student Records + Promotion feature for the teacher dashboard: add sec-006 section for class-002, replace 2-record seed with 18-record comprehensive dataset for 6 students × 3 exams, bump SEEDED_KEY to v6, and redesign TeacherRecords.tsx with per-student summary table and Promote All button.",
-  "status": "completed",
-  "feature_order": ["FEAT-001", "FEAT-002"],
-  "blocked_reason": null
-}
