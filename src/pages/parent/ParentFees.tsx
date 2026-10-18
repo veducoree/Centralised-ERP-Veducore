@@ -15,6 +15,25 @@ import { StatusBadge } from '@/components/ui/Badge';
 
 type PaymentPlan = 'full' | 'emi' | 'quarterly';
 
+// ── Monthly fee helpers (module-level, not re-created on every render) ──
+const MONTH_ORDER = [
+  'April','May','June','July','August','September',
+  'October','November','December','January','February','March',
+] as const;
+type MonthName = typeof MONTH_ORDER[number];
+
+const MONTH_ABBR: Record<MonthName, string> = {
+  April:'Apr', May:'May', June:'Jun', July:'Jul', August:'Aug',
+  September:'Sep', October:'Oct', November:'Nov', December:'Dec',
+  January:'Jan', February:'Feb', March:'Mar',
+};
+
+function parseMonthlyFee(fee: { fee_type: string }): { baseName: string; month: MonthName } | null {
+  const match = fee.fee_type.match(/^(.+) - (January|February|March|April|May|June|July|August|September|October|November|December)$/);
+  if (!match) return null;
+  return { baseName: match[1], month: match[2] as MonthName };
+}
+
 const printStyles = `
 @media print {
   body * { visibility: hidden; }
@@ -165,7 +184,7 @@ export default function ParentFees() {
     // This requires an order_id (server-side order creation) and a backend API — not yet implemented.
     const rzp = new window.Razorpay({
       key: setup.razorpay_key_id,
-      amount: (payAmount + 5) * 100,
+      amount: payAmount * 100,
       currency: 'INR',
       name: school?.name || 'School Fees',
       description: selectedFee.fee_type,
@@ -210,6 +229,75 @@ export default function ParentFees() {
   const isPastDue = (fee: Fee) =>
     fee.due_date && new Date(fee.due_date) < new Date() && fee.status !== 'paid';
 
+  // ── Monthly fee grouping ──
+  const monthlyGroups = new Map<string, { month: MonthName; fee: Fee }[]>();
+  const standaloneFees: Fee[] = [];
+
+  for (const f of fees) {
+    const parsed = parseMonthlyFee(f);
+    if (parsed) {
+      const group = monthlyGroups.get(parsed.baseName) ?? [];
+      group.push({ month: parsed.month, fee: f });
+      monthlyGroups.set(parsed.baseName, group);
+    } else {
+      standaloneFees.push(f);
+    }
+  }
+
+  // ── Monthly group card (inner component that closes over openPayModal) ──
+  function MonthlyFeeGroup({ baseName, entries }: { baseName: string; entries: { month: MonthName; fee: Fee }[] }) {
+    const byMonth = new Map(entries.map((e) => [e.month, e.fee]));
+    const paidCount = entries.filter((e) => e.fee.status === 'paid').length;
+    const totalYearAmount = entries.reduce((s, e) => s + Number(e.fee.amount), 0);
+    const totalPaidAmount = entries.reduce((s, e) => s + Number(e.fee.paid_amount), 0);
+
+    function chipStyle(month: MonthName): string {
+      const fee = byMonth.get(month);
+      if (!fee) return 'bg-gray-100 text-gray-400';
+      if (fee.status === 'paid') return 'bg-green-100 text-green-700';
+      if (fee.status === 'overdue' || (fee.due_date && new Date(fee.due_date) < new Date() && fee.status !== 'paid'))
+        return 'bg-red-100 text-red-600';
+      return 'bg-amber-100 text-amber-700';
+    }
+
+    return (
+      <Card className="p-4">
+        <p className="font-semibold text-gray-900 mb-3">{baseName}</p>
+        {/* Month chips */}
+        <div className="flex gap-2 overflow-x-auto pb-1 mb-3">
+          {MONTH_ORDER.map((month) => {
+            const fee = byMonth.get(month);
+            return (
+              <button
+                key={month}
+                disabled={!fee || fee.status === 'paid'}
+                onClick={() => fee && fee.status !== 'paid' && openPayModal(fee)}
+                className={`flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-medium transition-opacity ${chipStyle(month)} ${
+                  fee && fee.status !== 'paid' ? 'cursor-pointer hover:opacity-80' : 'cursor-default'
+                }`}
+              >
+                {MONTH_ABBR[month]}
+              </button>
+            );
+          })}
+        </div>
+        {/* Progress bar */}
+        <div className="mb-2">
+          <div className="flex justify-between text-xs text-gray-500 mb-1">
+            <span>{paidCount} / {entries.length} months paid</span>
+            <span>{formatCurrency(totalPaidAmount, '₹')} / {formatCurrency(totalYearAmount, '₹')}</span>
+          </div>
+          <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+            <div
+              className="h-full rounded-full bg-emerald-500 transition-all"
+              style={{ width: `${entries.length > 0 ? (paidCount / entries.length) * 100 : 0}%` }}
+            />
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
   if (loading) return <DashboardLayout title="Fees"><LoadingSpinner /></DashboardLayout>;
 
   return (
@@ -239,7 +327,12 @@ export default function ParentFees() {
           </div>
         ) : (
           <div className="space-y-4">
-            {fees.map((f) => (
+            {/* Monthly fee groups */}
+            {Array.from(monthlyGroups.entries()).map(([baseName, entries]) => (
+              <MonthlyFeeGroup key={baseName} baseName={baseName} entries={entries} />
+            ))}
+            {/* Standalone (non-monthly) fees */}
+            {standaloneFees.map((f) => (
               <Card key={f.id} className="p-4">
                 <div className="flex items-start justify-between mb-3">
                   <span className="font-semibold text-gray-900">{f.fee_type}</span>
@@ -364,13 +457,9 @@ export default function ParentFees() {
                 <span className="text-gray-500">Fee Amount</span>
                 <span className="font-medium">{formatCurrency(getPayAmount(selectedFee, selectedPlan), '₹')}</span>
               </div>
-              <div className="flex justify-between py-1">
-                <span className="text-gray-500">Platform Fee</span>
-                <span className="font-medium">₹5</span>
-              </div>
               <div className="flex justify-between py-1 border-t border-gray-200 mt-1">
                 <span className="font-semibold text-gray-900">Total to Pay</span>
-                <span className="font-bold text-gray-900">{formatCurrency(getPayAmount(selectedFee, selectedPlan) + 5, '₹')}</span>
+                <span className="font-bold text-gray-900">{formatCurrency(getPayAmount(selectedFee, selectedPlan), '₹')}</span>
               </div>
             </div>
 
@@ -444,7 +533,6 @@ export default function ParentFees() {
                 <tr>
                   <th className="px-3 py-2 font-semibold text-gray-600">Fee Type</th>
                   <th className="px-3 py-2 font-semibold text-gray-600 text-right">Amount</th>
-                  <th className="px-3 py-2 font-semibold text-gray-600 text-right">Platform Fee</th>
                   <th className="px-3 py-2 font-semibold text-gray-600 text-right">Total</th>
                 </tr>
               </thead>
@@ -452,13 +540,8 @@ export default function ParentFees() {
                 <tr className="border-t border-gray-200">
                   <td className="px-3 py-2 text-gray-900">{invoiceFee.fee_type}</td>
                   <td className="px-3 py-2 text-right text-gray-700">{formatCurrency(invoiceSessionAmount || invoiceFee.paid_amount, '₹')}</td>
-                  <td className="px-3 py-2 text-right text-gray-700">
-                    {lastPaymentMethod.includes('Razorpay') || lastPaymentMethod.includes('Simulated') ? '₹5' : '—'}
-                  </td>
                   <td className="px-3 py-2 text-right font-semibold text-gray-900">
-                    {lastPaymentMethod.includes('Razorpay') || lastPaymentMethod.includes('Simulated')
-                      ? formatCurrency((invoiceSessionAmount || invoiceFee.paid_amount) + 5, '₹')
-                      : formatCurrency(invoiceSessionAmount || invoiceFee.paid_amount, '₹')}
+                    {formatCurrency(invoiceSessionAmount || invoiceFee.paid_amount, '₹')}
                   </td>
                 </tr>
               </tbody>

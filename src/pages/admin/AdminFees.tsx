@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, IndianRupee, Trash2, CreditCard, Eye, EyeOff, CheckCircle, Info } from 'lucide-react';
+// Info is used in the Razorpay Key ID hint box in Tab 3
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -270,13 +271,79 @@ export default function AdminFees() {
     try {
       const studs = await fetchStudents(profile.school_id, fs.class_id ? { classId: fs.class_id } : undefined);
       const today = new Date();
-      const dueDate = fs.due_day
-        ? new Date(today.getFullYear(), today.getMonth(), fs.due_day).toISOString().split('T')[0]
-        : today.toISOString().split('T')[0];
-      await Promise.all(studs.map((s) =>
-        createFee({ school_id: profile.school_id!, student_id: s.id, fee_type: fs.fee_type, amount: fs.amount, due_date: dueDate })
-      ));
-      toast(`Assigned to ${studs.length} students`, 'success');
+      const currentYear = today.getFullYear();
+
+      // Indian academic year month names April-first
+      const MONTH_NAMES_AC = [
+        'April', 'May', 'June', 'July', 'August', 'September',
+        'October', 'November', 'December', 'January', 'February', 'March',
+      ];
+
+      if (fs.frequency === 'monthly') {
+        // 12 records per student, April–March academic year
+        const tasks: Promise<unknown>[] = [];
+        for (const s of studs) {
+          for (let i = 0; i < 12; i++) {
+            const monthName = MONTH_NAMES_AC[i];
+            // April(3)–December(11) use currentYear; January(0)–March(2) use currentYear+1
+            const calMonth = i < 9 ? 3 + i : i - 9;
+            const calYear  = i < 9 ? currentYear : currentYear + 1;
+            const dueDay   = fs.due_day ?? 1;
+            const dueDate  = new Date(calYear, calMonth, dueDay).toISOString().split('T')[0];
+            tasks.push(
+              createFee({
+                school_id: profile.school_id!,
+                student_id: s.id,
+                fee_type: `${fs.name} - ${monthName}`,
+                amount: fs.amount,
+                due_date: dueDate,
+              })
+            );
+          }
+        }
+        await Promise.all(tasks);
+        toast(`Assigned 12 monthly records to ${studs.length} students`, 'success');
+
+      } else if (fs.frequency === 'quarterly') {
+        // 4 records per student
+        const quarters: Array<{ label: string; calMonth: number; calYear: number }> = [
+          { label: 'Q1', calMonth: 3,  calYear: currentYear },
+          { label: 'Q2', calMonth: 6,  calYear: currentYear },
+          { label: 'Q3', calMonth: 9,  calYear: currentYear },
+          { label: 'Q4', calMonth: 0,  calYear: currentYear + 1 },
+        ];
+        const tasks: Promise<unknown>[] = [];
+        for (const s of studs) {
+          for (const q of quarters) {
+            const dueDay  = fs.due_day ?? 1;
+            const dueDate = new Date(q.calYear, q.calMonth, dueDay).toISOString().split('T')[0];
+            tasks.push(
+              createFee({
+                school_id: profile.school_id!,
+                student_id: s.id,
+                fee_type: `${fs.name} - ${q.label}`,
+                amount: fs.amount,
+                due_date: dueDate,
+              })
+            );
+          }
+        }
+        await Promise.all(tasks);
+        toast(`Assigned 4 quarterly records to ${studs.length} students`, 'success');
+
+      } else {
+        // one_time or annual — single record
+        const dueDate = fs.due_day
+          ? new Date(today.getFullYear(), today.getMonth(), fs.due_day).toISOString().split('T')[0]
+          : today.toISOString().split('T')[0];
+        await Promise.all(
+          studs.map((s) =>
+            createFee({ school_id: profile.school_id!, student_id: s.id, fee_type: fs.name, amount: fs.amount, due_date: dueDate })
+          )
+        );
+        toast(`Assigned to ${studs.length} students`, 'success');
+      }
+
       setAssigningStructure(null);
       loadData();
     } catch { toast('Failed to assign fees', 'error'); }
@@ -314,8 +381,6 @@ export default function AdminFees() {
     ? 'rzp_****' + setupForm.razorpay_key_id.slice(-4)
     : setupForm.razorpay_key_id;
 
-  const platformFeesTotal = fees.filter((f) => isOnlinePayment(f.payment_method)).length * 5;
-
   const TAB_CLASSES = {
     active: 'border-b-2 border-blue-600 text-blue-600 font-semibold bg-white px-4 py-2.5 text-sm',
     inactive: 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 px-4 py-2.5 text-sm border-b-2 border-transparent',
@@ -349,7 +414,7 @@ export default function AdminFees() {
         {activeTab === 'records' && (
           <>
             <div className="flex justify-end">
-              <Button icon={<Plus className="h-4 w-4" />} onClick={() => { setFeeForm({ student_id: '', fee_type: '', amount: '', due_date: new Date().toISOString().split('T')[0] }); setModalOpen(true); }}>Add Fee</Button>
+              <Button icon={<Plus className="h-4 w-4" />} onClick={() => { setFeeForm({ student_id: '', fee_type: '', amount: '', due_date: new Date().toISOString().split('T')[0] }); setModalOpen(true); }}>Cash Entry</Button>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
@@ -416,9 +481,6 @@ export default function AdminFees() {
                         <td className="px-4 py-3 text-gray-700">{formatCurrency(f.amount, '₹')}</td>
                         <td className="px-4 py-3 text-gray-700">
                           <span>{formatCurrency(f.paid_amount, '₹')}</span>
-                          {isOnlinePayment(f.payment_method) && (
-                            <span className="ml-1 text-xs text-violet-500" title="₹5 platform fee collected">₹5</span>
-                          )}
                         </td>
                         <td className="px-4 py-3 text-gray-700">{formatDate(f.due_date)}</td>
                         <td className="px-4 py-3">
@@ -516,13 +578,57 @@ export default function AdminFees() {
         {/* ══════════════ TAB 3: PAYMENT SETUP ══════════════ */}
         {activeTab === 'setup' && (
           <div className="space-y-5">
-            {/* Info banner */}
-            <div className="rounded-xl bg-blue-50 border border-blue-100 p-4">
-              <p className="text-sm font-medium text-blue-800">Platform Fee Notice</p>
-              <p className="mt-1 text-sm text-blue-700">
-                A ₹5 platform fee is charged per successful online payment. This fee is collected by Veducore; the remaining amount is credited to your school.
-              </p>
-            </div>
+            {/* Razorpay Key ID guide */}
+            <Card className="p-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-4">How to Get Your Razorpay Key ID</h3>
+              <ol className="space-y-4">
+                {[
+                  {
+                    step: 1,
+                    title: 'Create a Razorpay Account',
+                    body: "Go to razorpay.com → Sign Up → Complete KYC with your school's business details (PAN, bank account, GST if applicable).",
+                  },
+                  {
+                    step: 2,
+                    title: 'Activate Your Account',
+                    body: 'After KYC approval (usually 1–2 business days), your account will be activated for live payments.',
+                  },
+                  {
+                    step: 3,
+                    title: 'Get Your Key ID',
+                    body: 'In Razorpay Dashboard → Settings → API Keys → Generate Live Key → Copy the Key ID (starts with rzp_live_...).',
+                  },
+                  {
+                    step: 4,
+                    title: 'Enter Key ID Below',
+                    body: 'Paste your Key ID in the "Razorpay Key ID" field below and click Save.',
+                  },
+                ].map(({ step, title, body }) => (
+                  <li key={step} className="flex gap-3">
+                    <span className="flex-shrink-0 h-6 w-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">
+                      {step}
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{title}</p>
+                      <p className="text-sm text-gray-600 mt-0.5">{body}</p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <div className="mt-5 flex flex-col gap-2">
+                <a
+                  href="https://dashboard.razorpay.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors w-fit"
+                >
+                  Open Razorpay Dashboard →
+                </a>
+                <p className="text-xs text-gray-400">
+                  For test mode during development, use a key starting with <code className="font-mono bg-gray-100 px-1 rounded">rzp_test_</code>
+                </p>
+              </div>
+            </Card>
 
             <Card className="p-6">
               <div className="flex items-center justify-between mb-4">
@@ -604,36 +710,16 @@ export default function AdminFees() {
               <h3 className="text-sm font-semibold text-gray-900 mb-3">How Online Payments Work</h3>
               <ul className="space-y-2 text-sm text-gray-700">
                 <li>• Parent clicks "Pay Now" on their fee and selects a payment plan (full, quarterly, or EMI).</li>
-                <li>• Payment is processed securely via Razorpay. A ₹5 platform fee is added to each transaction for Veducore.</li>
+                <li>• Payment is processed securely via Razorpay.</li>
                 <li>• On success, the fee record is updated automatically and an invoice is generated for the parent to download or print.</li>
               </ul>
             </Card>
-
-            {/* Platform fees collected stat */}
-            {/* NOTE (Finding 1): This stat reflects estimated platform fees based on online
-                payment count × ₹5. Actual routing of the ₹5 to Veducore's account requires
-                a server-side Razorpay Route or transfer webhook — that backend infrastructure
-                is not yet implemented. Until it is, the ₹5 lands in the school's Razorpay
-                account and this number is an estimate only. */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <StatCard
-                label="Est. Platform Fees"
-                value={formatCurrency(platformFeesTotal, '₹')}
-                icon={<IndianRupee className="h-5 w-5" />}
-                color="violet"
-              />
-              <div className="sm:col-span-2 flex items-center rounded-xl bg-amber-50 border border-amber-100 p-3">
-                <p className="text-xs text-amber-800">
-                  <strong>Estimated only.</strong> Actual collection of ₹5/transaction to Veducore requires server-side Razorpay Route setup (not yet implemented).
-                </p>
-              </div>
-            </div>
           </div>
         )}
       </div>
 
       {/* ── Add Fee Modal ── */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add Fee Record" size="md"
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Cash Entry" size="md"
         footer={<><Button variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button><Button onClick={handleCreateFee} loading={saving}>Create</Button></>}>
         <div className="space-y-4">
           <Select label="Student" required value={feeForm.student_id} onChange={(e) => setFeeForm({ ...feeForm, student_id: e.target.value })}>
@@ -723,12 +809,25 @@ export default function AdminFees() {
         }>
         {assigningStructure && (
           <div className="space-y-3 text-sm text-gray-700">
-            <p>This will create a fee record of <strong>{formatCurrency(assigningStructure.amount, '₹')}</strong> ({assigningStructure.fee_type}) for:</p>
+            <p>
+              This will create fee records of{' '}
+              <strong>{formatCurrency(assigningStructure.amount, '₹')}</strong> ({assigningStructure.fee_type}) for:
+            </p>
             <p className="font-medium">
               {assigningStructure.class_id
                 ? (classes.find((c) => c.id === assigningStructure.class_id)?.name || assigningStructure.class_id) + ' students'
                 : 'All students in the school'}
             </p>
+            {assigningStructure.frequency === 'monthly' && (
+              <p className="text-blue-700 bg-blue-50 rounded-lg px-3 py-2">
+                Monthly frequency: <strong>12 records per student</strong> will be created (April – March).
+              </p>
+            )}
+            {assigningStructure.frequency === 'quarterly' && (
+              <p className="text-blue-700 bg-blue-50 rounded-lg px-3 py-2">
+                Quarterly frequency: <strong>4 records per student</strong> will be created (Q1–Q4).
+              </p>
+            )}
             <p className="text-gray-500">Are you sure you want to proceed?</p>
           </div>
         )}
