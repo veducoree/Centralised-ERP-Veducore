@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Camera, User, BookOpen, Hash, Calendar, Building2, Phone, Clock, CheckCircle } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
+import { useAuth } from '@/auth/AuthContext';
 
 const includedItems = [
   { icon: <Camera className="h-5 w-5 text-blue-600" />, label: 'Student Photo' },
@@ -26,12 +27,19 @@ const outlineLink =
   'inline-flex items-center justify-center gap-2 rounded-lg h-10 px-4 text-sm font-medium border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/40';
 
 export default function AdminIDCard() {
+  const { profile } = useAuth();
   const callHref = 'tel:+919999999999';
   const emailHref = 'mailto:idcards@veducore.com';
 
-  const [formSubmitted, setFormSubmitted] = useState(false);
+  // Check if already submitted for this school
+  const storageKey = profile?.school_id ? `veducore_idcard_request_${profile.school_id}` : null;
+  const existingRequest = storageKey ? (() => {
+    try { return JSON.parse(localStorage.getItem(storageKey) || 'null'); } catch { return null; }
+  })() : null;
+
+  const [formSubmitted, setFormSubmitted] = useState(!!existingRequest);
   const [formData, setFormData] = useState({
-    schoolName: 'Your School',
+    schoolName: profile?.full_name ? 'Your School' : 'Your School',
     contactName: '',
     contactPhone: '',
     studentCount: '',
@@ -41,6 +49,19 @@ export default function AdminIDCard() {
 
   function handleFormSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (storageKey) {
+      const request = {
+        schoolId: profile?.school_id,
+        submittedAt: new Date().toISOString(),
+        contactName: formData.contactName,
+        contactPhone: formData.contactPhone,
+        studentCount: formData.studentCount,
+        deliveryDate: formData.deliveryDate,
+        notes: formData.notes,
+        status: 'pending',
+      };
+      localStorage.setItem(storageKey, JSON.stringify(request));
+    }
     setFormSubmitted(true);
   }
 
@@ -197,6 +218,9 @@ export default function AdminIDCard() {
                 <div>
                   <p className="text-sm font-semibold text-gray-900">Application Submitted!</p>
                   <p className="mt-1 text-sm text-gray-600">Your application has been submitted! The Veducore team will contact you within 24 hours.</p>
+                  {existingRequest?.submittedAt && (
+                    <p className="mt-1 text-xs text-gray-400">Submitted on {new Date(existingRequest.submittedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                  )}
                 </div>
               </div>
             </Card>

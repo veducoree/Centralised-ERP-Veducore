@@ -267,6 +267,16 @@ function SchoolsSection({ schools, onTemplateUpload }: {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
+  // Read ID card requests from localStorage for each school
+  function getIdCardRequest(schoolId: string): { submittedAt: string; contactName: string; studentCount: string; status: string } | null {
+    try {
+      const stored = localStorage.getItem(`veducore_idcard_request_${schoolId}`);
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  }
+
   function handleFileChange(schoolId: string, e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) {
@@ -282,7 +292,9 @@ function SchoolsSection({ schools, onTemplateUpload }: {
       </div>
 
       <div className="space-y-3">
-        {schools.map(school => (
+        {schools.map(school => {
+          const idCardReq = getIdCardRequest(school.id);
+          return (
           <div key={school.id} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
             <div className="p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
@@ -300,6 +312,11 @@ function SchoolsSection({ schools, onTemplateUpload }: {
                       <span className="inline-flex items-center gap-1 rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-xs font-medium text-green-700">
                         <CheckCircle className="h-3 w-3" />
                         Template Ready
+                      </span>
+                    )}
+                    {idCardReq && !school.idCardTemplate && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        📋 ID Card Request
                       </span>
                     )}
                   </div>
@@ -353,50 +370,81 @@ function SchoolsSection({ schools, onTemplateUpload }: {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">ID Card Template</p>
-                    {school.idCardTemplate ? (
-                      <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3">
-                        <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-green-800 truncate">{school.idCardTemplate}</p>
-                          <p className="text-xs text-green-600">Template uploaded</p>
+                  <div className="space-y-4">
+                    {/* ID Card Template */}
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">ID Card Template</p>
+                      {school.idCardTemplate ? (
+                        <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3">
+                          <CheckCircle className="h-4 w-4 text-green-600 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium text-green-800 truncate">{school.idCardTemplate}</p>
+                            <p className="text-xs text-green-600">Template uploaded</p>
+                          </div>
+                          <button
+                            onClick={() => fileInputRefs.current[school.id]?.click()}
+                            className="text-xs text-green-700 underline hover:no-underline flex-shrink-0"
+                          >
+                            Replace
+                          </button>
                         </div>
-                        <button
-                          onClick={() => fileInputRefs.current[school.id]?.click()}
-                          className="text-xs text-green-700 underline hover:no-underline flex-shrink-0"
-                        >
-                          Replace
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-white p-3">
-                        <Upload className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                        <div className="flex-1">
-                          <p className="text-xs text-gray-500">No template uploaded</p>
+                      ) : (
+                        <div className="flex items-center gap-2 rounded-lg border border-dashed border-gray-300 bg-white p-3">
+                          <Upload className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                          <div className="flex-1">
+                            <p className="text-xs text-gray-500">No template uploaded</p>
+                          </div>
+                          <button
+                            onClick={() => fileInputRefs.current[school.id]?.click()}
+                            className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700 transition-colors flex-shrink-0"
+                          >
+                            <Upload className="h-3 w-3" />
+                            Upload
+                          </button>
                         </div>
-                        <button
-                          onClick={() => fileInputRefs.current[school.id]?.click()}
-                          className="inline-flex items-center gap-1 rounded-md bg-blue-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-blue-700 transition-colors flex-shrink-0"
-                        >
-                          <Upload className="h-3 w-3" />
-                          Upload
-                        </button>
-                      </div>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*,application/pdf"
-                      className="hidden"
-                      ref={el => { fileInputRefs.current[school.id] = el; }}
-                      onChange={e => handleFileChange(school.id, e)}
-                    />
+                      )}
+                      <input
+                        type="file"
+                        accept="image/*,application/pdf"
+                        className="hidden"
+                        ref={el => { fileInputRefs.current[school.id] = el; }}
+                        onChange={e => handleFileChange(school.id, e)}
+                      />
+                    </div>
+
+                    {/* ID Card Application Request */}
+                    {(() => {
+                      const req = getIdCardRequest(school.id);
+                      if (!req) return null;
+                      return (
+                        <div className="space-y-2">
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">ID Card Application</p>
+                          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 space-y-1.5">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                                📋 Request Pending
+                              </span>
+                              <span className="text-xs text-gray-400">{new Date(req.submittedAt).toLocaleDateString('en-IN')}</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-500">Contact Person</span>
+                              <span className="font-medium text-gray-900">{req.contactName}</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-500">Student Count</span>
+                              <span className="font-medium text-gray-900">{req.studentCount}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
