@@ -31,7 +31,6 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [attendanceTrend, setAttendanceTrend] = useState<{ date: string; present: number; absent: number }[]>([]);
-  const [feeStats, setFeeStats] = useState<{ paid: number; pending: number; partial: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [barsAnimated, setBarsAnimated] = useState(false);
 
@@ -140,6 +139,7 @@ export default function AdminDashboard() {
           to { transform: scaleY(1); }
         }
         .bar-animate {
+          transform-box: fill-box;
           transform-origin: bottom;
           animation: barGrow 0.5s ease-out forwards;
         }

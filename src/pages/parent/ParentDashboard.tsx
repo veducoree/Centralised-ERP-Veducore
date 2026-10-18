@@ -31,13 +31,17 @@ export default function ParentDashboard() {
         const links = await fetchParentStudents(p.id);
         const kids = links.map((l) => l.student).filter(Boolean) as Student[];
         setChildren(kids);
-        if (kids.length > 0 && !selectedChildId) setSelectedChildId(kids[0].id);
       }
     } catch { /* handled */ }
     finally { setLoading(false); }
-  }, [profile?.id, selectedChildId]);
+  }, [profile?.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Initialise selected child once children are loaded
+  useEffect(() => {
+    if (children.length > 0 && !selectedChildId) setSelectedChildId(children[0].id);
+  }, [children, selectedChildId]);
 
   const loadChildData = useCallback(async () => {
     if (!selectedChildId) return;
