@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, ClipboardList,
   IndianRupee, FileText, Bell, Settings, LogOut,
   Menu, X, UserCircle, ChevronDown, Shield, User,
-  Megaphone, UserPlus, ClipboardCheck, CreditCard,
+  Megaphone, UserPlus, ClipboardCheck, CreditCard, ChevronRight,
 } from 'lucide-react';
 import { useAuth } from '@/auth/AuthContext';
 import { fetchSchool } from '@/services/api';
@@ -119,7 +119,13 @@ export function DashboardLayout({ children, title }: { children: ReactNode; titl
 
       {/* ── Nav items ── */}
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <ul className="space-y-0.5">
+        <style>{`
+          @keyframes sidebarFadeIn {
+            from { opacity: 0; transform: translateX(-8px); }
+            to { opacity: 1; transform: translateX(0); }
+          }
+        `}</style>
+        <ul className="space-y-0.5" style={{ animation: 'sidebarFadeIn 0.3s ease-out forwards' }}>
           {navItems.map((item) => {
             const active = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
             return (
@@ -127,14 +133,19 @@ export function DashboardLayout({ children, title }: { children: ReactNode; titl
                 <button
                   onClick={() => { navigate(item.path); setSidebarOpen(false); }}
                   className={cn(
-                    'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                    'group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-200',
                     active
-                      ? 'bg-blue-50 text-blue-700'
+                      ? 'bg-blue-50 text-blue-700 border-l-[3px] border-blue-600 pl-[calc(0.75rem-3px)]'
                       : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                   )}
                 >
-                  {item.icon}
+                  <span className="group-hover:scale-110 group-hover:text-blue-600 transition-all duration-200 flex-shrink-0">
+                    {item.icon}
+                  </span>
                   <span className="truncate">{item.label}</span>
+                  {!active && (
+                    <ChevronRight className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 ml-auto h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                  )}
                 </button>
               </li>
             );
