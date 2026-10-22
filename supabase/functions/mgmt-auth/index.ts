@@ -72,11 +72,11 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Management account already exists. Please login instead." }, 409);
     }
 
-    // Create auth user
+    // Create auth user — email_confirm: false so verification email is sent
     const { data: authData, error: authErr } = await admin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true,
+      email_confirm: false,
       user_metadata: { full_name },
     });
     if (authErr || !authData?.user) {
@@ -95,19 +95,10 @@ Deno.serve(async (req: Request) => {
       return json({ error: insertErr.message }, 500);
     }
 
-    // Sign in to get a token
-    const anonClient = createClient(supabaseUrl, anonKey, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
-    const { data: signInData, error: signInErr } = await anonClient.auth.signInWithPassword({ email, password });
-    if (signInErr || !signInData?.session) {
-      return json({ error: "Account created but auto-login failed. Please login manually." }, 200);
-    }
-
+    // Don't auto-login — user must verify email first
     return json({
-      token: signInData.session.access_token,
-      full_name,
-      message: "Management account created successfully",
+      verified: false,
+      message: "Account created! Please check your email and click the verification link to activate your account.",
     });
   }
 
@@ -124,6 +115,10 @@ Deno.serve(async (req: Request) => {
     });
     const { data: signInData, error: signInErr } = await anonClient.auth.signInWithPassword({ email, password });
     if (signInErr || !signInData?.user) {
+      // Check if it's an email-not-confirmed error
+      if (signInErr?.message?.toLowerCase().includes('email not confirmed')) {
+        return json({ error: "Email not verified yet. Please check your inbox and click the verification link." }, 401);
+      }
       return json({ error: "Invalid email or password" }, 401);
     }
 

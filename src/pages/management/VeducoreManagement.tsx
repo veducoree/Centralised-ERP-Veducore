@@ -37,7 +37,7 @@ interface SchoolRecord {
 
 // ── Auth Screen (Setup + Login) ────────────────────────────────────────────────
 
-type AuthMode = 'checking' | 'setup' | 'login';
+type AuthMode = 'checking' | 'setup' | 'login' | 'verify-pending';
 
 function AuthScreen({ onLogin }: { onLogin: (fullName: string) => void }) {
   const [mode, setMode]           = useState<AuthMode>('checking');
@@ -48,6 +48,7 @@ function AuthScreen({ onLogin }: { onLogin: (fullName: string) => void }) {
   const [showPw, setShowPw]       = useState(false);
   const [error, setError]         = useState('');
   const [loading, setLoading]     = useState(false);
+  const [pendingEmail, setPendingEmail] = useState('');
 
   // On mount: check if setup is done
   useEffect(() => {
@@ -65,7 +66,9 @@ function AuthScreen({ onLogin }: { onLogin: (fullName: string) => void }) {
     const res = await callMgmt({ action: 'setup', email, password, full_name: fullName });
     setLoading(false);
     if (res.error) { setError(res.error as string); return; }
-    onLogin(res.full_name as string);
+    // Account created — show verify pending screen
+    setPendingEmail(email);
+    setMode('verify-pending');
   }
 
   async function handleLogin(e: React.FormEvent) {
@@ -84,6 +87,36 @@ function AuthScreen({ onLogin }: { onLogin: (fullName: string) => void }) {
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
           <p className="text-sm text-gray-500">Checking setup status...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Email verification pending ─────────────────────────────────────────────
+  if (mode === 'verify-pending') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md text-center">
+          <img src={veducoreLogo} alt="Veducore" className="h-10 w-auto mx-auto mb-6 object-contain" />
+          <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 mx-auto mb-4">
+              <CheckCircle className="h-8 w-8 text-blue-600" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Check your email</h2>
+            <p className="text-sm text-gray-500 mb-1">
+              A verification link has been sent to:
+            </p>
+            <p className="text-sm font-semibold text-blue-700 mb-4">{pendingEmail}</p>
+            <p className="text-sm text-gray-500 mb-6">
+              Click the link in the email to activate your Veducore Management account. Then come back here to login.
+            </p>
+            <button
+              onClick={() => { setMode('login'); setEmail(pendingEmail); setPassword(''); setError(''); }}
+              className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+            >
+              Go to Login
+            </button>
+          </div>
         </div>
       </div>
     );
