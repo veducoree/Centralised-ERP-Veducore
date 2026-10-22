@@ -37,7 +37,7 @@ ALTER TABLE holidays ENABLE ROW LEVEL SECURITY;
 -- Trigger: keep updated_at current
 CREATE TRIGGER set_updated_at_holidays
   BEFORE UPDATE ON holidays
-  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Policies
 DROP POLICY IF EXISTS "holidays_admin_all" ON holidays;
@@ -80,7 +80,7 @@ CREATE INDEX IF NOT EXISTS idx_exam_defs_section_id  ON exam_defs (section_id);
 -- Trigger
 CREATE TRIGGER set_updated_at_exam_defs
   BEFORE UPDATE ON exam_defs
-  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Policies
 DROP POLICY IF EXISTS "exam_defs_select_school" ON exam_defs;
@@ -170,7 +170,7 @@ ALTER TABLE fee_structures ENABLE ROW LEVEL SECURITY;
 -- Trigger
 CREATE TRIGGER set_updated_at_fee_structures
   BEFORE UPDATE ON fee_structures
-  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Policies
 DROP POLICY IF EXISTS "fee_structures_admin_all" ON fee_structures;
@@ -200,7 +200,7 @@ ALTER TABLE payment_setups ENABLE ROW LEVEL SECURITY;
 -- Trigger
 CREATE TRIGGER set_updated_at_payment_setups
   BEFORE UPDATE ON payment_setups
-  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Policies
 DROP POLICY IF EXISTS "payment_setups_admin_all" ON payment_setups;
