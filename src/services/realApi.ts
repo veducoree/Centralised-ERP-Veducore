@@ -4,6 +4,7 @@ import type {
   ClassAssignment, TeacherSchedule, Attendance, StudentRecord,
   Remark, FeeType, Fee, FeePayment, Notification, AuditLog,
   ParentStudent, School, Profile,
+  Holiday, ExamDef, FeeStructure, PaymentSetup,
 } from '@/types';
 
 export async function fetchSchool(schoolId: string) {
@@ -787,4 +788,168 @@ export async function removeSubjectTeacher(sectionId: string, subjectId: string)
     .eq('section_id', sectionId)
     .eq('subject_id', subjectId);
   if (error) throw error;
+}
+
+// ============================================================
+// HOLIDAYS
+// ============================================================
+export async function fetchHolidays(schoolId: string) {
+  const { data, error } = await supabase
+    .from('holidays')
+    .select('*')
+    .eq('school_id', schoolId)
+    .order('date');
+  if (error) throw error;
+  return data as Holiday[];
+}
+
+export async function createHoliday(holiday: {
+  school_id: string;
+  date: string;
+  type: 'working' | 'holiday' | 'festival';
+  label?: string | null;
+}) {
+  const { data, error } = await supabase
+    .from('holidays')
+    .insert(holiday)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data as Holiday | null;
+}
+
+export async function updateHoliday(id: string, updates: Partial<Holiday>) {
+  const { data, error } = await supabase
+    .from('holidays')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data as Holiday | null;
+}
+
+export async function deleteHoliday(id: string) {
+  const { error } = await supabase.from('holidays').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ============================================================
+// EXAM DEFS
+// ============================================================
+export async function fetchExamDefs(filters: { schoolId?: string; sectionId?: string }) {
+  let query = supabase
+    .from('exam_defs')
+    .select('*')
+    .order('date', { ascending: false });
+
+  if (filters.schoolId) query = query.eq('school_id', filters.schoolId);
+  if (filters.sectionId) query = query.eq('section_id', filters.sectionId);
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return data as ExamDef[];
+}
+
+export async function createExamDef(examDef: {
+  school_id: string;
+  section_id: string;
+  exam_name: string;
+  record_type: string;
+  max_marks?: number;
+  date?: string;
+  created_by_teacher_id?: string;
+}) {
+  const { data, error } = await supabase
+    .from('exam_defs')
+    .insert(examDef)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data as ExamDef | null;
+}
+
+export async function deleteExamDef(id: string) {
+  const { error } = await supabase.from('exam_defs').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ============================================================
+// FEE STRUCTURES
+// ============================================================
+export async function fetchFeeStructures(schoolId: string) {
+  const { data, error } = await supabase
+    .from('fee_structures')
+    .select('*')
+    .eq('school_id', schoolId)
+    .order('name');
+  if (error) throw error;
+  return data as FeeStructure[];
+}
+
+export async function createFeeStructure(feeStructure: {
+  school_id: string;
+  name: string;
+  fee_type: string;
+  class_id?: string | null;
+  amount: number;
+  frequency: 'one_time' | 'monthly' | 'quarterly' | 'annual';
+  due_day?: number | null;
+  academic_year?: string;
+  is_active?: boolean;
+}) {
+  const { data, error } = await supabase
+    .from('fee_structures')
+    .insert(feeStructure)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data as FeeStructure | null;
+}
+
+export async function updateFeeStructure(id: string, updates: Partial<FeeStructure>) {
+  const { data, error } = await supabase
+    .from('fee_structures')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data as FeeStructure | null;
+}
+
+export async function deleteFeeStructure(id: string) {
+  const { error } = await supabase.from('fee_structures').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ============================================================
+// PAYMENT SETUP
+// ============================================================
+export async function fetchPaymentSetup(schoolId: string) {
+  const { data, error } = await supabase
+    .from('payment_setups')
+    .select('*')
+    .eq('school_id', schoolId)
+    .maybeSingle();
+  if (error) throw error;
+  return data as PaymentSetup | null;
+}
+
+export async function upsertPaymentSetup(setup: {
+  school_id: string;
+  razorpay_key_id?: string;
+  account_holder_name?: string;
+  bank_name?: string;
+  account_number?: string;
+  ifsc_code?: string;
+  is_verified?: boolean;
+}) {
+  const { data, error } = await supabase
+    .from('payment_setups')
+    .upsert(setup, { onConflict: 'school_id' })
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data as PaymentSetup | null;
 }

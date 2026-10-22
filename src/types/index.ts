@@ -17,6 +17,16 @@ export interface ExamDef {
   created_by_teacher_id: string;
 }
 
+export interface Holiday {
+  id: string;
+  school_id: string;
+  date: string;
+  type: 'working' | 'holiday' | 'festival';
+  label: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface School {
   id: string;
   name: string;

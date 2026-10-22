@@ -53,7 +53,7 @@ function MonthlyFeeGroup({
     const fee = byMonth.get(month);
     if (!fee) return 'bg-gray-100 text-gray-400';
     if (fee.status === 'paid') return 'bg-green-100 text-green-700';
-    if (fee.status === 'overdue' || (fee.due_date && new Date(fee.due_date) < new Date() && fee.status !== 'paid'))
+    if (fee.status === 'overdue' || (fee.due_date && new Date(fee.due_date) < new Date() && (fee.status as string) !== 'paid'))
       return 'bg-red-100 text-red-600';
     return 'bg-amber-100 text-amber-700';
   }

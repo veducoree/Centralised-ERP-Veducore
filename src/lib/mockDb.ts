@@ -2,7 +2,7 @@ import type {
   School, Teacher, Parent, Student, Class, Section, Subject,
   ClassAssignment, TeacherSchedule, Attendance, StudentRecord,
   Remark, FeeType, Fee, FeePayment, Notification, AuditLog,
-  ParentStudent, Profile,
+  ParentStudent, Profile, Holiday, ExamDef, FeeStructure, PaymentSetup,
 } from '@/types';
 import {
   MOCK_SCHOOL,
@@ -18,7 +18,8 @@ type TableName =
   | 'schools' | 'teachers' | 'parents' | 'students' | 'classes'
   | 'sections' | 'subjects' | 'class_assignments' | 'teacher_schedules'
   | 'attendance' | 'student_records' | 'remarks' | 'fee_types' | 'fees'
-  | 'fee_payments' | 'notifications' | 'audit_logs' | 'parent_students' | 'profiles';
+  | 'fee_payments' | 'notifications' | 'audit_logs' | 'parent_students' | 'profiles'
+  | 'holidays' | 'exam_defs' | 'fee_structures' | 'payment_setups';
 
 const STORAGE_PREFIX = 'mock_db_';
 // Bump this key whenever you add new seed records so existing installs re-seed.
@@ -313,11 +314,16 @@ const SEED_DATA: Record<TableName, unknown[]> = {
       updated_at: '2026-01-01T00:00:00Z',
     },
   ],
+  holidays: [],
+  exam_defs: [],
+  fee_structures: [],
+  payment_setups: [],
 };
 
 // Suppress unused import warnings — these types are used via SEED_DATA shape inference
 type _Unused = School | ClassAssignment | TeacherSchedule | Attendance | StudentRecord
-  | Remark | FeeType | Fee | FeePayment | Notification | AuditLog | ParentStudent | Profile;
+  | Remark | FeeType | Fee | FeePayment | Notification | AuditLog | ParentStudent | Profile
+  | Holiday | ExamDef | FeeStructure | PaymentSetup;
 
 class MockDB {
   private getTable<T>(table: TableName): T[] {

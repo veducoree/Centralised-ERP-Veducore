@@ -3,6 +3,7 @@ import type {
   Teacher, Parent, Student, Class, Section, Subject,
   ClassAssignment, TeacherSchedule, Attendance, StudentRecord,
   Remark, FeeType, Fee, FeePayment, ParentStudent, School, Profile,
+  Holiday, ExamDef, FeeStructure, PaymentSetup,
 } from '@/types';
 // Alias to avoid conflict with browser global Notification
 import type { Notification as AppNotification } from '@/types';
@@ -776,4 +777,141 @@ export async function unlinkParentStudent(id: string): Promise<void> {
 
 export async function updateProfile(id: string, updates: Partial<Profile>): Promise<Profile | null> {
   return mockDb.update<Profile>('profiles', id, updates);
+}
+
+// ─── Holidays ───────────────────────────────────────────────────────────────
+
+export async function fetchHolidays(schoolId: string): Promise<Holiday[]> {
+  return mockDb.query<Holiday>('holidays', { school_id: schoolId })
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+export async function createHoliday(holiday: {
+  school_id: string;
+  date: string;
+  type: 'working' | 'holiday' | 'festival';
+  label?: string | null;
+}): Promise<Holiday | null> {
+  return mockDb.insert<Holiday>('holidays', {
+    school_id: holiday.school_id,
+    date: holiday.date,
+    type: holiday.type,
+    label: holiday.label ?? null,
+  });
+}
+
+export async function updateHoliday(id: string, updates: Partial<Holiday>): Promise<Holiday | null> {
+  return mockDb.update<Holiday>('holidays', id, updates);
+}
+
+export async function deleteHoliday(id: string): Promise<void> {
+  mockDb.delete('holidays', id);
+}
+
+// ─── Exam Defs ───────────────────────────────────────────────────────────────
+
+export async function fetchExamDefs(filters: {
+  schoolId?: string;
+  sectionId?: string;
+}): Promise<ExamDef[]> {
+  let rows = mockDb.getAll<ExamDef>('exam_defs');
+  if (filters.schoolId) rows = rows.filter(r => r.school_id === filters.schoolId);
+  if (filters.sectionId) rows = rows.filter(r => r.section_id === filters.sectionId);
+  return rows.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export async function createExamDef(examDef: {
+  school_id: string;
+  section_id: string;
+  exam_name: string;
+  record_type: string;
+  max_marks?: number;
+  date?: string;
+  created_by_teacher_id?: string;
+}): Promise<ExamDef | null> {
+  return mockDb.insert<ExamDef>('exam_defs', {
+    school_id: examDef.school_id,
+    section_id: examDef.section_id,
+    exam_name: examDef.exam_name,
+    record_type: examDef.record_type,
+    max_marks: examDef.max_marks ?? 100,
+    date: examDef.date ?? new Date().toISOString().slice(0, 10),
+    created_by_teacher_id: examDef.created_by_teacher_id ?? '',
+  });
+}
+
+export async function deleteExamDef(id: string): Promise<void> {
+  mockDb.delete('exam_defs', id);
+}
+
+// ─── Fee Structures ──────────────────────────────────────────────────────────
+
+export async function fetchFeeStructures(schoolId: string): Promise<FeeStructure[]> {
+  return mockDb.query<FeeStructure>('fee_structures', { school_id: schoolId })
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function createFeeStructure(feeStructure: {
+  school_id: string;
+  name: string;
+  fee_type: string;
+  class_id?: string | null;
+  amount: number;
+  frequency: 'one_time' | 'monthly' | 'quarterly' | 'annual';
+  due_day?: number | null;
+  academic_year?: string;
+  is_active?: boolean;
+}): Promise<FeeStructure | null> {
+  return mockDb.insert<FeeStructure>('fee_structures', {
+    school_id: feeStructure.school_id,
+    name: feeStructure.name,
+    fee_type: feeStructure.fee_type,
+    class_id: feeStructure.class_id ?? null,
+    amount: feeStructure.amount,
+    frequency: feeStructure.frequency,
+    due_day: feeStructure.due_day ?? null,
+    academic_year: feeStructure.academic_year ?? '2025-2026',
+    is_active: feeStructure.is_active ?? true,
+  });
+}
+
+export async function updateFeeStructure(
+  id: string,
+  updates: Partial<FeeStructure>
+): Promise<FeeStructure | null> {
+  return mockDb.update<FeeStructure>('fee_structures', id, updates);
+}
+
+export async function deleteFeeStructure(id: string): Promise<void> {
+  mockDb.delete('fee_structures', id);
+}
+
+// ─── Payment Setup ───────────────────────────────────────────────────────────
+
+export async function fetchPaymentSetup(schoolId: string): Promise<PaymentSetup | null> {
+  return mockDb.query<PaymentSetup>('payment_setups', { school_id: schoolId })[0] ?? null;
+}
+
+export async function upsertPaymentSetup(setup: {
+  school_id: string;
+  razorpay_key_id?: string;
+  account_holder_name?: string;
+  bank_name?: string;
+  account_number?: string;
+  ifsc_code?: string;
+  is_verified?: boolean;
+}): Promise<PaymentSetup | null> {
+  const existing = mockDb.query<PaymentSetup>('payment_setups', { school_id: setup.school_id })[0];
+  if (existing) {
+    return mockDb.update<PaymentSetup>('payment_setups', existing.id, setup as Partial<PaymentSetup>);
+  }
+  return mockDb.insert<PaymentSetup>('payment_setups', {
+    school_id: setup.school_id,
+    razorpay_key_id: setup.razorpay_key_id ?? '',
+    account_holder_name: setup.account_holder_name ?? '',
+    bank_name: setup.bank_name ?? '',
+    account_number: setup.account_number ?? '',
+    ifsc_code: setup.ifsc_code ?? '',
+    is_verified: setup.is_verified ?? false,
+  });
 }
