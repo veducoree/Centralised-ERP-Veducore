@@ -20,7 +20,6 @@ import AdminTracking from '@/pages/admin/AdminTracking';
 import AdminNotifications from '@/pages/admin/AdminNotifications';
 import AdminSettings from '@/pages/admin/AdminSettings';
 import AdminIDCard from '@/pages/admin/AdminIDCard';
-import AdminIDCardGenerator from '@/pages/admin/AdminIDCardGenerator';
 import AdminDocuments from '@/pages/admin/AdminDocuments';
 import AdminHolidays from '@/pages/admin/AdminHolidays';
 import ProfilePage from '@/pages/shared/ProfilePage';
@@ -58,6 +57,13 @@ function App() {
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<LoginPage />} />
 
+            {/* Root Section Redirects */}
+            <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="/teacher" element={<Navigate to="/teacher/dashboard" replace />} />
+            <Route path="/parent" element={<Navigate to="/parent/dashboard" replace />} />
+            <Route path="/management" element={<Navigate to="/veducore/management" replace />} />
+            <Route path="/veducore" element={<Navigate to="/veducore/management" replace />} />
+
             {/* Admin routes */}
             <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
             <Route path="/admin/students" element={<ProtectedRoute allowedRoles={['admin']}><AdminStudents /></ProtectedRoute>} />
@@ -71,7 +77,7 @@ function App() {
             <Route path="/admin/assignments" element={<ProtectedRoute allowedRoles={['admin']}><AdminAssignments /></ProtectedRoute>} />
             <Route path="/admin/tracking" element={<ProtectedRoute allowedRoles={['admin']}><AdminTracking /></ProtectedRoute>} />
             <Route path="/admin/id-cards" element={<ProtectedRoute allowedRoles={['admin']}><AdminIDCard /></ProtectedRoute>} />
-            <Route path="/admin/id-cards/generate" element={<ProtectedRoute allowedRoles={['admin']}><AdminIDCardGenerator /></ProtectedRoute>} />
+            <Route path="/admin/id-cards/generate" element={<Navigate to="/admin/id-cards" replace />} />
             <Route path="/admin/documents" element={<ProtectedRoute allowedRoles={['admin']}><AdminDocuments /></ProtectedRoute>} />
             <Route path="/admin/holidays" element={<ProtectedRoute allowedRoles={['admin']}><AdminHolidays /></ProtectedRoute>} />
             <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={['admin']}><AdminNotifications /></ProtectedRoute>} />

@@ -74,6 +74,8 @@ Deno.serve(async (req: Request) => {
         timezone: "Asia/Kolkata",
         currency: "INR",
         currency_symbol: "₹",
+        admin_password_reference: admin_password,
+        status: "Active",
       })
       .select()
       .maybeSingle();

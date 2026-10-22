@@ -3,41 +3,24 @@ import { KeyRound, Eye, EyeOff } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Form';
 import { Modal } from '@/components/ui/Modal';
 import { PageHeader } from '@/components/ui/Primitives';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
-import {
-  updateProfile,
-  fetchTeacherByUserId,
-  fetchSchool,
-} from '@/services/api';
+import { fetchTeacherByUserId, fetchSchool } from '@/services/api';
 import { supabase } from '@/lib/supabase';
 import { getInitials } from '@/lib/utils';
 import { generateTeacherUsername } from '@/lib/parentUtils';
 import type { Teacher, School } from '@/types';
 
 export default function ProfilePage() {
-  const { profile, refreshProfile } = useAuth();
+  const { profile } = useAuth();
   const toast = useToast();
-
-  const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    full_name: profile?.full_name || '',
-    phone: profile?.phone || '',
-  });
 
   const [teacher, setTeacher] = useState<Teacher | null>(null);
   const [school, setSchool] = useState<School | null>(null);
 
-  // Change password modal state
-  const [pwModalOpen, setPwModalOpen] = useState(false);
-  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
-  const [pwSaving, setPwSaving] = useState(false);
-  const [showCurrent, setShowCurrent] = useState(false);
-  const [showNext, setShowNext] = useState(false);
-
+  // Fetch school & teacher info
   useEffect(() => {
     if (!profile) return;
     if (profile.school_id) {
@@ -46,28 +29,14 @@ export default function ProfilePage() {
     if (profile.role === 'teacher') {
       fetchTeacherByUserId(profile.id).then(setTeacher).catch(() => {});
     }
-  }, [profile?.id, profile?.school_id, profile?.role]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [profile?.id, profile?.school_id, profile?.role]);
 
-  // Keep form in sync when profile loads
-  useEffect(() => {
-    if (profile) {
-      setForm({ full_name: profile.full_name || '', phone: profile.phone || '' });
-    }
-  }, [profile?.full_name, profile?.phone]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  async function handleSave() {
-    if (!profile) return;
-    setSaving(true);
-    try {
-      await updateProfile(profile.id, { full_name: form.full_name, phone: form.phone });
-      toast('Profile updated successfully', 'success');
-      refreshProfile();
-    } catch {
-      toast('Failed to update profile', 'error');
-    } finally {
-      setSaving(false);
-    }
-  }
+  // Change password modal state
+  const [pwModalOpen, setPwModalOpen] = useState(false);
+  const [pwForm, setPwForm] = useState({ current: '', next: '', confirm: '' });
+  const [pwSaving, setPwSaving] = useState(false);
+  const [showCurrent, setShowCurrent] = useState(false);
+  const [showNext, setShowNext] = useState(false);
 
   function openPwModal() {
     setPwForm({ current: '', next: '', confirm: '' });
@@ -144,48 +113,98 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          {/* Form fields */}
+          {/* Institutional Credentials Grid (Non-editable as requested) */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <Input
-              label="Full Name"
-              value={form.full_name}
-              onChange={(e) => setForm({ ...form, full_name: e.target.value })}
-            />
-            <Input
-              label="Email / Username"
-              value={displayUsername}
-              disabled
-              hint="Your login identifier — cannot be changed"
-            />
-            <Input
-              label="Phone"
-              value={form.phone}
-              onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            />
-            <Input label="Role" value={roleLabel} disabled />
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Full Name
+              </label>
+              <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50/75 px-3.5 py-2.5 text-sm font-medium text-gray-900 shadow-sm">
+                <span>{profile.full_name}</span>
+                <span className="ml-auto text-[11px] font-semibold text-gray-400">Verified</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Login Identifier (Email / Username)
+              </label>
+              <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50/75 px-3.5 py-2.5 text-sm font-mono text-blue-700 shadow-sm">
+                <span className="truncate">{displayUsername}</span>
+                <span className="ml-auto text-[11px] font-semibold text-gray-400 flex-shrink-0">Locked</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Contact Number
+              </label>
+              <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50/75 px-3.5 py-2.5 text-sm font-medium text-gray-900 shadow-sm">
+                <span>{profile.phone || school?.contact_number || 'Not Provided'}</span>
+                <span className="ml-auto text-[11px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded px-1.5 py-0.5">
+                  Verified Contact
+                </span>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                Institutional Role
+              </label>
+              <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50/75 px-3.5 py-2.5 text-sm font-medium text-gray-900 shadow-sm">
+                <span>{roleLabel}</span>
+                <span className="ml-auto text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded px-1.5 py-0.5">
+                  {school?.name || 'Veducore Platform'}
+                </span>
+              </div>
+            </div>
+
             {profile.role === 'teacher' && teacher && (
               <>
-                <Input label="Employee ID" value={teacher.employee_id} disabled />
-                <Input label="Subject" value={teacher.subject ?? ''} disabled />
-                <Input label="Qualification" value={teacher.qualification ?? ''} disabled />
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Employee ID
+                  </label>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50/75 px-3.5 py-2.5 text-sm font-mono text-gray-800 shadow-sm">
+                    {teacher.employee_id}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Primary Subject
+                  </label>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50/75 px-3.5 py-2.5 text-sm text-gray-800 shadow-sm">
+                    {teacher.subject ?? 'General'}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                    Academic Qualification
+                  </label>
+                  <div className="rounded-lg border border-gray-200 bg-gray-50/75 px-3.5 py-2.5 text-sm text-gray-800 shadow-sm">
+                    {teacher.qualification ?? 'Certified Faculty'}
+                  </div>
+                </div>
               </>
             )}
           </div>
 
-          {/* Actions */}
-          <div className="mt-6 flex items-center justify-between">
-            {isTeacherOrParent ? (
-              <Button
-                variant="outline"
-                icon={<KeyRound className="h-4 w-4" />}
-                onClick={openPwModal}
-              >
-                Change Password
-              </Button>
-            ) : (
-              <div />
-            )}
-            <Button onClick={handleSave} loading={saving}>Save Changes</Button>
+          {/* Info Banner */}
+          <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs text-blue-800 flex items-center justify-between">
+            <p>
+              Institutional records, mobile numbers, and login credentials are centrally managed by the school administration and cannot be edited directly.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<KeyRound className="h-4 w-4" />}
+              onClick={openPwModal}
+              className="bg-white hover:bg-gray-50 flex-shrink-0 ml-4 shadow-sm"
+            >
+              Change Password
+            </Button>
           </div>
         </Card>
       </div>

@@ -38,6 +38,10 @@ export interface School {
   timezone: string;
   currency: string;
   currency_symbol: string;
+  motto?: string | null;
+  affiliation_board?: string | null;
+  affiliation_code?: string | null;
+  settings?: Record<string, any> | null;
   created_at: string;
   updated_at: string;
 }

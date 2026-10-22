@@ -64,9 +64,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchProfile]);
 
   const signIn = async (identifier: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email: identifier, password });
-    if (error) return { error: error.message };
-    return { error: null };
+    const raw = identifier.trim();
+    const pw = password.trim();
+    const emailsToTry = [raw];
+    if (!raw.includes('@')) {
+      emailsToTry.push(`${raw}@veducore.internal`);
+    }
+
+    let lastError: string | null = null;
+    for (const email of emailsToTry) {
+      const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
+      if (!error) return { error: null };
+      lastError = error.message;
+    }
+    return { error: lastError };
   };
 
   const signOut = async () => {

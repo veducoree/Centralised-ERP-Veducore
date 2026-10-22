@@ -155,13 +155,16 @@ export function DashboardLayout({ children, title }: { children: ReactNode; titl
 
   useEffect(() => {
     if (!profile?.school_id) return;
-    fetchSchool(profile.school_id).then((s) => { if (s) setSchool(s); }).catch(() => {});
+    let isCancelled = false;
+    fetchSchool(profile.school_id)
+      .then((s) => {
+        if (!isCancelled && s) setSchool(s);
+      })
+      .catch(() => {});
+    return () => {
+      isCancelled = true;
+    };
   }, [profile?.school_id]);
-
-  useEffect(() => {
-    if (!profile?.school_id) return;
-    fetchSchool(profile.school_id).then((s) => { if (s) setSchool(s); }).catch(() => {});
-  }, [location.pathname, profile?.school_id]);
 
   const handleSignOut = async () => {
     await signOut();

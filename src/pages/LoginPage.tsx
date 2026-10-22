@@ -135,14 +135,14 @@ export default function LoginPage() {
             {/* Username */}
             <div>
               <label htmlFor="identifier" className="mb-1.5 block text-sm font-medium text-gray-700">
-                Username
+                Username or Email
               </label>
               <input
                 id="identifier"
                 type="text"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="Enter your username"
+                placeholder="Enter your username or email"
                 autoComplete="username"
                 className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                 disabled={loading}

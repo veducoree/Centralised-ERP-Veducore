@@ -133,6 +133,7 @@ Deno.serve(async (req: Request) => {
         subject: extra?.subject || null,
         date_of_joining: extra?.date_of_joining || new Date().toISOString().split("T")[0],
         status: "active",
+        password,
       });
       if (teacherErr) {
         console.error("Teacher insert error:", teacherErr);
@@ -147,6 +148,7 @@ Deno.serve(async (req: Request) => {
         occupation: extra?.occupation || null,
         address: extra?.address || null,
         status: "active",
+        password,
       });
       if (parentErr) {
         console.error("Parent insert error:", parentErr);
@@ -164,7 +166,13 @@ Deno.serve(async (req: Request) => {
     });
 
     return new Response(
-      JSON.stringify({ id: newUserId, email, message: `${role} account created successfully` }),
+      JSON.stringify({
+        id: newUserId,
+        email,
+        username: email,
+        password,
+        message: `${role} account created successfully`,
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {

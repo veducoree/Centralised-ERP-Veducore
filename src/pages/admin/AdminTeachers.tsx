@@ -42,6 +42,7 @@ export default function AdminTeachers() {
   const [schoolLoaded, setSchoolLoaded] = useState(false);
 
   function getUsername(t: Teacher): string {
+    if (t.email) return t.email;
     return generateTeacherUsername(t.full_name, school?.name ?? '');
   }
 
@@ -110,7 +111,7 @@ export default function AdminTeachers() {
 
   function openCredentials(t: Teacher) {
     setCredTeacher(t);
-    setCredVisible(false);
+    setCredVisible(true);
     setCredCopied(false);
   }
 
@@ -129,7 +130,7 @@ export default function AdminTeachers() {
     if (!validate() || !profile?.school_id) return;
     setSaving(true);
     try {
-      await createTeacherAccount({
+      const res = await createTeacherAccount({
         email: form.username,   // username IS the login identifier
         password: form.password,
         full_name: form.full_name,
@@ -142,6 +143,26 @@ export default function AdminTeachers() {
       });
       toast('Teacher account created successfully', 'success');
       setModalOpen(false);
+
+      // Immediately display credentials modal with username and password visible
+      const newTeacher: Teacher = {
+        id: res?.id || `teacher-${Date.now()}`,
+        school_id: profile.school_id,
+        user_id: res?.id,
+        full_name: form.full_name,
+        email: form.username,
+        employee_id: form.employee_id,
+        phone: form.phone || '',
+        qualification: form.qualification || '',
+        subject: form.subject || '',
+        date_of_joining: form.date_of_joining || '',
+        status: 'active',
+        password: form.password,
+      };
+      setCredTeacher(newTeacher);
+      setCredVisible(true);
+      setCredCopied(false);
+
       loadData();
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to create teacher';
@@ -396,16 +417,19 @@ export default function AdminTeachers() {
       >
         {credTeacher && (
           <div className="space-y-4">
-            <div className="rounded-lg bg-gray-50 px-4 py-3 space-y-3">
-              <div className="flex items-center justify-between">
+            <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4 space-y-3">
+              <div className="flex items-center justify-between pb-3 border-b border-blue-100/60">
                 <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Username</p>
-                  <p className="font-mono text-sm font-medium text-blue-700">{getUsername(credTeacher)}</p>
+                  <p className="text-xs font-medium text-gray-500 mb-0.5">Username</p>
+                  <p className="font-mono text-sm font-semibold text-blue-700">{getUsername(credTeacher)}</p>
                 </div>
                 <button
                   type="button"
-                  onClick={() => { navigator.clipboard.writeText(getUsername(credTeacher)); }}
-                  className="rounded p-1.5 text-gray-400 hover:text-blue-600 transition-colors"
+                  onClick={() => {
+                    navigator.clipboard.writeText(getUsername(credTeacher));
+                    toast('Username copied', 'success');
+                  }}
+                  className="rounded-lg p-1.5 bg-white shadow-sm border border-gray-200 text-gray-500 hover:text-blue-600 hover:border-blue-300 transition-all"
                   title="Copy username"
                 >
                   <Copy className="h-4 w-4" />
@@ -413,16 +437,16 @@ export default function AdminTeachers() {
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-gray-500 mb-0.5">Password</p>
-                  <p className="font-mono text-sm font-medium text-gray-800">
-                    {credVisible ? (credTeacher.password ?? '(not stored)') : '••••••••'}
+                  <p className="text-xs font-medium text-gray-500 mb-0.5">Password</p>
+                  <p className="font-mono text-sm font-semibold text-gray-900 tracking-wide">
+                    {credVisible ? (credTeacher.password || '(not stored)') : '••••••••'}
                   </p>
                 </div>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setCredVisible(v => !v)}
-                    className="rounded p-1.5 text-gray-400 hover:text-gray-700 transition-colors"
+                    className="rounded-lg p-1.5 bg-white shadow-sm border border-gray-200 text-gray-500 hover:text-gray-800 hover:border-gray-300 transition-all"
                     title={credVisible ? 'Hide' : 'Show'}
                   >
                     {credVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -433,9 +457,10 @@ export default function AdminTeachers() {
                       const pw = credTeacher.password ?? '';
                       navigator.clipboard.writeText(pw);
                       setCredCopied(true);
+                      toast('Password copied', 'success');
                       setTimeout(() => setCredCopied(false), 1500);
                     }}
-                    className="rounded p-1.5 text-gray-400 hover:text-blue-600 transition-colors"
+                    className="rounded-lg p-1.5 bg-white shadow-sm border border-gray-200 text-gray-500 hover:text-blue-600 hover:border-blue-300 transition-all"
                     title="Copy password"
                   >
                     {credCopied ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
@@ -443,6 +468,18 @@ export default function AdminTeachers() {
                 </div>
               </div>
             </div>
+
+            <Button
+              variant="outline"
+              className="w-full flex items-center justify-center gap-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium shadow-sm"
+              onClick={() => {
+                const text = `Teacher Login Credentials\nSchool: ${school?.name || 'Veducore School'}\nTeacher: ${credTeacher.full_name}\nUsername: ${getUsername(credTeacher)}\nPassword: ${credTeacher.password || ''}`;
+                navigator.clipboard.writeText(text);
+                toast('Username & Password copied to clipboard', 'success');
+              }}
+            >
+              <Copy className="h-4 w-4" /> Copy All Credentials
+            </Button>
           </div>
         )}
       </Modal>

@@ -80,20 +80,25 @@ export default function AdminDashboard() {
       });
       setRecentActivity(logs.data as RecentActivity[] || []);
 
-      // Attendance trend for last 5 days
+      // Attendance trend for last 5 days (single batched query)
       const dates: string[] = [];
       for (let i = 1; i <= 5; i++) {
         const d = new Date();
         d.setDate(d.getDate() - i);
         dates.push(d.toISOString().split('T')[0]);
       }
-      const attData = await Promise.all(
-        dates.map(async (date) => {
-          const { count: present } = await supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('school_id', sid).eq('attendance_date', date).eq('status', 'present');
-          const { count: absent } = await supabase.from('attendance').select('id', { count: 'exact', head: true }).eq('school_id', sid).eq('attendance_date', date).eq('status', 'absent');
-          return { date, present: present || 0, absent: absent || 0 };
-        })
-      );
+      const { data: trendRows } = await supabase
+        .from('attendance')
+        .select('attendance_date, status')
+        .eq('school_id', sid)
+        .in('attendance_date', dates);
+
+      const attData = dates.map((date) => {
+        const dayRows = trendRows?.filter((r) => r.attendance_date === date) || [];
+        const present = dayRows.filter((r) => r.status === 'present').length;
+        const absent = dayRows.filter((r) => r.status === 'absent').length;
+        return { date, present, absent };
+      });
       setAttendanceTrend(attData);
     } catch (err) {
       console.error('Dashboard load error:', err);
