@@ -1,8 +1,45 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth, getDashboardPath } from '@/auth/AuthContext';
 import veducoreLogo from '@/assets/veducore-logo.png';
+
+// ── Math Captcha ──────────────────────────────────────────────────────────────
+
+interface CaptchaState {
+  a: number;
+  b: number;
+  op: '+' | '-' | '×';
+  answer: number;
+}
+
+function generateCaptcha(): CaptchaState {
+  const ops: Array<'+' | '-' | '×'> = ['+', '-', '×'];
+  const op = ops[Math.floor(Math.random() * ops.length)];
+  let a: number, b: number, answer: number;
+
+  switch (op) {
+    case '+':
+      a = Math.floor(Math.random() * 20) + 1;
+      b = Math.floor(Math.random() * 20) + 1;
+      answer = a + b;
+      break;
+    case '-':
+      a = Math.floor(Math.random() * 20) + 10;
+      b = Math.floor(Math.random() * a) + 1;
+      answer = a - b;
+      break;
+    case '×':
+      a = Math.floor(Math.random() * 9) + 2;
+      b = Math.floor(Math.random() * 9) + 2;
+      answer = a * b;
+      break;
+  }
+
+  return { a, b, op, answer };
+}
+
+// ── Login Page ────────────────────────────────────────────────────────────────
 
 export default function LoginPage() {
   const { signIn, session, profile, loading: authLoading } = useAuth();
@@ -15,6 +52,17 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Captcha state
+  const [captcha, setCaptcha] = useState<CaptchaState>(generateCaptcha);
+  const [captchaInput, setCaptchaInput] = useState('');
+  const [captchaError, setCaptchaError] = useState(false);
+
+  const refreshCaptcha = useCallback(() => {
+    setCaptcha(generateCaptcha());
+    setCaptchaInput('');
+    setCaptchaError(false);
+  }, []);
+
   // Redirect if already authenticated
   useEffect(() => {
     if (!authLoading && session && profile) {
@@ -26,9 +74,18 @@ export default function LoginPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    setCaptchaError(false);
 
     if (!identifier || !password) {
-      setError('Please enter both email/username and password.');
+      setError('Please enter both username and password.');
+      return;
+    }
+
+    // Verify captcha
+    if (parseInt(captchaInput, 10) !== captcha.answer) {
+      setCaptchaError(true);
+      setCaptchaInput('');
+      refreshCaptcha();
       return;
     }
 
@@ -37,8 +94,10 @@ export default function LoginPage() {
     setLoading(false);
 
     if (signInError) {
+      // Refresh captcha on failed login
+      refreshCaptcha();
       if (signInError.includes('Invalid login')) {
-        setError('Invalid credentials. Please check your email/username and password.');
+        setError('Invalid credentials. Please check your username and password.');
       } else if (signInError.includes('Email not confirmed')) {
         setError('Your account has not been confirmed. Please contact your administrator.');
       } else {
@@ -72,22 +131,25 @@ export default function LoginPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+
+            {/* Username */}
             <div>
               <label htmlFor="identifier" className="mb-1.5 block text-sm font-medium text-gray-700">
-                Email
+                Username
               </label>
               <input
                 id="identifier"
                 type="text"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="Enter your email"
+                placeholder="Enter your username"
                 autoComplete="username"
                 className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                 disabled={loading}
               />
             </div>
 
+            {/* Password */}
             <div>
               <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-gray-700">
                 Password
@@ -113,8 +175,52 @@ export default function LoginPage() {
               </div>
             </div>
 
+            {/* Math Captcha */}
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Security Check
+              </label>
+              <div className={`flex items-center gap-3 rounded-lg border px-3.5 py-2.5 transition-colors ${
+                captchaError
+                  ? 'border-red-300 bg-red-50'
+                  : 'border-gray-300 bg-gray-50'
+              }`}>
+                {/* Math expression */}
+                <span className="select-none font-mono text-sm font-semibold text-gray-800 whitespace-nowrap">
+                  {captcha.a} {captcha.op} {captcha.b} =
+                </span>
+                {/* Answer input */}
+                <input
+                  type="number"
+                  value={captchaInput}
+                  onChange={(e) => {
+                    setCaptchaInput(e.target.value);
+                    setCaptchaError(false);
+                  }}
+                  placeholder="?"
+                  className="w-16 rounded-md border border-gray-300 bg-white px-2 py-1 text-center text-sm font-mono font-medium text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                  disabled={loading}
+                  autoComplete="off"
+                />
+                {/* Refresh captcha */}
+                <button
+                  type="button"
+                  onClick={refreshCaptcha}
+                  disabled={loading}
+                  className="ml-auto rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600 disabled:opacity-40"
+                  title="Get new question"
+                >
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              {captchaError && (
+                <p className="mt-1 text-xs text-red-500">Incorrect answer. A new question has been generated.</p>
+              )}
+            </div>
+
+            {/* Remember me / Forgot password */}
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm text-gray-600">
+              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
                 <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500/30" />
                 Remember me
               </label>
@@ -123,6 +229,7 @@ export default function LoginPage() {
               </Link>
             </div>
 
+            {/* Submit */}
             <button
               type="submit"
               disabled={loading}
@@ -134,7 +241,6 @@ export default function LoginPage() {
           </form>
         </div>
 
-        {/* Footer */}
         <p className="mt-4 text-center text-xs text-gray-400">
           Veducore &middot; Secure access for authorized users only
         </p>
