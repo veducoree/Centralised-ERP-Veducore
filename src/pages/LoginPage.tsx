@@ -32,15 +32,6 @@ export default function LoginPage() {
       return;
     }
 
-    // Validate format: must be an email or a .veducore username
-    const isEmail = identifier.includes('@');
-    const isVeducore = identifier.toLowerCase().endsWith('.veducore');
-
-    if (!isEmail && !isVeducore) {
-      setError('Please enter a valid email or username.');
-      return;
-    }
-
     setLoading(true);
     const { error: signInError } = await signIn(identifier, password);
     setLoading(false);
@@ -83,14 +74,14 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label htmlFor="identifier" className="mb-1.5 block text-sm font-medium text-gray-700">
-                Email / Username
+                Email
               </label>
               <input
                 id="identifier"
                 type="text"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="Enter your email or username"
+                placeholder="Enter your email"
                 autoComplete="username"
                 className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                 disabled={loading}
@@ -143,46 +134,7 @@ export default function LoginPage() {
           </form>
         </div>
 
-        {/* Demo Credentials */}
-        <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
-          <p className="mb-2 text-xs font-semibold text-blue-700">Demo Credentials (click to fill)</p>
-          <div className="space-y-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                setIdentifier('iamaryan721@gmail.com');
-                setPassword('aryan3860');
-              }}
-              className="flex w-full items-center justify-between rounded-lg bg-white px-3 py-2 text-left text-xs hover:bg-blue-50 transition-colors border border-blue-100"
-            >
-              <span className="font-medium text-gray-700">Admin</span>
-              <span className="text-gray-400">iamaryan721@gmail.com / aryan3860</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIdentifier('priya@greenwood.veducore');
-                setPassword('Teacher@123');
-              }}
-              className="flex w-full items-center justify-between rounded-lg bg-white px-3 py-2 text-left text-xs hover:bg-blue-50 transition-colors border border-blue-100"
-            >
-              <span className="font-medium text-gray-700">Teacher (Priya Sharma)</span>
-              <span className="text-gray-400">priya@greenwood.veducore / Teacher@123</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIdentifier('ADM-2024-001@greenwood.veducore');
-                setPassword('aaka2024');
-              }}
-              className="flex w-full items-center justify-between rounded-lg bg-white px-3 py-2 text-left text-xs hover:bg-blue-50 transition-colors border border-blue-100"
-            >
-              <span className="font-medium text-gray-700">Parent (Ramesh Verma)</span>
-              <span className="text-gray-400">ADM-2024-001@greenwood.veducore / aaka2024</span>
-            </button>
-          </div>
-        </div>
-
+        {/* Footer */}
         <p className="mt-4 text-center text-xs text-gray-400">
           Veducore &middot; Secure access for authorized users only
         </p>

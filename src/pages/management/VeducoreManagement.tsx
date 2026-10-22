@@ -24,81 +24,6 @@ interface SchoolRecord {
   idCardTemplate: string | null;
 }
 
-// ── Mock Data ─────────────────────────────────────────────────────────────────
-
-const INITIAL_SCHOOLS: SchoolRecord[] = [
-  {
-    id: 'SCH001',
-    name: 'Delhi Public School',
-    city: 'New Delhi',
-    adminEmail: 'admin@dps.edu.in',
-    adminName: 'Ramesh Sharma',
-    students: 1240,
-    teachers: 68,
-    status: 'Active',
-    joinedDate: '2024-01-15',
-    lastLogin: '2024-12-10',
-    academicYear: '2024-25',
-    idCardTemplate: null,
-  },
-  {
-    id: 'SCH002',
-    name: 'Ryan International School',
-    city: 'Mumbai',
-    adminEmail: 'admin@ryan.edu.in',
-    adminName: 'Priya Menon',
-    students: 980,
-    teachers: 54,
-    status: 'Active',
-    joinedDate: '2024-02-20',
-    lastLogin: '2024-12-09',
-    academicYear: '2024-25',
-    idCardTemplate: 'ryan_template.png',
-  },
-  {
-    id: 'SCH003',
-    name: 'Kendriya Vidyalaya No. 3',
-    city: 'Bangalore',
-    adminEmail: 'admin@kv3.edu.in',
-    adminName: 'Suresh Nair',
-    students: 760,
-    teachers: 42,
-    status: 'Active',
-    joinedDate: '2024-03-05',
-    lastLogin: '2024-12-08',
-    academicYear: '2024-25',
-    idCardTemplate: null,
-  },
-  {
-    id: 'SCH004',
-    name: "St. Mary's Convent School",
-    city: 'Pune',
-    adminEmail: 'admin@stmarys.edu.in',
-    adminName: 'Sister Maria',
-    students: 620,
-    teachers: 35,
-    status: 'Active',
-    joinedDate: '2024-04-12',
-    lastLogin: '2024-11-30',
-    academicYear: '2024-25',
-    idCardTemplate: 'stmarys_id_template.pdf',
-  },
-  {
-    id: 'SCH005',
-    name: 'Sunrise Academy',
-    city: 'Jaipur',
-    adminEmail: 'admin@sunrise.edu.in',
-    adminName: 'Vikram Singh',
-    students: 310,
-    teachers: 22,
-    status: 'Inactive',
-    joinedDate: '2024-05-01',
-    lastLogin: '2024-10-15',
-    academicYear: '2024-25',
-    idCardTemplate: null,
-  },
-];
-
 // ── Login Screen ───────────────────────────────────────────────────────────────
 
 function LoginScreen({ onLogin }: { onLogin: () => void }) {
@@ -498,109 +423,59 @@ function AddSchoolSection({ onAdd }: { onAdd: (school: SchoolRecord) => void }) 
     setSubmitting(true);
     setSubmitError('');
 
-    if (import.meta.env.VITE_MOCK_AUTH === 'true') {
-      // Mock mode: just add to local state
+    try {
+      const mgmtSecret = import.meta.env.VITE_VEDUCORE_MGMT_SECRET ?? 'veducore-internal-2024';
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-school`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${mgmtSecret}`,
+          },
+          body: JSON.stringify({
+            name: form.name,
+            address: form.address || undefined,
+            contact_number: form.contactNumber || undefined,
+            email: form.email,
+            academic_year: form.academicYear || '2025-2026',
+            admin_name: form.adminName,
+            admin_password: form.adminPassword,
+          }),
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok) {
+        setSubmitError(result.error || 'Failed to create school');
+        setSubmitting(false);
+        return;
+      }
+
       const newSchool: SchoolRecord = {
-        id: `SCH${String(Date.now()).slice(-4)}`,
+        id: result.school_id,
         name: form.name,
-        city: form.city || 'N/A',
+        city: form.city || '',
         adminEmail: form.email,
         adminName: form.adminName,
         students: 0,
         teachers: 0,
         status: 'Active',
         joinedDate: new Date().toISOString().split('T')[0],
-        lastLogin: 'Never',
-        academicYear: form.academicYear,
+        lastLogin: 'N/A',
+        academicYear: form.academicYear || '2025-2026',
         idCardTemplate: null,
       };
       onAdd(newSchool);
       setSuccessData({ email: form.email, password: form.adminPassword, name: form.name });
       setForm(EMPTY_FORM);
       setErrors({});
+    } catch (err: unknown) {
+      setSubmitError(err instanceof Error ? err.message : 'Network error — check your connection');
+    } finally {
       setSubmitting(false);
-      return;
     }
-
-    // Step 1: Insert school into Supabase
-    const { data: newSchool, error: schoolError } = await supabase
-      .from('schools')
-      .insert({
-        name: form.name,
-        address: form.address || null,
-        contact_number: form.contactNumber || null,
-        email: form.email,
-        academic_year: form.academicYear || '2024-25',
-        logo_url: null,
-        timezone: 'Asia/Kolkata',
-        currency: 'INR',
-        currency_symbol: '₹',
-      })
-      .select()
-      .maybeSingle();
-
-    if (schoolError || !newSchool) {
-      setSubmitError(schoolError?.message || 'Failed to create school record');
-      setSubmitting(false);
-      return;
-    }
-
-    // Step 2: Create admin user via edge function using anon key
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    let userCreationWarning = '';
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${anonKey}`,
-          },
-          body: JSON.stringify({
-            email: form.email,
-            password: form.adminPassword,
-            full_name: form.adminName,
-            role: 'admin',
-            school_id: newSchool.id,
-          }),
-        }
-      );
-      if (!response.ok) {
-        const errBody = await response.text();
-        userCreationWarning = `School created but admin account setup failed: ${errBody}`;
-      }
-    } catch (fetchErr: unknown) {
-      userCreationWarning = `School created but admin account setup failed: ${
-        fetchErr instanceof Error ? fetchErr.message : String(fetchErr)
-      }`;
-    }
-
-    // Step 3: Add to local state (optimistic)
-    const mappedSchool: SchoolRecord = {
-      id: newSchool.id,
-      name: newSchool.name,
-      city: newSchool.address || '',
-      adminEmail: newSchool.email || form.email,
-      adminName: form.adminName,
-      students: 0,
-      teachers: 0,
-      status: 'Active',
-      joinedDate: newSchool.created_at ? newSchool.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
-      lastLogin: 'N/A',
-      academicYear: newSchool.academic_year || form.academicYear,
-      idCardTemplate: null,
-    };
-    onAdd(mappedSchool);
-
-    if (userCreationWarning) {
-      setSubmitError(userCreationWarning);
-    }
-
-    setSuccessData({ email: form.email, password: form.adminPassword, name: form.name });
-    setForm(EMPTY_FORM);
-    setErrors({});
-    setSubmitting(false);
   }
 
   return (
@@ -769,9 +644,7 @@ type Section = 'overview' | 'schools' | 'add-school';
 export default function VeducoreManagement() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [activeSection, setActiveSection] = useState<Section>('overview');
-  const [schools, setSchools] = useState<SchoolRecord[]>(
-    import.meta.env.VITE_MOCK_AUTH === 'true' ? INITIAL_SCHOOLS : []
-  );
+  const [schools, setSchools] = useState<SchoolRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState('');
   const [idCardTemplates, setIdCardTemplates] = useState<Record<string, string>>({});
@@ -840,7 +713,6 @@ export default function VeducoreManagement() {
 
   useEffect(() => {
     if (!loggedIn) return;
-    if (import.meta.env.VITE_MOCK_AUTH === 'true') return;
     fetchSchoolsData();
   }, [loggedIn]);
 
