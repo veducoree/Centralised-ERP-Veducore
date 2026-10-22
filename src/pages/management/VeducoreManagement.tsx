@@ -2,10 +2,21 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Building2, Users, GraduationCap, BarChart3, Eye, EyeOff,
   Upload, CheckCircle, Plus, ChevronDown, ChevronRight, Globe,
-  LogOut, TrendingUp,
+  LogOut, TrendingUp, Loader2, AlertCircle, ShieldCheck,
 } from 'lucide-react';
 import veducoreLogo from '@/assets/veducore-logo.png';
 import { supabase } from '@/lib/supabase';
+
+const MGMT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mgmt-auth`;
+
+async function callMgmt(body: Record<string, string>) {
+  const res = await fetch(MGMT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return res.json() as Promise<Record<string, unknown>>;
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -24,80 +35,172 @@ interface SchoolRecord {
   idCardTemplate: string | null;
 }
 
-// ── Login Screen ───────────────────────────────────────────────────────────────
+// ── Auth Screen (Setup + Login) ────────────────────────────────────────────────
 
-function LoginScreen({ onLogin }: { onLogin: () => void }) {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+type AuthMode = 'checking' | 'setup' | 'login';
 
-  function handleSubmit(e: React.FormEvent) {
+function AuthScreen({ onLogin }: { onLogin: (fullName: string) => void }) {
+  const [mode, setMode]           = useState<AuthMode>('checking');
+  const [email, setEmail]         = useState('');
+  const [password, setPassword]   = useState('');
+  const [fullName, setFullName]   = useState('');
+  const [confirmPw, setConfirmPw] = useState('');
+  const [showPw, setShowPw]       = useState(false);
+  const [error, setError]         = useState('');
+  const [loading, setLoading]     = useState(false);
+
+  // On mount: check if setup is done
+  useEffect(() => {
+    callMgmt({ action: 'check' }).then(res => {
+      setMode(res.is_setup_done ? 'login' : 'setup');
+    }).catch(() => setMode('login'));
+  }, []);
+
+  async function handleSetup(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
     setError('');
-    setTimeout(() => {
-      if (email === 'admin@veducore.com' && password === 'veducore@2024') {
-        onLogin();
-      } else {
-        setError('Invalid email or password.');
-        setLoading(false);
-      }
-    }, 600);
+    if (password.length < 8) { setError('Password must be at least 8 characters.'); return; }
+    if (password !== confirmPw) { setError('Passwords do not match.'); return; }
+    setLoading(true);
+    const res = await callMgmt({ action: 'setup', email, password, full_name: fullName });
+    setLoading(false);
+    if (res.error) { setError(res.error as string); return; }
+    onLogin(res.full_name as string);
+  }
+
+  async function handleLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+    const res = await callMgmt({ action: 'login', email, password });
+    setLoading(false);
+    if (res.error) { setError(res.error as string); return; }
+    onLogin(res.full_name as string);
+  }
+
+  if (mode === 'checking') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-indigo-50">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <p className="text-sm text-gray-500">Checking setup status...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
+
+        {/* Header */}
         <div className="text-center mb-8">
           <img src={veducoreLogo} alt="Veducore" className="h-10 w-auto mx-auto mb-4 object-contain" />
           <h1 className="text-2xl font-bold text-gray-900">Veducore Management</h1>
-          <p className="text-sm text-gray-500 mt-1">Internal team portal</p>
+          <p className="text-sm text-gray-500 mt-1">
+            {mode === 'setup' ? 'Create your management account to get started' : 'Internal team portal'}
+          </p>
         </div>
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
-          <form onSubmit={handleSubmit} className="space-y-4">
+
+        {/* Setup banner */}
+        {mode === 'setup' && (
+          <div className="mb-4 flex items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3">
+            <ShieldCheck className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <p className="text-sm font-semibold text-blue-900">First-time Setup</p>
+              <p className="text-xs text-blue-700 mt-0.5">
+                No management account exists yet. Create one now — this will be the permanent admin login for this portal.
+              </p>
+            </div>
+          </div>
+        )}
+
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-8">
+
+          {error && (
+            <div className="mb-4 flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2.5">
+              <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-red-600">{error}</p>
+            </div>
+          )}
+
+          <form onSubmit={mode === 'setup' ? handleSetup : handleLogin} className="space-y-4">
+
+            {/* Full name — setup only */}
+            {mode === 'setup' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={e => setFullName(e.target.value)}
+                  placeholder="Your full name"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
               <input
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="admin@veducore.com"
+                placeholder="you@veducore.com"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
-                autoFocus
+                autoFocus={mode === 'login'}
               />
             </div>
+
+            {/* Password */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {mode === 'setup' ? 'Create Password' : 'Password'} <span className="text-red-500">*</span>
+              </label>
               <div className="relative">
                 <input
-                  type={showPassword ? 'text' : 'password'}
+                  type={showPw ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder="Enter password"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder={mode === 'setup' ? 'Min 8 characters' : 'Enter password'}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(s => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                <button type="button" onClick={() => setShowPw(s => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
-            {error && (
-              <p className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+
+            {/* Confirm password — setup only */}
+            {mode === 'setup' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password <span className="text-red-500">*</span></label>
+                <input
+                  type="password"
+                  value={confirmPw}
+                  onChange={e => setConfirmPw(e.target.value)}
+                  placeholder="Re-enter password"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
             )}
+
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-lg bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors disabled:opacity-60"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+              {loading
+                ? (mode === 'setup' ? 'Creating account...' : 'Signing in...')
+                : (mode === 'setup' ? 'Create Management Account' : 'Sign In')}
             </button>
           </form>
         </div>
@@ -643,6 +746,7 @@ type Section = 'overview' | 'schools' | 'add-school';
 
 export default function VeducoreManagement() {
   const [loggedIn, setLoggedIn] = useState(false);
+  const [adminName, setAdminName] = useState('');
   const [activeSection, setActiveSection] = useState<Section>('overview');
   const [schools, setSchools] = useState<SchoolRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -717,7 +821,7 @@ export default function VeducoreManagement() {
   }, [loggedIn]);
 
   if (!loggedIn) {
-    return <LoginScreen onLogin={() => setLoggedIn(true)} />;
+    return <AuthScreen onLogin={(name) => { setAdminName(name); setLoggedIn(true); }} />;
   }
 
   function handleTemplateUpload(schoolId: string, filename: string) {
@@ -786,7 +890,7 @@ export default function VeducoreManagement() {
           <div className="ml-auto flex items-center gap-2">
             <div className="flex items-center gap-1.5 text-xs text-gray-500">
               <Globe className="h-3.5 w-3.5" />
-              admin@veducore.com
+              {adminName || 'Veducore Admin'}
             </div>
           </div>
         </header>
