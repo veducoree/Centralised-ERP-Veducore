@@ -1,2 +1,8 @@
 [functions.create-user]
 verify_jwt = true
+
+[functions.mgmt-auth]
+verify_jwt = false
+
+[functions.create-school]
+verify_jwt = false

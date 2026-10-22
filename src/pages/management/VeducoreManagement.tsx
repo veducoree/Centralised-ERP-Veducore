@@ -66,9 +66,8 @@ function AuthScreen({ onLogin }: { onLogin: (fullName: string) => void }) {
     const res = await callMgmt({ action: 'setup', email, password, full_name: fullName });
     setLoading(false);
     if (res.error) { setError(res.error as string); return; }
-    // Account created — show verify pending screen
-    setPendingEmail(email);
-    setMode('verify-pending');
+    // Account created and activated immediately — log in directly
+    onLogin((res.full_name as string) || fullName);
   }
 
   async function handleLogin(e: React.FormEvent) {

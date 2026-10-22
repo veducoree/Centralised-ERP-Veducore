@@ -72,11 +72,11 @@ Deno.serve(async (req: Request) => {
       return json({ error: "Management account already exists. Please login instead." }, 409);
     }
 
-    // Create auth user — email_confirm: false so verification email is sent
+    // Create auth user with email_confirm: true (direct activation for internal management admin)
     const { data: authData, error: authErr } = await admin.auth.admin.createUser({
       email,
       password,
-      email_confirm: false,
+      email_confirm: true,
       user_metadata: { full_name },
     });
     if (authErr || !authData?.user) {
@@ -95,10 +95,16 @@ Deno.serve(async (req: Request) => {
       return json({ error: insertErr.message }, 500);
     }
 
-    // Don't auto-login — user must verify email first
+    // Sign in immediately to generate session token
+    const anonClient = createClient(supabaseUrl, anonKey, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
+    const { data: signInData } = await anonClient.auth.signInWithPassword({ email, password });
+
     return json({
-      verified: false,
-      message: "Account created! Please check your email and click the verification link to activate your account.",
+      token: signInData?.session?.access_token ?? null,
+      full_name,
+      message: "Management account created and signed in successfully",
     });
   }
 
@@ -113,13 +119,28 @@ Deno.serve(async (req: Request) => {
     const anonClient = createClient(supabaseUrl, anonKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
-    const { data: signInData, error: signInErr } = await anonClient.auth.signInWithPassword({ email, password });
-    if (signInErr || !signInData?.user) {
-      // Check if it's an email-not-confirmed error
-      if (signInErr?.message?.toLowerCase().includes('email not confirmed')) {
-        return json({ error: "Email not verified yet. Please check your inbox and click the verification link." }, 401);
+    let { data: signInData, error: signInErr } = await anonClient.auth.signInWithPassword({ email, password });
+
+    // If previously unconfirmed, auto-repair/auto-confirm for verified veducore admin
+    if (signInErr && signInErr.message?.toLowerCase().includes("email not confirmed")) {
+      const { data: adminRecord } = await admin
+        .from("veducore_admins")
+        .select("id, full_name")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (adminRecord) {
+        // Confirm user in Supabase Auth
+        await admin.auth.admin.updateUserById(adminRecord.id, { email_confirm: true });
+        // Retry sign-in
+        const retry = await anonClient.auth.signInWithPassword({ email, password });
+        signInData = retry.data;
+        signInErr = retry.error;
       }
-      return json({ error: "Invalid email or password" }, 401);
+    }
+
+    if (signInErr || !signInData?.user) {
+      return json({ error: signInErr?.message || "Invalid email or password" }, 401);
     }
 
     // Verify this user is actually a veducore admin
