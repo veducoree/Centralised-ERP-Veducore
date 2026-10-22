@@ -1,12 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from '@/auth/AuthContext';
-import { MockAuthProvider } from '@/auth/MockAuthContext';
 import { ToastProvider } from '@/components/ui/Toast';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import LoginPage from '@/pages/LoginPage';
-
-const isMockAuth = import.meta.env.VITE_MOCK_AUTH === 'true';
-const ActiveAuthProvider = isMockAuth ? MockAuthProvider : AuthProvider;
 
 // Management portal
 import VeducoreManagement from '@/pages/management/VeducoreManagement';
@@ -26,7 +22,6 @@ import AdminSettings from '@/pages/admin/AdminSettings';
 import AdminIDCard from '@/pages/admin/AdminIDCard';
 import AdminIDCardGenerator from '@/pages/admin/AdminIDCardGenerator';
 import AdminDocuments from '@/pages/admin/AdminDocuments';
-import AdminDocumentGenerator from '@/pages/admin/AdminDocumentGenerator';
 import AdminHolidays from '@/pages/admin/AdminHolidays';
 import ProfilePage from '@/pages/shared/ProfilePage';
 import StudentDetailPage from '@/pages/admin/StudentDetailPage';
@@ -56,7 +51,7 @@ import ParentRemarks from '@/pages/parent/ParentRemarks';
 
 function App() {
   return (
-    <ActiveAuthProvider>
+    <AuthProvider>
       <ToastProvider>
         <BrowserRouter>
           <Routes>
@@ -78,7 +73,6 @@ function App() {
             <Route path="/admin/id-cards" element={<ProtectedRoute allowedRoles={['admin']}><AdminIDCard /></ProtectedRoute>} />
             <Route path="/admin/id-cards/generate" element={<ProtectedRoute allowedRoles={['admin']}><AdminIDCardGenerator /></ProtectedRoute>} />
             <Route path="/admin/documents" element={<ProtectedRoute allowedRoles={['admin']}><AdminDocuments /></ProtectedRoute>} />
-            <Route path="/admin/documents/generate" element={<ProtectedRoute allowedRoles={['admin']}><AdminDocumentGenerator /></ProtectedRoute>} />
             <Route path="/admin/holidays" element={<ProtectedRoute allowedRoles={['admin']}><AdminHolidays /></ProtectedRoute>} />
             <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={['admin']}><AdminNotifications /></ProtectedRoute>} />
             <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['admin']}><AdminSettings /></ProtectedRoute>} />
@@ -114,7 +108,7 @@ function App() {
           </Routes>
         </BrowserRouter>
       </ToastProvider>
-    </ActiveAuthProvider>
+    </AuthProvider>
   );
 }
 

@@ -1,0 +1,7 @@
+{
+  "task_id": "task-mock-to-supabase",
+  "task_description": "Migrate the Veducore School ERP from mock data to real Supabase production backend: write SQL migration for missing tables/columns, remove all mock infrastructure (mockData, mockDb, mockApi, MockAuthContext), add missing API functions (holidays, exam defs, fee structures, payment setup), fix dependent pages, create mobile Supabase client, and achieve a clean TypeScript build.",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003"],
+  "blocked_reason": null
+}

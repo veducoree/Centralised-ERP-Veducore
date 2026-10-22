@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer } from 'lucide-react';
-import { MOCK_SCHOOL } from '@/lib/mockData';
-import type { Student } from '@/types';
+import type { Student, School } from '@/types';
 import { useAuth } from '@/auth/AuthContext';
-import { fetchStudents } from '@/services/api';
+import { fetchStudents, fetchSchool } from '@/services/api';
 import { LoadingSpinner } from '@/components/ui/Primitives';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -66,7 +65,7 @@ function DarkRow({ label, value }: { label: string; value: string }) {
 
 // ── Template 1 — Classic Blue ─────────────────────────────────────────────────
 
-function Template1({ student }: { student: Student }) {
+function Template1({ student, schoolName }: { student: Student; schoolName: string }) {
   return (
     <div
       className="w-full h-full bg-white rounded-lg overflow-hidden flex flex-col shadow border border-gray-200"
@@ -74,7 +73,7 @@ function Template1({ student }: { student: Student }) {
     >
       {/* Header */}
       <div className="bg-blue-800 px-3 py-2 text-center">
-        <p className="text-white text-xs font-bold tracking-wide">{MOCK_SCHOOL.name}</p>
+        <p className="text-white text-xs font-bold tracking-wide">{schoolName}</p>
         <p className="text-blue-200 text-[10px]">Student Identity Card</p>
       </div>
       {/* Photo + info */}
@@ -115,7 +114,7 @@ function Template1({ student }: { student: Student }) {
 
 // ── Template 2 — Modern Dark ──────────────────────────────────────────────────
 
-function Template2({ student }: { student: Student }) {
+function Template2({ student, schoolName }: { student: Student; schoolName: string }) {
   return (
     <div
       className="w-full h-full rounded-lg overflow-hidden flex shadow"
@@ -124,7 +123,7 @@ function Template2({ student }: { student: Student }) {
       <div className="w-1.5 flex-shrink-0" style={{ background: '#f59e0b' }} />
       <div className="flex-1 p-3 flex flex-col">
         <p className="text-yellow-400 text-[10px] font-bold tracking-widest uppercase mb-2">
-          {MOCK_SCHOOL.name}
+          {schoolName}
         </p>
         <div className="flex gap-2 flex-1 items-center">
           <div className="h-14 w-14 rounded-md bg-slate-700 border border-slate-600 flex-shrink-0 flex items-center justify-center text-yellow-400 font-bold text-lg overflow-hidden">
@@ -161,14 +160,14 @@ function Template2({ student }: { student: Student }) {
 
 // ── Template 3 — Minimal Green ────────────────────────────────────────────────
 
-function Template3({ student }: { student: Student }) {
+function Template3({ student, schoolName }: { student: Student; schoolName: string }) {
   return (
     <div
       className="w-full h-full bg-white rounded-lg overflow-hidden flex flex-col shadow"
       style={{ borderLeft: '4px solid #16a34a', fontFamily: 'sans-serif' }}
     >
       <div className="px-3 pt-3 pb-1 border-b border-gray-100">
-        <p className="text-green-600 text-xs font-bold">{MOCK_SCHOOL.name}</p>
+        <p className="text-green-600 text-xs font-bold">{schoolName}</p>
         <p className="text-gray-400 text-[10px]">Student Identity Card</p>
       </div>
       <div className="flex-1 flex gap-3 px-3 py-2 items-center">
@@ -239,6 +238,7 @@ export default function AdminIDCardGenerator() {
   const [template, setTemplate] = useState<1 | 2 | 3>(1);
   const [classFilter, setClassFilter] = useState('All');
   const [students, setStudents] = useState<Student[]>([]);
+  const [school, setSchool] = useState<School | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Inject print styles
@@ -252,20 +252,25 @@ export default function AdminIDCardGenerator() {
     };
   }, []);
 
-  // Fetch students from the API (so newly admitted students with their
-  // stored photos appear here too — seed students come from localStorage
-  // the same way in mock mode).
   useEffect(() => {
     if (!profile?.school_id) {
       setLoading(false);
       return;
     }
     setLoading(true);
-    fetchStudents(profile.school_id)
-      .then((data) => setStudents(data))
-      .catch(() => setStudents([]))
+    Promise.all([
+      fetchStudents(profile.school_id),
+      fetchSchool(profile.school_id),
+    ])
+      .then(([studentData, schoolData]) => {
+        setStudents(studentData);
+        setSchool(schoolData);
+      })
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, [profile?.school_id]);
+
+  const schoolName = school?.name ?? 'School';
 
   const classes = [
     'All',
@@ -278,9 +283,9 @@ export default function AdminIDCardGenerator() {
       : students.filter(s => s.class?.name === classFilter);
 
   function renderCard(student: Student) {
-    if (template === 1) return <Template1 student={student} />;
-    if (template === 2) return <Template2 student={student} />;
-    return <Template3 student={student} />;
+    if (template === 1) return <Template1 student={student} schoolName={schoolName} />;
+    if (template === 2) return <Template2 student={student} schoolName={schoolName} />;
+    return <Template3 student={student} schoolName={schoolName} />;
   }
 
   return (

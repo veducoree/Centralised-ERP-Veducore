@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   Plus, Pencil, Trash2, User, Mail, Phone, MapPin, Link2, Unlink,
-  Eye, EyeOff, Copy, CheckCircle,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
@@ -19,10 +18,6 @@ import type { Parent, Student, ParentStudent } from '@/types';
 import { validateEmail, getInitials } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { StatusBadge } from '@/components/ui/Badge';
-import { mockDb } from '@/lib/mockDb';
-import { getParentGroups, type ParentGroup } from '@/lib/parentUtils';
-
-const isMock = import.meta.env.VITE_MOCK_AUTH === 'true';
 
 // ─── Supabase helper ────────────────────────────────────────────────────────
 
@@ -34,259 +29,9 @@ async function refreshLinks(parentId: string): Promise<ParentStudent[]> {
   return (data as ParentStudent[]) || [];
 }
 
-// ─── Mock Mode: Family-Grouped View ─────────────────────────────────────────
+// ─── Main View ───────────────────────────────────────────────────────────────
 
-interface ChildRowProps {
-  admissionNumber: string;
-  studentName: string;
-  className: string;
-  sectionName: string;
-  username: string;
-  password: string;
-}
-
-function ChildRow({ admissionNumber, studentName, className, sectionName, username, password }: ChildRowProps) {
-  const [visible, setVisible] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  function handleCopy() {
-    navigator.clipboard.writeText(`${username}\n${password}`).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
-  }
-
-  return (
-    <tr className="hover:bg-gray-50/50 transition-colors">
-      <td className="px-4 py-3 text-sm text-gray-900">{studentName}</td>
-      <td className="px-4 py-3 text-sm text-gray-600">
-        {className}{sectionName ? ` — ${sectionName}` : ''}
-      </td>
-      <td className="px-4 py-3 text-sm text-gray-600 font-mono">{admissionNumber}</td>
-      <td className="px-4 py-3 text-sm text-blue-700 font-mono">{username}</td>
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-sm text-gray-700">
-            {visible ? password : '••••••••'}
-          </span>
-          <button
-            type="button"
-            onClick={() => setVisible(v => !v)}
-            className="rounded p-1 text-gray-400 hover:text-gray-600 transition-colors"
-            title={visible ? 'Hide password' : 'Show password'}
-          >
-            {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
-        </div>
-      </td>
-      <td className="px-4 py-3">
-        <button
-          type="button"
-          onClick={handleCopy}
-          className="rounded p-1 text-gray-400 hover:text-blue-600 transition-colors"
-          title="Copy username & password"
-        >
-          {copied ? (
-            <CheckCircle className="h-4 w-4 text-emerald-500" />
-          ) : (
-            <Copy className="h-4 w-4" />
-          )}
-        </button>
-      </td>
-    </tr>
-  );
-}
-
-// ─── Mock Mode: Credentials Modal ────────────────────────────────────────────
-
-interface CredentialsModalProps {
-  group: ParentGroup | null;
-  onClose: () => void;
-}
-
-function CredentialsModal({ group, onClose }: CredentialsModalProps) {
-  if (!group) return null;
-
-  return (
-    <Modal
-      open={!!group}
-      onClose={onClose}
-      title={[group.fatherName, group.motherName].filter(Boolean).join(' & ') || 'Parent Credentials'}
-      description={[group.parentEmail, group.parentPhone].filter(Boolean).join(' · ') || undefined}
-      size="xl"
-      footer={
-        <Button variant="outline" onClick={onClose}>Close</Button>
-      }
-    >
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
-        <table className="w-full text-left text-sm">
-          <thead className="border-b border-gray-200 bg-gray-50/50">
-            <tr>
-              <th className="px-4 py-3 font-semibold text-gray-600">Student Name</th>
-              <th className="px-4 py-3 font-semibold text-gray-600">Class</th>
-              <th className="px-4 py-3 font-semibold text-gray-600">Admission No.</th>
-              <th className="px-4 py-3 font-semibold text-gray-600">Username</th>
-              <th className="px-4 py-3 font-semibold text-gray-600">Password</th>
-              <th className="px-4 py-3 font-semibold text-gray-600">Copy</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {group.children.map(child => (
-              <ChildRow
-                key={child.studentId}
-                admissionNumber={child.admissionNumber}
-                studentName={child.studentName}
-                className={child.className}
-                sectionName={child.sectionName}
-                username={child.username}
-                password={child.password}
-              />
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </Modal>
-  );
-}
-
-// ─── Mock Mode: Table View ────────────────────────────────────────────────────
-
-function MockParentsView() {
-  const [groups, setGroups] = useState<ParentGroup[]>([]);
-  const [search, setSearch] = useState('');
-  const [selectedGroup, setSelectedGroup] = useState<ParentGroup | null>(null);
-
-  useEffect(() => {
-    const allClasses = mockDb.getAll<{ id: string; name: string }>('classes');
-    const allSections = mockDb.getAll<{ id: string; name: string }>('sections');
-    const students = mockDb.getAll<Student>('students').map(s => ({
-      ...s,
-      class: allClasses.find(c => c.id === s.class_id),
-      section: allSections.find(sec => sec.id === s.section_id),
-    }));
-    setGroups(getParentGroups(students as Student[]));
-  }, []);
-
-  const filtered = groups.filter(g => {
-    const q = search.toLowerCase();
-    if (!q) return true;
-    return (
-      g.fatherName.toLowerCase().includes(q) ||
-      g.motherName.toLowerCase().includes(q) ||
-      g.parentEmail.toLowerCase().includes(q) ||
-      g.children.some(c => c.studentName.toLowerCase().includes(q))
-    );
-  });
-
-  const totalStudents = groups.reduce((sum, g) => sum + g.children.length, 0);
-
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Parent Management"
-        description="View parent accounts and portal credentials for each family"
-      />
-
-      {/* Stats row */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
-        <Card className="p-4">
-          <p className="text-sm font-medium text-gray-500">Total Families</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">{groups.length}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm font-medium text-gray-500">Total Students Linked</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">{totalStudents}</p>
-        </Card>
-      </div>
-
-      {/* Search bar */}
-      <div className="max-w-sm">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search by parent name, email, or student name…" />
-      </div>
-
-      {/* Table or empty state */}
-      {filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-          <User className="h-12 w-12 text-gray-300 mb-3" />
-          <p className="font-medium text-gray-600">No parent accounts found</p>
-          <p className="mt-1 text-sm text-gray-400">Parents are created automatically when students are admitted</p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-          <table className="w-full text-left text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50/50">
-              <tr>
-                <th className="px-4 py-3 font-semibold text-gray-600">Parent</th>
-                <th className="px-4 py-3 font-semibold text-gray-600">Contact</th>
-                <th className="px-4 py-3 font-semibold text-gray-600">Children</th>
-                <th className="px-4 py-3 font-semibold text-gray-600">Students</th>
-                <th className="px-4 py-3 font-semibold text-gray-600">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filtered.map(group => (
-                <tr key={group.id} className="hover:bg-gray-50/50 transition-colors">
-                  {/* Parent names */}
-                  <td className="px-4 py-3">
-                    <p className="font-bold text-gray-900">{group.fatherName || '—'}</p>
-                    {group.motherName && (
-                      <p className="text-xs text-gray-500 mt-0.5">{group.motherName}</p>
-                    )}
-                  </td>
-                  {/* Contact */}
-                  <td className="px-4 py-3">
-                    {group.parentEmail ? (
-                      <p className="text-gray-700">{group.parentEmail}</p>
-                    ) : (
-                      <p className="text-gray-400">—</p>
-                    )}
-                    {group.parentPhone && (
-                      <p className="text-xs text-gray-500 mt-0.5">{group.parentPhone}</p>
-                    )}
-                  </td>
-                  {/* Child chips */}
-                  <td className="px-4 py-3 max-w-xs">
-                    <div className="flex flex-wrap gap-1.5">
-                      {group.children.map(child => (
-                        <span
-                          key={child.studentId}
-                          className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700"
-                        >
-                          {child.studentName}{child.className ? ` · ${child.className}${child.sectionName ? child.sectionName : ''}` : ''}
-                        </span>
-                      ))}
-                    </div>
-                  </td>
-                  {/* Count */}
-                  <td className="px-4 py-3 text-gray-700">
-                    {group.children.length} student{group.children.length !== 1 ? 's' : ''}
-                  </td>
-                  {/* Actions */}
-                  <td className="px-4 py-3">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedGroup(group)}
-                      className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                      title="View credentials"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <CredentialsModal group={selectedGroup} onClose={() => setSelectedGroup(null)} />
-    </div>
-  );
-}
-
-// ─── Real (Supabase) Mode View ───────────────────────────────────────────────
-
-function AdminParentsRealView() {
+function AdminParentsView() {
   const { profile } = useAuth();
   const toast = useToast();
   const [parents, setParents] = useState<Parent[]>([]);
@@ -394,7 +139,7 @@ function AdminParentsRealView() {
       toast('Parent updated successfully', 'success');
       setEditModalOpen(false);
       loadData();
-    } catch (err) {
+    } catch {
       toast('Failed to update parent', 'error');
     } finally {
       setSaving(false);
@@ -407,7 +152,7 @@ function AdminParentsRealView() {
       await deleteParent(deleteId);
       toast('Parent deleted successfully', 'success');
       loadData();
-    } catch (err) {
+    } catch {
       toast('Failed to delete parent', 'error');
     }
   }
@@ -420,7 +165,7 @@ function AdminParentsRealView() {
       const links = await refreshLinks(linkParent.id);
       setCurrentLinks(links);
       setLinkStudentId('');
-    } catch (err) {
+    } catch {
       toast('Failed to link student', 'error');
     }
   }
@@ -433,7 +178,7 @@ function AdminParentsRealView() {
         const links = await refreshLinks(linkParent.id);
         setCurrentLinks(links);
       }
-    } catch (err) {
+    } catch {
       toast('Failed to unlink student', 'error');
     }
   }
@@ -456,6 +201,7 @@ function AdminParentsRealView() {
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
           <User className="h-12 w-12 text-gray-300 mb-3" />
           <p className="font-medium text-gray-600">No parents found</p>
+          <p className="mt-1 text-sm text-gray-400">Add a parent account using the button above</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -595,7 +341,7 @@ function AdminParentsRealView() {
 export default function AdminParents() {
   return (
     <DashboardLayout title="Parents">
-      {isMock ? <MockParentsView /> : <AdminParentsRealView />}
+      <AdminParentsView />
     </DashboardLayout>
   );
 }

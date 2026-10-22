@@ -41,6 +41,36 @@ interface SectionData {
   subjectsLoaded: boolean;
 }
 
+// ── Class sort order ───────────────────────────────────────────────────────────
+// Returns a numeric sort key so Nursery < LKG/KG < UKG < Class 1 < Class 2 …
+function getClassSortKey(name: string, gradeLevel: number | null): number {
+  const n = name.trim().toLowerCase();
+
+  // Pre-primary order: nursery=0, lkg/kg=1, ukg=2
+  if (n === 'nursery' || n === 'pre-nursery' || n === 'pre nursery') return 0;
+  if (n === 'lkg' || n === 'kg' || n === 'lower kg' || n === 'lower kindergarten') return 1;
+  if (n === 'ukg' || n === 'upper kg' || n === 'upper kindergarten') return 2;
+
+  // If grade_level is set, use it (offset by 3 to place after pre-primary)
+  if (gradeLevel != null) return gradeLevel + 3;
+
+  // Try to extract a number from the name ("Class 1", "Grade 5", "1st", "std 3", etc.)
+  const match = n.match(/(\d+)/);
+  if (match) return parseInt(match[1], 10) + 3;
+
+  // Alphabetical fallback — far down the list
+  return 9999;
+}
+
+function sortClasses(rows: ClassRow[]): ClassRow[] {
+  return [...rows].sort((a, b) => {
+    const ka = getClassSortKey(a.name, a.grade_level);
+    const kb = getClassSortKey(b.name, b.grade_level);
+    if (ka !== kb) return ka - kb;
+    return a.name.localeCompare(b.name);
+  });
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function AdminClasses() {
@@ -105,7 +135,7 @@ export default function AdminClasses() {
         sections: c.sections,
         expanded: true,
       }));
-      setClasses(rows);
+      setClasses(sortClasses(rows));
 
       // Load class teachers for all sections in parallel
       const allSections = rawClasses.flatMap((c) => c.sections);

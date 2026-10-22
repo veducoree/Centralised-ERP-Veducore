@@ -78,8 +78,8 @@ function SidebarContent({ navItems, location, school, roleLabel, onNavigate, onS
         <img src={veducoreLogo} alt="Veducore" className="h-6 w-auto flex-shrink-0 object-contain" />
         {school?.logo_url && (
           <>
-            <div className="h-6 w-px bg-gray-200 flex-shrink-0" />
-            <img src={school.logo_url} alt={school.name} className="h-7 w-auto flex-shrink-0 object-contain" />
+            <div className="h-8 w-px bg-gray-200 flex-shrink-0" />
+            <img src={school.logo_url} alt={school.name} className="h-9 w-auto flex-shrink-0 object-contain" />
           </>
         )}
         <span className="ml-auto flex-shrink-0 text-xs font-medium text-gray-400">{roleLabel}</span>

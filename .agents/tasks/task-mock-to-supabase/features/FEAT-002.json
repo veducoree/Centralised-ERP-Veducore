@@ -1,0 +1,35 @@
+{
+  "id": "FEAT-002",
+  "type": "refactor",
+  "description": "Remove all mock infrastructure. Deletes mockApi.ts, mockData.ts, mockDb.ts, MockAuthContext.tsx; simplifies AuthContext.tsx and App.tsx to only use the real Supabase auth path; fixes the three pages that imported from mock files (AdminParents.tsx, AdminIDCardGenerator.tsx, ProfilePage.tsx); fixes a pre-existing FeeStatus type error in ParentFees.tsx; disables VITE_MOCK_AUTH in .env; and converts api.ts to a direct re-export of realApi with no mock toggle. Depends on FEAT-001 (api.ts new exports must exist before the mock toggle is removed).",
+  "status": "pending",
+  "steps": [
+    "In src/services/api.ts: remove the 'import * as mock from ./mockApi' and the 'const isMock / const api = ...' lines. Change every 'api.functionName' to 'real.functionName'. All 13 new function exports added in FEAT-001 are already present as 'api.X' — change them to 'real.X'. Now the file is a pure re-export of realApi with no mock reference.",
+    "Delete src/services/mockApi.ts.",
+    "Delete src/lib/mockData.ts.",
+    "Delete src/lib/mockDb.ts.",
+    "Delete src/auth/MockAuthContext.tsx.",
+    "In src/auth/AuthContext.tsx: (a) remove 'import { MockAuthContext } from ./MockAuthContext'; (b) simplify useAuth() to: const ctx = useContext(AuthContext); if (!ctx) throw new Error('useAuth must be used within AuthProvider'); return ctx; — remove the mockCtx variable and the '?? mockCtx' fallback entirely.",
+    "In src/App.tsx: (a) remove 'import { MockAuthProvider } from @/auth/MockAuthContext'; (b) remove 'const isMockAuth = ...' and 'const ActiveAuthProvider = ...'; (c) replace <ActiveAuthProvider> opening/closing tags with <AuthProvider>.",
+    "In src/pages/admin/AdminParents.tsx: (a) remove 'import { mockDb } from @/lib/mockDb'; (b) remove 'const isMock = import.meta.env.VITE_MOCK_AUTH === \"true\"'; (c) delete the entire MockParentsView component function (lines roughly 150–250 — the function that calls mockDb.getAll and renders the mock grouped table); (d) in the JSX where the file previously renders '{isMock ? <MockParentsView /> : <AdminParentsRealView />}', change it to simply '<AdminParentsRealView />' (or whatever the real view component is named); (e) remove the getParentGroups import if it is only used inside the deleted MockParentsView — check if any other code in the file uses it. If getParentGroups is used elsewhere (e.g., to generate credentials to display), keep the import.",
+    "In src/pages/admin/AdminIDCardGenerator.tsx: (a) remove 'import { MOCK_SCHOOL } from @/lib/mockData'; (b) import School type from @/types and fetchSchool from @/services/api if not already imported; (c) add 'const [school, setSchool] = useState<School | null>(null)' alongside the existing students state; (d) in the useEffect that fetches students, also call 'fetchSchool(profile.school_id).then(setSchool).catch(()=>{})'; (e) replace every occurrence of 'MOCK_SCHOOL.name' with 'school?.name ?? \"School\"' (there are 3 occurrences in Template1, Template2, Template3).",
+    "In src/pages/shared/ProfilePage.tsx: (a) remove 'import { useParentChildren } from @/auth/MockAuthContext'; (b) add fetchParentStudents to the existing import from @/services/api; (c) replace 'const parentChildren = useParentChildren()' with 'const [parentChildren, setParentChildren] = useState<Student[]>([])'; (d) in the existing useEffect (the one that fetches school and teacher), add a branch: if (profile.role === 'parent') { fetchParentStudents(profile.id).then(links => setParentChildren(links.map(l => l.student))).catch(() => {}); }",
+    "In src/pages/parent/ParentFees.tsx line 56: fix the pre-existing TS2367 error. Read the file first to understand the condition, then fix the type comparison so the status variable's type properly includes all FeeStatus values.",
+    "In .env: change VITE_MOCK_AUTH=true to VITE_MOCK_AUTH=false."
+  ],
+  "acceptance_criteria": [
+    "None of the four deleted files exist in the repo.",
+    "src/auth/AuthContext.tsx useAuth() function has no reference to MockAuthContext.",
+    "src/App.tsx has no reference to MockAuthProvider.",
+    "src/pages/admin/AdminParents.tsx has no import from @/lib/mockDb and renders only the real view.",
+    "src/pages/admin/AdminIDCardGenerator.tsx fetches school data from Supabase and displays school.name instead of MOCK_SCHOOL.name.",
+    "src/pages/shared/ProfilePage.tsx fetches parentChildren via fetchParentStudents, not useParentChildren.",
+    "npm run typecheck exits 0 with zero output (including the pre-existing ParentFees.tsx error being fixed)."
+  ],
+  "verification": [
+    "cd /Users/aryansinghthakur/Downloads/Veducore && npm run typecheck",
+    "cd /Users/aryansinghthakur/Downloads/Veducore && npm run build"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

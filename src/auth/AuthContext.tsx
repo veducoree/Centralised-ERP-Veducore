@@ -2,17 +2,16 @@ import { createContext, useContext, useEffect, useState, useCallback, type React
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import type { Profile, Student, UserRole } from '@/types';
-import { MockAuthContext } from './MockAuthContext';
 
 export interface AuthContextValue {
-  session: Session | { access_token: string } | null;
-  user: User | { id: string; email: string } | null;
+  session: Session | null;
+  user: User | null;
   profile: Profile | null;
   loading: boolean;
   signIn: (identifier: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
-  /** Children linked to a parent account. Populated in mock mode; empty in real mode. */
+  /** Children linked to a parent account (populated by ParentDashboard/ParentChild pages). */
   parentChildren?: Student[];
 }
 
@@ -78,7 +77,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshProfile = async () => {
-    if (user) await fetchProfile((user as User).id);
+    if (user) await fetchProfile(user.id);
   };
 
   return (
@@ -88,17 +87,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-/**
- * useAuth — works in both real (Supabase) and mock mode.
- * In mock mode, App.tsx wraps with MockAuthProvider which supplies MockAuthContext.
- * In real mode, App.tsx wraps with AuthProvider which supplies AuthContext.
- * We check both contexts here so the hook always resolves.
- */
 export function useAuth(): AuthContextValue {
-  const realCtx = useContext(AuthContext);
-  const mockCtx = useContext(MockAuthContext);
-  const ctx = realCtx ?? mockCtx;
-  if (!ctx) throw new Error('useAuth must be used within AuthProvider or MockAuthProvider');
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error('useAuth must be used within AuthProvider');
   return ctx;
 }
 

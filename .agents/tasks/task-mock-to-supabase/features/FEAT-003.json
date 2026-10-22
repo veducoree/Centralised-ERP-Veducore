@@ -1,0 +1,21 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Create the mobile Supabase client. Independent of FEAT-001 and FEAT-002 (touches only the app/ directory). Adds app/src/lib/supabase.ts using @react-native-async-storage/async-storage for session persistence, and notes the required npm install for @supabase/supabase-js inside app/.",
+  "status": "pending",
+  "steps": [
+    "Run 'cd /Users/aryansinghthakur/Downloads/Veducore/app && npm install @supabase/supabase-js@2.57.4' to add the Supabase client to the mobile app. This pins to the same version (^2.57.4) used by the web app.",
+    "Create app/src/lib/supabase.ts with the following content — use the real URL and anon key from the web .env file (https://cdxvtpelytopdunvwvvl.supabase.co and the full JWT from VITE_SUPABASE_ANON_KEY): import AsyncStorage from '@react-native-async-storage/async-storage'; import { createClient } from '@supabase/supabase-js'; const SUPABASE_URL = 'https://cdxvtpelytopdunvwvvl.supabase.co'; const SUPABASE_ANON_KEY = '<full anon key from .env>'; export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { storage: AsyncStorage, autoRefreshToken: true, persistSession: true, detectSessionInUrl: false } });",
+    "Verify the mobile TypeScript config accepts the new file by running 'cd /Users/aryansinghthakur/Downloads/Veducore/app && npx tsc --noEmit'. The mobile tsconfig.json at app/tsconfig.json should include app/src."
+  ],
+  "acceptance_criteria": [
+    "@supabase/supabase-js@2.57.4 appears in app/package.json dependencies.",
+    "app/src/lib/supabase.ts exists and exports a supabase client configured with AsyncStorage.",
+    "cd /Users/aryansinghthakur/Downloads/Veducore/app && npx tsc --noEmit exits 0."
+  ],
+  "verification": [
+    "cd /Users/aryansinghthakur/Downloads/Veducore/app && npx tsc --noEmit"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

@@ -12,18 +12,15 @@ import {
   updateProfile,
   fetchTeacherByUserId,
   fetchSchool,
-  updateTeacher,
-  updateStudent,
 } from '@/services/api';
+import { supabase } from '@/lib/supabase';
 import { getInitials } from '@/lib/utils';
-import { generateTeacherUsername, generateParentCredentials } from '@/lib/parentUtils';
-import { useParentChildren } from '@/auth/MockAuthContext';
-import type { Teacher, School, Student } from '@/types';
+import { generateTeacherUsername } from '@/lib/parentUtils';
+import type { Teacher, School } from '@/types';
 
 export default function ProfilePage() {
   const { profile, refreshProfile } = useAuth();
   const toast = useToast();
-  const parentChildren = useParentChildren();
 
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -51,6 +48,13 @@ export default function ProfilePage() {
     }
   }, [profile?.id, profile?.school_id, profile?.role]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Keep form in sync when profile loads
+  useEffect(() => {
+    if (profile) {
+      setForm({ full_name: profile.full_name || '', phone: profile.phone || '' });
+    }
+  }, [profile?.full_name, profile?.phone]); // eslint-disable-line react-hooks/exhaustive-deps
+
   async function handleSave() {
     if (!profile) return;
     setSaving(true);
@@ -75,60 +79,41 @@ export default function ProfilePage() {
   async function handleChangePassword() {
     if (!profile) return;
 
-    // Validate
     if (!pwForm.current) { toast('Enter your current password', 'error'); return; }
     if (!pwForm.next || pwForm.next.length < 6) { toast('New password must be at least 6 characters', 'error'); return; }
     if (pwForm.next !== pwForm.confirm) { toast('Passwords do not match', 'error'); return; }
 
-    // Verify current password
-    const storedPassword =
-      profile.role === 'teacher' ? (teacher?.password ?? '') :
-      profile.role === 'parent' ? getParentPassword() :
-      '';
-
-    if (pwForm.current !== storedPassword) {
-      toast('Current password is incorrect', 'error');
-      return;
-    }
-
     setPwSaving(true);
     try {
-      if (profile.role === 'teacher' && teacher) {
-        await updateTeacher(teacher.id, { password: pwForm.next });
-        setTeacher(prev => prev ? { ...prev, password: pwForm.next } : prev);
-      } else if (profile.role === 'parent') {
-        // Update password on all linked student records (stored on parent via admission)
-        for (const child of parentChildren) {
-          // Password is derived — we store it on the student row as a custom field
-          // We update via updateStudent using a convention field
-          await updateStudent(child.id, { password: pwForm.next } as Partial<Student>);
-        }
+      // Re-authenticate with current password first
+      const { error: signInErr } = await supabase.auth.signInWithPassword({
+        email: profile.email,
+        password: pwForm.current,
+      });
+      if (signInErr) {
+        toast('Current password is incorrect', 'error');
+        return;
       }
+
+      // Update password via Supabase Auth
+      const { error: updateErr } = await supabase.auth.updateUser({ password: pwForm.next });
+      if (updateErr) throw updateErr;
+
       toast('Password changed successfully', 'success');
       setPwModalOpen(false);
-    } catch {
-      toast('Failed to change password', 'error');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to change password';
+      toast(msg, 'error');
     } finally {
       setPwSaving(false);
     }
   }
 
-  /** Get the current password for the logged-in parent (from first child's derived credentials) */
-  function getParentPassword(): string {
-    if (parentChildren.length === 0 || !school) return '';
-    const child = parentChildren[0];
-    return generateParentCredentials(child.full_name, child.admission_number ?? '', school.name).password;
-  }
-
-  /** Get the username to display (not email) */
+  /** Get the username/email to display */
   function getDisplayUsername(): string {
     if (!school) return profile?.email ?? '';
     if (profile?.role === 'teacher') {
       return generateTeacherUsername(profile.full_name, school.name);
-    }
-    if (profile?.role === 'parent' && parentChildren.length > 0) {
-      const child = parentChildren[0];
-      return generateParentCredentials(child.full_name, child.admission_number ?? '', school.name).username;
     }
     return profile?.email ?? '';
   }
@@ -167,10 +152,10 @@ export default function ProfilePage() {
               onChange={(e) => setForm({ ...form, full_name: e.target.value })}
             />
             <Input
-              label="Username"
+              label="Email / Username"
               value={displayUsername}
               disabled
-              hint="Your login username — cannot be changed"
+              hint="Your login identifier — cannot be changed"
             />
             <Input
               label="Phone"
@@ -178,11 +163,17 @@ export default function ProfilePage() {
               onChange={(e) => setForm({ ...form, phone: e.target.value })}
             />
             <Input label="Role" value={roleLabel} disabled />
+            {profile.role === 'teacher' && teacher && (
+              <>
+                <Input label="Employee ID" value={teacher.employee_id} disabled />
+                <Input label="Subject" value={teacher.subject ?? ''} disabled />
+                <Input label="Qualification" value={teacher.qualification ?? ''} disabled />
+              </>
+            )}
           </div>
 
           {/* Actions */}
           <div className="mt-6 flex items-center justify-between">
-            {/* Change password — only for teacher and parent */}
             {isTeacherOrParent ? (
               <Button
                 variant="outline"
