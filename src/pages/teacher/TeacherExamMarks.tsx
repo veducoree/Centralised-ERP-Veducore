@@ -170,7 +170,7 @@ export default function TeacherExamMarks() {
 
   function getSubjectsForExam(examDef: ExamDef): Subject[] {
     const isClassTeacher = assignments.some(
-      (a) => a.section_id === examDef.section_id && a.is_class_teacher === true
+      (a) => a.section_id === examDef.section_id && (a.is_class_teacher === true || !a.subject_id)
     );
     if (isClassTeacher) return subjects;
     return subjects.filter((sub) =>

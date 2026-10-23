@@ -849,8 +849,14 @@ export default function NewAdmissionPage() {
     }
   }
 
-  const credentials = school !== null
-    ? generateParentCredentials(formData.full_name, formData.admission_number, school.name)
+  const parentCreds = school !== null
+    ? generateParentCredentials(formData.full_name, formData.admission_number, school.name, formData.date_of_birth)
+    : null;
+  const credentials = parentCreds
+    ? {
+        username: parentCreds.username,
+        password: parentCreds.password,
+      }
     : null;
 
   // ─────────────────────────────────────────────────────────────────────────────

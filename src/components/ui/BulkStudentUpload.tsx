@@ -2,7 +2,8 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { Upload, Download, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { createStudent } from '@/services/api';
+import { createStudent, fetchSchool } from '@/services/api';
+import { generateParentCredentials } from '@/lib/parentUtils';
 import type { Class, Section } from '@/types';
 
 // ---------------------------------------------------------------------------
@@ -23,6 +24,7 @@ interface ParsedRow {
   father_name: string;
   mother_name: string;
   parent_email: string;
+  phone_number: string;
   date_of_birth: string;
   gender: string;
   class_id: string;
@@ -113,9 +115,9 @@ function parseCSV(text: string): string[][] {
 // ---------------------------------------------------------------------------
 
 const SAMPLE_CSV = [
-  'admission_number,full_name,father_name,mother_name,parent_email,date_of_birth,gender,class_name,section_name,address,admission_date',
-  '2024001,Rahul Sharma,Raj Sharma,Meena Sharma,sharma.family@example.com,2010-05-15,male,Class 6,A,123 Main Street,2024-04-01',
-  '2024002,Priya Singh,Anil Singh,Renu Singh,singh.family@example.com,2011-03-20,female,Class 7,B,456 Park Avenue,2024-04-01',
+  'admission_number,full_name,father_name,mother_name,parent_email,phone_number,date_of_birth,gender,class_name,section_name,address,admission_date',
+  '2024001,Rahul Sharma,Raj Sharma,Meena Sharma,sharma.family@example.com,9876543210,2010-05-15,male,Class 6,A,123 Main Street,2024-04-01',
+  '2024002,Priya Singh,Anil Singh,Renu Singh,singh.family@example.com,9876543211,2011-03-20,female,Class 7,B,456 Park Avenue,2024-04-01',
 ].join('\n');
 
 function downloadSampleCsv() {
@@ -138,7 +140,16 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [schoolName, setSchoolName] = useState('school');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (schoolId) {
+      fetchSchool(schoolId).then((s) => {
+        if (s?.name) setSchoolName(s.name);
+      }).catch(() => {});
+    }
+  }, [schoolId]);
 
   // Keep a ref to the latest onSuccess so the effect below never goes stale
   const onSuccessRef = useRef(onSuccess);
@@ -192,6 +203,7 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
         const iFather = col('father_name');
         const iMother = col('mother_name');
         const iParentEmail = col('parent_email');
+        const iPhone = col('phone_number') >= 0 ? col('phone_number') : col('phone') >= 0 ? col('phone') : col('parent_phone') >= 0 ? col('parent_phone') : col('emergency_contact');
         const iDob = col('date_of_birth');
         const iGender = col('gender');
         const iClass = col('class_name');
@@ -213,6 +225,8 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
           const father_name = get(iFather);
           const mother_name = get(iMother);
           const parent_email = get(iParentEmail);
+          const phoneRaw = get(iPhone);
+          const phone_number = phoneRaw ? phoneRaw.replace(/\D/g, '').slice(-10) : '';
           const date_of_birth = get(iDob);
           const gender = get(iGender) || 'male';
           const class_name = get(iClass);
@@ -259,6 +273,7 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
             father_name,
             mother_name,
             parent_email,
+            phone_number,
             date_of_birth,
             gender,
             class_id,
@@ -334,6 +349,7 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
           father_name: row.father_name || null,
           mother_name: row.mother_name || null,
           parent_email: row.parent_email || null,
+          emergency_contact: row.phone_number || null,
           date_of_birth: row.date_of_birth || null,
           gender: row.gender || null,
           class_id: row.class_id,
@@ -403,7 +419,7 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
         <div className="mt-4 rounded-lg bg-gray-50 px-4 py-3">
           <p className="text-xs font-medium text-gray-500 mb-1">Expected CSV columns</p>
           <p className="text-xs text-gray-400 font-mono break-all">
-            admission_number, full_name, father_name, mother_name, parent_email, date_of_birth, gender, class_name, section_name, address, admission_date
+            admission_number, full_name, father_name, mother_name, parent_email, phone_number, date_of_birth, gender, class_name, section_name, address, admission_date
           </p>
           <p className="mt-1 text-xs text-gray-400">Required: admission_number, full_name, class_name, section_name</p>
         </div>
@@ -437,6 +453,7 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
                 <th className="px-3 py-2 font-semibold text-gray-600">Full Name</th>
                 <th className="px-3 py-2 font-semibold text-gray-600">Father's Name</th>
                 <th className="px-3 py-2 font-semibold text-gray-600">Mother's Name</th>
+                <th className="px-3 py-2 font-semibold text-gray-600">Phone</th>
                 <th className="px-3 py-2 font-semibold text-gray-600">Class</th>
                 <th className="px-3 py-2 font-semibold text-gray-600">Section</th>
                 <th className="px-3 py-2 font-semibold text-gray-600">Status</th>
@@ -450,6 +467,7 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
                   <td className="px-3 py-2 text-gray-700">{row.full_name || '—'}</td>
                   <td className="px-3 py-2 text-gray-700">{row.father_name || '—'}</td>
                   <td className="px-3 py-2 text-gray-700">{row.mother_name || '—'}</td>
+                  <td className="px-3 py-2 text-gray-700">{row.phone_number ? `+91 ${row.phone_number}` : '—'}</td>
                   <td className="px-3 py-2 text-gray-700">{row.class_name || '—'}</td>
                   <td className="px-3 py-2 text-gray-700">{row.section_name || '—'}</td>
                   <td className="px-3 py-2">
@@ -472,9 +490,30 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-3">
         <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
-        <p className="text-sm text-gray-600">Importing students, please wait…</p>
+        <p className="text-sm font-medium text-gray-700">Enrolling students and provisioning parent accounts…</p>
+        <p className="text-xs text-gray-400">Please wait while student and parent records are created.</p>
       </div>
     );
+  }
+
+  function downloadCreatedParentCredentials() {
+    const valid = parsedRows.filter((r) => r.errors.length === 0);
+    const rows = [
+      'Admission No,Student Name,Parent Name,Username,Password',
+      ...valid.map((r) => {
+        const creds = generateParentCredentials(r.full_name, r.admission_number, schoolName, r.date_of_birth);
+        const parentName = r.father_name || r.mother_name || `${r.full_name}'s Parent`;
+        return `"${r.admission_number}","${r.full_name}","${parentName}","${creds.username}","${creds.password}"`;
+      }),
+    ].join('\n');
+
+    const blob = new Blob([rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `parent_credentials_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   function renderDonePhase() {
@@ -483,9 +522,23 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
       <div className="flex flex-col py-8 gap-4">
         <div className="flex flex-col items-center gap-2">
           {importResult.success > 0 && (
-            <div className="flex items-center gap-2 text-green-600">
-              <CheckCircle className="h-6 w-6" />
-              <span className="font-semibold">{importResult.success} student{importResult.success !== 1 ? 's' : ''} added successfully</span>
+            <div className="flex flex-col items-center gap-2 text-green-600">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-6 w-6" />
+                <span className="font-semibold">{importResult.success} student{importResult.success !== 1 ? 's' : ''} added successfully</span>
+              </div>
+              <p className="text-xs text-gray-500">
+                ⚡ Parent accounts have been automatically created and linked for all {importResult.success} students.
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                icon={<Download className="h-4 w-4" />}
+                onClick={downloadCreatedParentCredentials}
+                className="mt-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50 shadow-2xs"
+              >
+                Download Parent Credentials (CSV)
+              </Button>
             </div>
           )}
           {importResult.failed > 0 && (

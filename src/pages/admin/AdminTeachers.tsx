@@ -158,6 +158,9 @@ export default function AdminTeachers() {
         date_of_joining: form.date_of_joining || '',
         status: 'active',
         password: form.password,
+        avatar_url: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       };
       setCredTeacher(newTeacher);
       setCredVisible(true);

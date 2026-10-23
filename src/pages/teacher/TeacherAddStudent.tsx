@@ -53,13 +53,13 @@ export default function TeacherAddStudent() {
       if (t) {
         const a = await fetchTeacherAssignments(t.id);
         setAssignments(a);
-        // Pre-select first incharge section
-        const firstIncharge = a.find((ca) => ca.is_class_teacher);
+        const isIncharge = (ca: any) => Boolean(ca.is_class_teacher || !ca.subject_id);
+        const firstIncharge = a.find(isIncharge);
         if (firstIncharge) setSelectedSection(firstIncharge.section_id);
 
         // Load full classes for incharge sections (needed for bulk CSV)
         const allClasses = await fetchClasses(profile.school_id);
-        const inchargeAssignments = a.filter((ca) => ca.is_class_teacher);
+        const inchargeAssignments = a.filter(isIncharge);
         const inchargeClassIds = [...new Set(inchargeAssignments.map((ca) => ca.class_id))];
         const incharge = allClasses.filter((c) => inchargeClassIds.includes(c.id));
         setInchargeClasses(incharge);
@@ -87,7 +87,7 @@ export default function TeacherAddStudent() {
 
   // Only sections where teacher is class incharge
   const uniqueSections = assignments
-    .filter((a) => a.is_class_teacher)
+    .filter((a) => a.is_class_teacher || !a.subject_id)
     .reduce(
       (acc: { id: string; label: string; classId: string }[], a) => {
         if (!acc.find((x) => x.id === a.section_id)) {
@@ -137,7 +137,7 @@ export default function TeacherAddStudent() {
         address: form.address || undefined,
         status: 'active',
       });
-      toast('Student added successfully', 'success');
+      toast('Student added & Parent account created successfully', 'success');
       setModalOpen(false);
       loadStudents();
     } catch (err) {
@@ -178,7 +178,7 @@ export default function TeacherAddStudent() {
                 className="bg-emerald-600 text-white hover:bg-emerald-700 active:bg-emerald-800"
                 icon={<UserPlus className="h-4 w-4" />}
                 onClick={() => navigate('/teacher/new-admission')}
-                disabled={assignments.filter((a) => a.is_class_teacher).length === 0}
+                disabled={assignments.filter((a) => a.is_class_teacher || !a.subject_id).length === 0}
               >
                 New Admission
               </Button>

@@ -20,11 +20,29 @@ export interface ParentGroup {
 }
 
 /** Returns the first word of a school name, lowercased and letters-only.
- *  e.g. "Greenwood International School" → "greenwood" */
+ *  e.g. "Green Valley Convent School" → "green"
+ *       "greenvalleyconventschool" → "green"
+ *       "Greenwood International School" → "greenwood" */
 export function getSchoolSlug(schoolName: string): string {
-  return (schoolName.trim().split(/\s+/)[0] ?? 'school')
+  if (!schoolName) return 'school';
+  let name = schoolName.trim();
+  // Handle camelCase e.g. "GreenValley" -> "Green Valley"
+  name = name.replace(/([a-z])([A-Z])/g, '$1 $2');
+
+  // If no spaces, check if words like valley/convent/school/academy/public/international/high are concatenated
+  if (!/\s/.test(name)) {
+    const compoundMatch = name.match(/^([a-zA-Z]+?)(valley|convent|school|academy|public|international|grammar|high|college|vidyalaya|vidhyalaya|gurukul|foundation)/i);
+    if (compoundMatch && compoundMatch[1]) {
+      name = compoundMatch[1];
+    }
+  }
+
+  // Get first word, stripping non-alphanumeric
+  const firstWord = (name.split(/[\s_\-.]+/)[0] ?? 'school')
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '');
+
+  return firstWord || 'school';
 }
 
 /** Generates teacher username: firstname@schoolslug.veducore */
@@ -34,19 +52,38 @@ export function generateTeacherUsername(fullName: string, schoolName: string): s
   return first && slug ? `${first}@${slug}.veducore` : '';
 }
 
-/** Generates parent credentials: admissionnumber@schoolslug.veducore */
+/** Generates parent credentials:
+ *  username: admissionnumber@schoolslug.veducore (e.g. 23@green.veducore)
+ *  password: studentfirstname4letters + dobYear (e.g. arya2005)
+ */
 export function generateParentCredentials(
   studentName: string,
   admissionNumber: string,
   schoolName = 'school',
+  dateOfBirth?: string | null,
 ): { username: string; password: string } {
   const slug = getSchoolSlug(schoolName);
   const adm = admissionNumber.replace(/\s+/g, '');
   const username = `${adm}@${slug}.veducore`;
-  const yearMatch = admissionNumber.match(/(\d{4})/);
-  const year = yearMatch ? yearMatch[1] : new Date().getFullYear().toString();
-  const namePart = studentName.replace(/\s+/g, '').toLowerCase().slice(0, 4);
-  return { username, password: `${namePart}${year}` };
+
+  // Student name first 4 letters (letters only, lowercase)
+  const lettersOnly = studentName.replace(/[^a-zA-Z]/g, '').toLowerCase();
+  const namePart = (lettersOnly.slice(0, 4) || 'user').padEnd(4, '0');
+
+  // DOB year (e.g. "2005-08-15" or "15/08/2005" → "2005")
+  let year = '';
+  if (dateOfBirth) {
+    const match = dateOfBirth.match(/(\d{4})/);
+    if (match) year = match[1];
+  }
+  if (!year) {
+    const admMatch = admissionNumber.match(/(\d{4})/);
+    year = admMatch ? admMatch[1] : '2005';
+  }
+
+  const password = `${namePart}${year}`;
+
+  return { username, password };
 }
 
 export function getParentGroups(students: Student[], schoolName = 'school'): ParentGroup[] {
@@ -62,6 +99,7 @@ export function getParentGroups(students: Student[], schoolName = 'school'): Par
       student.full_name,
       student.admission_number ?? '',
       schoolName,
+      student.date_of_birth,
     );
 
     const child: ParentChildEntry = {

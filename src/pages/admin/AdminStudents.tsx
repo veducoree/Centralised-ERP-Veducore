@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Eye, Pencil, Trash2, Users, Upload, UserPlus } from 'lucide-react';
+import { Plus, Eye, Pencil, Trash2, Users, Upload, UserPlus, KeyRound, Copy, EyeOff, CheckCircle } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Form';
@@ -10,11 +10,12 @@ import { SearchInput, PageHeader, LoadingSpinner } from '@/components/ui/Primiti
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
 import {
-  fetchStudents, fetchClasses, createStudent, updateStudent, deleteStudent,
+  fetchStudents, fetchClasses, createStudent, updateStudent, deleteStudent, ensureParentForStudent,
 } from '@/services/api';
 import type { Student, Class, Section } from '@/types';
 import { formatDate, validateEmail, getInitials } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/Badge';
+import { supabase } from '@/lib/supabase';
 
 export default function AdminStudents() {
   const { profile } = useAuth();
@@ -32,10 +33,21 @@ export default function AdminStudents() {
   const [saving, setSaving] = useState(false);
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const [form, setForm] = useState({
-    admission_number: '', full_name: '', father_name: '', date_of_birth: '', gender: 'male',
-    class_id: '', section_id: '', address: '', admission_date: '',
+    admission_number: '', full_name: '', father_name: '', mother_name: '', date_of_birth: '', gender: 'male',
+    class_id: '', section_id: '', address: '', parent_email: '', emergency_contact: '', admission_date: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Parent credentials modal state
+  const [parentCredModal, setParentCredModal] = useState<{
+    studentName: string;
+    parentName: string;
+    username: string;
+    password: string;
+  } | null>(null);
+  const [parentCredVisible, setParentCredVisible] = useState(true);
+  const [parentCredCopied, setParentCredCopied] = useState(false);
+  const [loadingParentCred, setLoadingParentCred] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     if (!profile?.school_id) return;
@@ -62,8 +74,8 @@ export default function AdminStudents() {
   function openAdd() {
     setEditing(null);
     setForm({
-      admission_number: '', full_name: '', father_name: '', date_of_birth: '', gender: 'male',
-      class_id: '', section_id: '', address: '',
+      admission_number: '', full_name: '', father_name: '', mother_name: '', date_of_birth: '', gender: 'male',
+      class_id: '', section_id: '', address: '', parent_email: '', emergency_contact: '',
       admission_date: new Date().toISOString().split('T')[0],
     });
     setErrors({});
@@ -72,15 +84,21 @@ export default function AdminStudents() {
 
   function openEdit(student: Student) {
     setEditing(student);
+    const rawContact = (student as any).emergency_contact || '';
+    const digitsOnly = rawContact.replace(/\D/g, '');
+    const cleanContact = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
     setForm({
       admission_number: student.admission_number,
       full_name: student.full_name,
       father_name: student.father_name || '',
+      mother_name: student.mother_name || '',
       date_of_birth: student.date_of_birth || '',
       gender: student.gender || 'male',
       class_id: student.class_id || '',
       section_id: student.section_id || '',
       address: student.address || '',
+      parent_email: student.parent_email || '',
+      emergency_contact: cleanContact,
       admission_date: student.admission_date || '',
     });
     setErrors({});
@@ -106,11 +124,14 @@ export default function AdminStudents() {
         admission_number: form.admission_number,
         full_name: form.full_name,
         father_name: form.father_name || null,
+        mother_name: form.mother_name || null,
         date_of_birth: form.date_of_birth || null,
         gender: form.gender,
         class_id: form.class_id,
         section_id: form.section_id,
         address: form.address || null,
+        parent_email: form.parent_email?.trim() || null,
+        emergency_contact: form.emergency_contact?.trim() || null,
         admission_date: form.admission_date || null,
       };
 
@@ -118,8 +139,19 @@ export default function AdminStudents() {
         await updateStudent(editing.id, data);
         toast('Student updated successfully', 'success');
       } else {
-        await createStudent(data);
-        toast('Student added successfully', 'success');
+        const res = await createStudent(data);
+        toast('Student & Parent account created successfully!', 'success');
+        if ((res as any)?._parentResult?.credentials) {
+          const pr = (res as any)._parentResult;
+          setParentCredModal({
+            studentName: form.full_name,
+            parentName: pr.parent?.full_name || form.father_name || `${form.full_name}'s Parent`,
+            username: pr.credentials.username,
+            password: pr.credentials.password,
+          });
+          setParentCredVisible(true);
+          setParentCredCopied(false);
+        }
       }
       setModalOpen(false);
       loadData();
@@ -128,6 +160,44 @@ export default function AdminStudents() {
       toast(msg, 'error');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function openParentCredentials(student: Student) {
+    setLoadingParentCred(student.id);
+    try {
+      const { data: links } = await supabase
+        .from('parent_students')
+        .select('*, parent:parents(*)')
+        .eq('student_id', student.id);
+
+      if (links && links.length > 0 && links[0].parent) {
+        const p = links[0].parent as any;
+        setParentCredModal({
+          studentName: student.full_name,
+          parentName: p.full_name || `${student.full_name}'s Parent`,
+          username: p.email,
+          password: p.password || '(not set)',
+        });
+        setParentCredVisible(true);
+        setParentCredCopied(false);
+      } else {
+        toast('Creating & linking parent account...', 'info');
+        const pr = await ensureParentForStudent(student);
+        setParentCredModal({
+          studentName: student.full_name,
+          parentName: pr.parent?.full_name || `${student.full_name}'s Parent`,
+          username: pr.credentials.username,
+          password: pr.credentials.password,
+        });
+        setParentCredVisible(true);
+        setParentCredCopied(false);
+      }
+    } catch (err) {
+      console.error(err);
+      toast('Failed to load parent credentials', 'error');
+    } finally {
+      setLoadingParentCred(null);
     }
   }
 
@@ -223,6 +293,14 @@ export default function AdminStudents() {
                     <td className="px-4 py-3"><StatusBadge status={s.status} /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1 whitespace-nowrap">
+                        <button
+                          onClick={() => openParentCredentials(s)}
+                          className="rounded-lg p-1.5 text-gray-400 hover:bg-cyan-50 hover:text-cyan-700 transition-colors disabled:opacity-50"
+                          title="View Parent Credentials"
+                          disabled={loadingParentCred === s.id}
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </button>
                         <button onClick={() => navigate(`/admin/students/${s.id}`)} className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors" title="View">
                           <Eye className="h-4 w-4" />
                         </button>
@@ -259,6 +337,7 @@ export default function AdminStudents() {
           <Input label="Admission Number" required value={form.admission_number} onChange={(e) => setForm({ ...form, admission_number: e.target.value })} error={errors.admission_number} />
           <Input label="Full Name" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} error={errors.full_name} />
           <Input label="Father's Name" value={form.father_name} onChange={(e) => setForm({ ...form, father_name: e.target.value })} placeholder="Father's full name" />
+          <Input label="Mother's Name" value={form.mother_name} onChange={(e) => setForm({ ...form, mother_name: e.target.value })} placeholder="Mother's full name" />
           <Input label="Date of Birth" type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} />
           <Select label="Gender" value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
             <option value="male">Male</option>
@@ -274,6 +353,34 @@ export default function AdminStudents() {
             {availableSections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </Select>
           <Input label="Admission Date" type="date" value={form.admission_date} onChange={(e) => setForm({ ...form, admission_date: e.target.value })} />
+          <Input
+            label="Email"
+            type="email"
+            value={form.parent_email}
+            onChange={(e) => setForm({ ...form, parent_email: e.target.value })}
+            placeholder="Enter email address"
+          />
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              Mobile Number
+            </label>
+            <div className="flex rounded-lg shadow-2xs">
+              <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-600 text-sm font-medium select-none">
+                +91
+              </span>
+              <input
+                type="tel"
+                maxLength={10}
+                value={form.emergency_contact}
+                onChange={(e) => {
+                  const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                  setForm({ ...form, emergency_contact: digits });
+                }}
+                className="flex-1 rounded-r-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                placeholder="10-digit mobile number"
+              />
+            </div>
+          </div>
           <div className="sm:col-span-2">
             <Input label="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
           </div>
@@ -287,6 +394,84 @@ export default function AdminStudents() {
         classes={classes}
         onSuccess={loadData}
       />
+
+      {/* Parent Credentials Modal */}
+      <Modal
+        open={!!parentCredModal}
+        onClose={() => setParentCredModal(null)}
+        title="Parent Portal Credentials"
+        description={parentCredModal ? `Student: ${parentCredModal.studentName} · Parent: ${parentCredModal.parentName}` : ''}
+        size="md"
+        footer={<Button variant="outline" onClick={() => setParentCredModal(null)}>Close</Button>}
+      >
+        {parentCredModal && (
+          <div className="space-y-4">
+            <div className="rounded-xl border border-cyan-200 bg-gradient-to-br from-cyan-50/70 to-blue-50/50 p-4 space-y-3">
+              <div className="flex items-center justify-between pb-3 border-b border-cyan-100">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-0.5">Username / Email</p>
+                  <p className="font-mono text-sm font-semibold text-cyan-900">{parentCredModal.username}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(parentCredModal.username);
+                    toast('Username copied', 'success');
+                  }}
+                  className="rounded-lg p-1.5 bg-white shadow-2xs border border-gray-200 text-gray-500 hover:text-cyan-700 hover:border-cyan-300 transition-all"
+                  title="Copy username"
+                >
+                  <Copy className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-0.5">Portal Password</p>
+                  <p className="font-mono text-sm font-semibold text-gray-900 tracking-wide">
+                    {parentCredVisible ? (parentCredModal.password || '(not stored)') : '••••••••'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setParentCredVisible((v) => !v)}
+                    className="rounded-lg p-1.5 bg-white shadow-2xs border border-gray-200 text-gray-500 hover:text-gray-800 hover:border-gray-300 transition-all"
+                    title={parentCredVisible ? 'Hide' : 'Show'}
+                  >
+                    {parentCredVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(parentCredModal.password);
+                      setParentCredCopied(true);
+                      toast('Password copied', 'success');
+                      setTimeout(() => setParentCredCopied(false), 1500);
+                    }}
+                    className="rounded-lg p-1.5 bg-white shadow-2xs border border-gray-200 text-gray-500 hover:text-cyan-700 hover:border-cyan-300 transition-all"
+                    title="Copy password"
+                  >
+                    {parentCredCopied ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              variant="outline"
+              className="w-full flex items-center justify-center gap-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium shadow-2xs"
+              onClick={() => {
+                const text = `Parent Login Credentials\nStudent: ${parentCredModal.studentName}\nParent: ${parentCredModal.parentName}\nUsername: ${parentCredModal.username}\nPassword: ${parentCredModal.password}\nPortal: Veducore Parent App / Web`;
+                navigator.clipboard.writeText(text);
+                toast('Parent credentials copied to clipboard', 'success');
+              }}
+            >
+              <Copy className="h-4 w-4" /> Copy All Credentials
+            </Button>
+          </div>
+        )}
+      </Modal>
 
       <ConfirmDialog
         open={!!deleteId}

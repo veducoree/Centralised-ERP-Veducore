@@ -364,7 +364,7 @@ export default function TeacherNewAdmission() {
       if (t) {
         const a = await fetchTeacherAssignments(t.id);
         setAssignments(a);
-        const first = a.find((x) => x.is_class_teacher);
+        const first = a.find((x) => x.is_class_teacher || !x.subject_id);
         if (first) setFormData((prev) => ({ ...prev, section_id: first.section_id }));
       }
       if (s) setSchool(s);
@@ -376,7 +376,7 @@ export default function TeacherNewAdmission() {
 
   // Only incharge sections
   const inchargeSections = assignments
-    .filter((a) => a.is_class_teacher)
+    .filter((a) => a.is_class_teacher || !a.subject_id)
     .reduce((acc: { id: string; label: string; classId: string }[], a) => {
       if (!acc.find((x) => x.id === a.section_id))
         acc.push({ id: a.section_id, label: `${a.class?.name} - ${a.section?.name}`, classId: a.class_id });
@@ -462,8 +462,14 @@ export default function TeacherNewAdmission() {
     }
   }
 
-  const credentials = school !== null
-    ? generateParentCredentials(formData.full_name, formData.admission_number, school.name)
+  const parentCreds = school !== null
+    ? generateParentCredentials(formData.full_name, formData.admission_number, school.name, formData.date_of_birth)
+    : null;
+  const credentials = parentCreds
+    ? {
+        username: parentCreds.username,
+        password: parentCreds.password,
+      }
     : null;
 
   // ── Render ────────────────────────────────────────────────────────────────

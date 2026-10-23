@@ -1,42 +1,103 @@
-import { useState, useEffect, useCallback, type FormEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Eye, EyeOff, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth, getDashboardPath } from '@/auth/AuthContext';
 import veducoreLogo from '@/assets/veducore-logo.png';
 
-// ── Math Captcha ──────────────────────────────────────────────────────────────
+// ── Image Captcha Helper ──────────────────────────────────────────────────────
 
-interface CaptchaState {
-  a: number;
-  b: number;
-  op: '+' | '-' | '×';
-  answer: number;
+// Unambiguous characters (avoiding 0/O, 1/I/l)
+const CAPTCHA_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+function generateRandomCaptcha(length = 5): string {
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += CAPTCHA_CHARS.charAt(Math.floor(Math.random() * CAPTCHA_CHARS.length));
+  }
+  return result;
 }
 
-function generateCaptcha(): CaptchaState {
-  const ops: Array<'+' | '-' | '×'> = ['+', '-', '×'];
-  const op = ops[Math.floor(Math.random() * ops.length)];
-  let a: number, b: number, answer: number;
+function renderCaptchaToCanvas(canvas: HTMLCanvasElement, text: string) {
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
 
-  switch (op) {
-    case '+':
-      a = Math.floor(Math.random() * 20) + 1;
-      b = Math.floor(Math.random() * 20) + 1;
-      answer = a + b;
-      break;
-    case '-':
-      a = Math.floor(Math.random() * 20) + 10;
-      b = Math.floor(Math.random() * a) + 1;
-      answer = a - b;
-      break;
-    case '×':
-      a = Math.floor(Math.random() * 9) + 2;
-      b = Math.floor(Math.random() * 9) + 2;
-      answer = a * b;
-      break;
+  const width = canvas.width;
+  const height = canvas.height;
+
+  // Background gradient
+  const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+  bgGrad.addColorStop(0, '#f1f5f9');
+  bgGrad.addColorStop(0.5, '#e2e8f0');
+  bgGrad.addColorStop(1, '#f8fafc');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, width, height);
+
+  // Background noise: random decorative lines
+  for (let i = 0; i < 4; i++) {
+    ctx.strokeStyle = `rgba(${Math.floor(Math.random() * 100 + 80)}, ${Math.floor(Math.random() * 100 + 80)}, ${Math.floor(Math.random() * 100 + 120)}, 0.45)`;
+    ctx.lineWidth = Math.random() * 1.5 + 1;
+    ctx.beginPath();
+    ctx.moveTo(Math.random() * width, Math.random() * height);
+    ctx.bezierCurveTo(
+      Math.random() * width, Math.random() * height,
+      Math.random() * width, Math.random() * height,
+      Math.random() * width, Math.random() * height
+    );
+    ctx.stroke();
   }
 
-  return { a, b, op, answer };
+  // Background noise: dots
+  for (let i = 0; i < 25; i++) {
+    ctx.fillStyle = `rgba(${Math.floor(Math.random() * 120)}, ${Math.floor(Math.random() * 120)}, ${Math.floor(Math.random() * 120)}, 0.35)`;
+    ctx.beginPath();
+    ctx.arc(Math.random() * width, Math.random() * height, Math.random() * 1.5 + 0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Draw characters
+  const charCount = text.length;
+  const slotWidth = (width - 24) / charCount;
+
+  const fontFamilies = ['Courier New', 'Georgia', 'Arial', 'Verdana', 'Trebuchet MS'];
+  const colors = [
+    '#0f172a', // slate-900
+    '#1e3a8a', // blue-900
+    '#065f46', // emerald-800
+    '#7c2d12', // orange-900
+    '#581c87', // purple-900
+    '#164e63', // cyan-900
+    '#312e81', // indigo-900
+  ];
+
+  for (let i = 0; i < charCount; i++) {
+    const char = text[i];
+    const fontSize = Math.floor(Math.random() * 4) + 21; // 21-25px
+    const font = fontFamilies[Math.floor(Math.random() * fontFamilies.length)];
+    ctx.font = `bold ${fontSize}px ${font}`;
+    ctx.fillStyle = colors[Math.floor(Math.random() * colors.length)];
+
+    const x = 14 + i * slotWidth + (Math.random() * 3 - 1.5);
+    const y = height / 2 + (Math.random() * 6 - 2) + 6;
+    const angle = (Math.random() * 0.4 - 0.2); // -11 to +11 deg
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    ctx.fillText(char, 0, 0);
+    ctx.restore();
+  }
+
+  // Strikethrough wavy line across text
+  ctx.strokeStyle = 'rgba(71, 85, 105, 0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(8, height * 0.55 + Math.random() * 6 - 3);
+  ctx.bezierCurveTo(
+    width * 0.3, height * 0.35,
+    width * 0.7, height * 0.75,
+    width - 8, height * 0.45 + Math.random() * 6 - 3
+  );
+  ctx.stroke();
 }
 
 // ── Login Page ────────────────────────────────────────────────────────────────
@@ -52,15 +113,26 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Captcha state
-  const [captcha, setCaptcha] = useState<CaptchaState>(generateCaptcha);
+  // Image Captcha state
+  const [captchaCode, setCaptchaCode] = useState(() => generateRandomCaptcha(5));
   const [captchaInput, setCaptchaInput] = useState('');
-  const [captchaError, setCaptchaError] = useState(false);
+  const [captchaError, setCaptchaError] = useState('');
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Redraw canvas whenever captchaCode changes
+  useEffect(() => {
+    if (canvasRef.current) {
+      renderCaptchaToCanvas(canvasRef.current, captchaCode);
+    }
+  }, [captchaCode]);
 
   const refreshCaptcha = useCallback(() => {
-    setCaptcha(generateCaptcha());
+    const newCode = generateRandomCaptcha(5);
+    setCaptchaCode(newCode);
     setCaptchaInput('');
-    setCaptchaError(false);
+    if (canvasRef.current) {
+      renderCaptchaToCanvas(canvasRef.current, newCode);
+    }
   }, []);
 
   // Redirect if already authenticated
@@ -74,18 +146,19 @@ export default function LoginPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    setCaptchaError(false);
+    setCaptchaError('');
 
     if (!identifier || !password) {
       setError('Please enter both username and password.');
       return;
     }
 
-    // Verify captcha
-    if (parseInt(captchaInput, 10) !== captcha.answer) {
-      setCaptchaError(true);
+    // Verify image captcha (case-insensitive check)
+    if (!captchaInput.trim() || captchaInput.trim().toUpperCase() !== captchaCode.toUpperCase()) {
+      setCaptchaError('Wrong captcha code. A new image has been loaded.');
       setCaptchaInput('');
       refreshCaptcha();
+      // Notice: identifier & password are NOT cleared so user doesn't have to re-type them!
       return;
     }
 
@@ -94,8 +167,9 @@ export default function LoginPage() {
     setLoading(false);
 
     if (signInError) {
-      // Refresh captcha on failed login
+      // Refresh captcha on failed login, but preserve username & password
       refreshCaptcha();
+      setCaptchaInput('');
       if (signInError.includes('Invalid login')) {
         setError('Invalid credentials. Please check your username and password.');
       } else if (signInError.includes('Email not confirmed')) {
@@ -175,46 +249,67 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Math Captcha */}
+            {/* Image Captcha */}
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                Security Check
-              </label>
-              <div className={`flex items-center gap-3 rounded-lg border px-3.5 py-2.5 transition-colors ${
-                captchaError
-                  ? 'border-red-300 bg-red-50'
-                  : 'border-gray-300 bg-gray-50'
-              }`}>
-                {/* Math expression */}
-                <span className="select-none font-mono text-sm font-semibold text-gray-800 whitespace-nowrap">
-                  {captcha.a} {captcha.op} {captcha.b} =
-                </span>
-                {/* Answer input */}
-                <input
-                  type="number"
-                  value={captchaInput}
-                  onChange={(e) => {
-                    setCaptchaInput(e.target.value);
-                    setCaptchaError(false);
-                  }}
-                  placeholder="?"
-                  className="w-16 rounded-md border border-gray-300 bg-white px-2 py-1 text-center text-sm font-mono font-medium text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                  disabled={loading}
-                  autoComplete="off"
-                />
-                {/* Refresh captcha */}
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-medium text-gray-700">
+                  Security Code (CAPTCHA)
+                </label>
+                <span className="text-[11px] text-gray-400">Click image or icon to refresh</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {/* Canvas Captcha Image */}
+                <div
+                  className="relative flex items-center justify-center overflow-hidden rounded-lg border border-gray-300 bg-gray-100 shadow-2xs select-none cursor-pointer group"
+                  onClick={refreshCaptcha}
+                  title="Click image to reload captcha"
+                >
+                  <canvas
+                    ref={canvasRef}
+                    width={130}
+                    height={40}
+                    className="block group-hover:opacity-90 transition-opacity"
+                  />
+                </div>
+
+                {/* Refresh Button */}
                 <button
                   type="button"
                   onClick={refreshCaptcha}
                   disabled={loading}
-                  className="ml-auto rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-200 hover:text-gray-600 disabled:opacity-40"
-                  title="Get new question"
+                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-2xs hover:bg-gray-50 hover:text-blue-600 transition-colors disabled:opacity-40"
+                  title="Refresh Captcha Image"
                 >
-                  <RefreshCw className="h-3.5 w-3.5" />
+                  <RefreshCw className="h-4 w-4" />
                 </button>
+
+                {/* Captcha Input */}
+                <input
+                  type="text"
+                  value={captchaInput}
+                  onChange={(e) => {
+                    setCaptchaInput(e.target.value);
+                    if (captchaError) setCaptchaError('');
+                  }}
+                  placeholder="Enter code"
+                  maxLength={6}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-mono tracking-widest text-gray-900 placeholder-gray-400 uppercase transition-colors focus:outline-none focus:ring-2 ${
+                    captchaError
+                      ? 'border-red-400 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20'
+                      : 'border-gray-300 bg-white focus:border-blue-500 focus:ring-blue-500/30'
+                  }`}
+                  disabled={loading}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
               </div>
+
               {captchaError && (
-                <p className="mt-1 text-xs text-red-500">Incorrect answer. A new question has been generated.</p>
+                <p className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-red-600 animate-in fade-in">
+                  <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+                  {captchaError}
+                </p>
               )}
             </div>
 

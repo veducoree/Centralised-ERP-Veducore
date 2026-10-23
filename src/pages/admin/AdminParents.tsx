@@ -1,33 +1,21 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
-  Plus, Pencil, Trash2, User, Mail, Phone, MapPin, Link2, Unlink,
+  Pencil, Trash2, User, Mail, Phone, MapPin,
+  Copy, Eye, EyeOff, CheckCircle, GraduationCap, KeyRound,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Input, Select } from '@/components/ui/Form';
 import { Modal, ConfirmDialog } from '@/components/ui/Modal';
 import { SearchInput, PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
 import {
-  fetchParents, updateParent, deleteParent, createParentAccount,
-  fetchStudents, linkParentStudent, fetchParentStudents, unlinkParentStudent,
+  fetchParents, updateParent, deleteParent, fetchSchool,
 } from '@/services/api';
-import type { Parent, Student, ParentStudent } from '@/types';
-import { validateEmail, getInitials } from '@/lib/utils';
-import { supabase } from '@/lib/supabase';
+import type { Parent, School } from '@/types';
+import { getInitials } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/Badge';
-
-// ─── Supabase helper ────────────────────────────────────────────────────────
-
-async function refreshLinks(parentId: string): Promise<ParentStudent[]> {
-  const { data } = await supabase
-    .from('parent_students')
-    .select('*, student:students(*)')
-    .eq('parent_id', parentId);
-  return (data as ParentStudent[]) || [];
-}
 
 // ─── Main View ───────────────────────────────────────────────────────────────
 
@@ -35,31 +23,34 @@ function AdminParentsView() {
   const { profile } = useAuth();
   const toast = useToast();
   const [parents, setParents] = useState<Parent[]>([]);
+  const [school, setSchool] = useState<School | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Parent | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ full_name: '', email: '', password: '', phone: '', occupation: '', address: '' });
-  const [editForm, setEditForm] = useState<Partial<Parent>>({});
-  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  // Link modal state
-  const [linkModalOpen, setLinkModalOpen] = useState(false);
-  const [linkParent, setLinkParent] = useState<Parent | null>(null);
-  const [allStudents, setAllStudents] = useState<Student[]>([]);
-  const [linkStudentId, setLinkStudentId] = useState('');
-  const [linkRelationship, setLinkRelationship] = useState('guardian');
-  const [currentLinks, setCurrentLinks] = useState<ParentStudent[]>([]);
+  // Edit modal state (Only Phone Number & Address)
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editing, setEditing] = useState<Parent | null>(null);
+  const [editPhone, setEditPhone] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+
+  // Credentials modal state
+  const [credModalOpen, setCredModalOpen] = useState(false);
+  const [credParent, setCredParent] = useState<Parent | null>(null);
+  const [credVisible, setCredVisible] = useState(true);
+  const [credCopied, setCredCopied] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!profile?.school_id) return;
     setLoading(true);
     try {
-      const data = await fetchParents(profile.school_id);
+      const [data, schoolData] = await Promise.all([
+        fetchParents(profile.school_id),
+        fetchSchool(profile.school_id),
+      ]);
       setParents(data);
+      setSchool(schoolData);
     } catch (err) {
       toast('Failed to load parents', 'error');
       console.error(err);
@@ -70,76 +61,41 @@ function AdminParentsView() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  const filtered = parents.filter((p) =>
-    p.full_name.toLowerCase().includes(search.toLowerCase()) ||
-    p.email.toLowerCase().includes(search.toLowerCase())
-  );
-
-  function openAdd() {
-    setForm({ full_name: '', email: '', password: '', phone: '', occupation: '', address: '' });
-    setErrors({});
-    setModalOpen(true);
+  function openCredentials(p: Parent) {
+    setCredParent(p);
+    setCredVisible(true);
+    setCredCopied(false);
+    setCredModalOpen(true);
   }
 
   function openEdit(p: Parent) {
     setEditing(p);
-    setEditForm({ full_name: p.full_name, phone: p.phone, occupation: p.occupation, address: p.address, status: p.status });
+    const rawPhone = p.phone || '';
+    const digitsOnly = rawPhone.replace(/\D/g, '');
+    const cleanPhone = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
+    setEditPhone(cleanPhone);
+    setEditAddress(p.address || '');
     setEditModalOpen(true);
-  }
-
-  async function openLinkModal(p: Parent) {
-    setLinkParent(p);
-    setLinkStudentId('');
-    setLinkRelationship('guardian');
-    if (profile?.school_id) {
-      const students = await fetchStudents(profile.school_id);
-      setAllStudents(students);
-      const links = await refreshLinks(p.id);
-      setCurrentLinks(links);
-    }
-    setLinkModalOpen(true);
-  }
-
-  function validate() {
-    const e: Record<string, string> = {};
-    if (!form.full_name) e.full_name = 'Name is required';
-    if (!form.email) e.email = 'Email is required';
-    else if (!validateEmail(form.email)) e.email = 'Invalid email';
-    if (!form.password) e.password = 'Password is required';
-    else if (form.password.length < 8) e.password = 'Min 8 characters';
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  }
-
-  async function handleCreate() {
-    if (!validate() || !profile?.school_id) return;
-    setSaving(true);
-    try {
-      await createParentAccount({
-        email: form.email, password: form.password, full_name: form.full_name,
-        school_id: profile.school_id, phone: form.phone || undefined,
-        occupation: form.occupation || undefined, address: form.address || undefined,
-      });
-      toast('Parent account created successfully', 'success');
-      setModalOpen(false);
-      loadData();
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to create parent';
-      toast(msg, 'error');
-    } finally {
-      setSaving(false);
-    }
   }
 
   async function handleUpdate() {
     if (!editing) return;
     setSaving(true);
     try {
-      await updateParent(editing.id, editForm);
-      toast('Parent updated successfully', 'success');
+      const formattedPhone = editPhone.trim() ? editPhone.trim() : null;
+      const formattedAddress = editAddress.trim() ? editAddress.trim() : null;
+
+      await updateParent(editing.id, {
+        phone: formattedPhone,
+        address: formattedAddress,
+      });
+
+      toast('Parent details updated successfully', 'success');
       setEditModalOpen(false);
-      loadData();
-    } catch {
+      setEditing(null);
+      await loadData();
+    } catch (err) {
+      console.error(err);
       toast('Failed to update parent', 'error');
     } finally {
       setSaving(false);
@@ -157,42 +113,41 @@ function AdminParentsView() {
     }
   }
 
-  async function handleLink() {
-    if (!linkParent || !linkStudentId || !profile?.school_id) return;
-    try {
-      await linkParentStudent(profile.school_id, linkParent.id, linkStudentId, linkRelationship);
-      toast('Student linked successfully', 'success');
-      const links = await refreshLinks(linkParent.id);
-      setCurrentLinks(links);
-      setLinkStudentId('');
-    } catch {
-      toast('Failed to link student', 'error');
-    }
-  }
-
-  async function handleUnlink(id: string) {
-    try {
-      await unlinkParentStudent(id);
-      toast('Student unlinked', 'success');
-      if (linkParent) {
-        const links = await refreshLinks(linkParent.id);
-        setCurrentLinks(links);
-      }
-    } catch {
-      toast('Failed to unlink student', 'error');
-    }
-  }
+  const filtered = parents.filter((p) =>
+    p.full_name.toLowerCase().includes(search.toLowerCase()) ||
+    p.email.toLowerCase().includes(search.toLowerCase()) ||
+    (p.phone && p.phone.includes(search))
+  );
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Parent Management"
-        description="Create parent accounts and link them to students"
-        action={<Button icon={<Plus className="h-4 w-4" />} onClick={openAdd}>Add Parent</Button>}
+        description="Parent accounts are automatically generated upon student admissions"
       />
 
+      {/* Stat counters */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Card className="p-4">
+          <p className="text-sm font-medium text-gray-500">Total Parents</p>
+          <p className="mt-1 text-2xl font-bold text-gray-900">{parents.length}</p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-sm font-medium text-gray-500">Active Accounts</p>
+          <p className="mt-1 text-2xl font-bold text-emerald-600">
+            {parents.filter((p) => p.status === 'active').length}
+          </p>
+        </Card>
+        <Card className="p-4">
+          <p className="text-sm font-medium text-gray-500">Linked Students</p>
+          <p className="mt-1 text-2xl font-bold text-cyan-600">
+            {parents.reduce((acc, p) => acc + (p.parent_students?.length || 0), 0)}
+          </p>
+        </Card>
+      </div>
+
       <div className="max-w-sm">
-        <SearchInput value={search} onChange={setSearch} placeholder="Search parents..." />
+        <SearchInput value={search} onChange={setSearch} placeholder="Search parents by name, email or phone..." />
       </div>
 
       {loading ? (
@@ -201,137 +156,321 @@ function AdminParentsView() {
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
           <User className="h-12 w-12 text-gray-300 mb-3" />
           <p className="font-medium text-gray-600">No parents found</p>
-          <p className="mt-1 text-sm text-gray-400">Add a parent account using the button above</p>
+          <p className="mt-1 text-sm text-gray-400">Parent accounts appear automatically when students are enrolled</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((p) => (
-            <Card key={p.id} className="p-5">
-              <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-cyan-100 text-sm font-semibold text-cyan-700">
-                  {getInitials(p.full_name)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-semibold text-gray-900 truncate">{p.full_name}</h3>
-                  <div className="mt-1"><StatusBadge status={p.status} /></div>
-                </div>
-              </div>
-              <div className="mt-4 space-y-1.5 text-sm text-gray-600">
-                <p className="flex items-center gap-2 truncate"><Mail className="h-3.5 w-3.5 text-gray-400" /> {p.email}</p>
-                {p.phone && <p className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-gray-400" /> {p.phone}</p>}
-                {p.occupation && <p className="flex items-center gap-2"><User className="h-3.5 w-3.5 text-gray-400" /> {p.occupation}</p>}
-                {p.address && <p className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5 text-gray-400" /> {p.address}</p>}
-              </div>
-              <div className="mt-4 flex items-center gap-2 border-t border-gray-100 pt-3">
-                <Button size="sm" variant="outline" icon={<Link2 className="h-3.5 w-3.5" />} onClick={() => openLinkModal(p)}>Link Student</Button>
-                <Button size="sm" variant="ghost" icon={<Pencil className="h-3.5 w-3.5" />} onClick={() => openEdit(p)}>Edit</Button>
-                <Button size="sm" variant="ghost" className="text-red-600 hover:bg-red-50" icon={<Trash2 className="h-3.5 w-3.5" />} onClick={() => setDeleteId(p.id)} />
-              </div>
-            </Card>
-          ))}
+        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-2xs">
+          <table className="w-full text-left text-sm">
+            <thead className="border-b border-gray-200 bg-gray-50/70 text-xs font-semibold uppercase tracking-wider text-gray-600">
+              <tr>
+                <th className="px-4 py-3.5">Parent</th>
+                <th className="px-4 py-3.5">Linked Student(s)</th>
+                <th className="px-4 py-3.5">Contact & Address</th>
+                <th className="px-4 py-3.5">Status</th>
+                <th className="px-4 py-3.5 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filtered.map((p) => (
+                <tr key={p.id} className="hover:bg-gray-50/60 transition-colors">
+                  {/* Parent: Avatar + Name + Occupation */}
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-cyan-100 text-sm font-bold text-cyan-800">
+                        {getInitials(p.full_name)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">{p.full_name}</p>
+                        <p className="text-xs text-gray-400 truncate">Parent / Guardian</p>
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* Linked Student(s) */}
+                  <td className="px-4 py-3.5">
+                    {p.parent_students && p.parent_students.length > 0 ? (
+                      <div className="flex flex-wrap gap-1.5 max-w-xs">
+                        {p.parent_students.map((ps) => (
+                          <span
+                            key={ps.id}
+                            className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-100"
+                          >
+                            <GraduationCap className="h-3 w-3 text-blue-500" />
+                            {ps.student?.full_name || 'Student'}
+                            {ps.student?.class?.name ? ` (${ps.student.class.name})` : ''}
+                            <span className="text-[10px] text-blue-400 capitalize">· {ps.relationship || 'Child'}</span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">No student linked</span>
+                    )}
+                  </td>
+
+                  {/* Contact: Phone, Email & Address */}
+                  <td className="px-4 py-3.5">
+                    <p className="text-sm font-medium text-gray-800 flex items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                      {p.phone ? (p.phone.startsWith('+91') ? p.phone : `+91 ${p.phone}`) : '—'}
+                    </p>
+                    <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5">
+                      <Mail className="h-3 w-3 text-gray-400 flex-shrink-0" /> {p.email}
+                    </p>
+                    {p.address && (
+                      <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5 max-w-xs truncate" title={p.address}>
+                        <MapPin className="h-3 w-3 text-gray-400 flex-shrink-0" /> {p.address}
+                      </p>
+                    )}
+                  </td>
+
+                  {/* Status */}
+                  <td className="px-4 py-3.5">
+                    <StatusBadge status={p.status} />
+                  </td>
+
+                  {/* Actions: Credentials, Edit (Phone & Address), Delete */}
+                  <td className="px-4 py-3.5 text-right">
+                    <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 border-cyan-200 text-cyan-800 bg-cyan-50/60 hover:bg-cyan-100 font-medium"
+                        icon={<KeyRound className="h-3.5 w-3.5" />}
+                        onClick={() => openCredentials(p)}
+                        title="View Login Credentials"
+                      >
+                        Credentials
+                      </Button>
+                      <button
+                        onClick={() => openEdit(p)}
+                        className="rounded-lg p-1.5 text-gray-400 hover:bg-amber-50 hover:text-amber-600 transition-colors"
+                        title="Edit Phone Number & Address"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setDeleteId(p.id)}
+                        className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                        title="Delete Parent"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
-      {/* Create Parent Modal */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Add New Parent" description="Create a parent account that can view their child's information." size="lg"
-        footer={<><Button variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button><Button onClick={handleCreate} loading={saving}>Create Account</Button></>}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Input label="Full Name" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} error={errors.full_name} />
-          <Input label="Email" type="email" required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} error={errors.email} />
-          <Input label="Password" type="password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} error={errors.password} hint="Min 8 characters" />
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Phone</label>
-            <div className="flex">
-              <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">+91</span>
-              <input
-                type="tel"
-                maxLength={10}
-                value={form.phone}
-                onChange={(e) => {
-                  const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
-                  setForm({ ...form, phone: digits });
-                }}
-                className="flex-1 rounded-r-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                placeholder="10-digit mobile number"
+      {/* Edit Parent Modal: ONLY Phone Number & Address */}
+      <Modal
+        open={editModalOpen && !!editing}
+        onClose={() => {
+          setEditModalOpen(false);
+          setEditing(null);
+        }}
+        title="Edit Parent Contact & Address"
+        size="md"
+        footer={
+          <>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setEditModalOpen(false);
+                setEditing(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleUpdate} loading={saving}>
+              Save Changes
+            </Button>
+          </>
+        }
+      >
+        {editing && (
+          <div className="space-y-4">
+            {/* Readonly info header */}
+            <div className="rounded-xl bg-gray-50 border border-gray-200 p-3.5 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 font-medium">Parent Name</p>
+                <p className="text-sm font-semibold text-gray-900">{editing.full_name}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-500 font-medium">Login Username</p>
+                <p className="text-xs font-mono text-gray-700">{editing.email}</p>
+              </div>
+            </div>
+
+            {/* Phone Number Input */}
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Phone Number
+              </label>
+              <div className="flex rounded-lg shadow-2xs">
+                <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-600 text-sm font-medium select-none">
+                  +91
+                </span>
+                <input
+                  type="tel"
+                  maxLength={10}
+                  value={editPhone}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                    setEditPhone(digits);
+                  }}
+                  className="flex-1 rounded-r-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  placeholder="10-digit mobile number"
+                />
+              </div>
+              <p className="mt-1 text-xs text-gray-400">
+                Used for SMS/WhatsApp updates and synced as emergency contact for linked student(s).
+              </p>
+            </div>
+
+            {/* Residential Address Textarea */}
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                Residential Address
+              </label>
+              <textarea
+                rows={3}
+                value={editAddress}
+                onChange={(e) => setEditAddress(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                placeholder="Enter complete residential address..."
               />
+              <p className="mt-1 text-xs text-gray-400">
+                Directly updates residential address for this parent and linked student records in database.
+              </p>
             </div>
           </div>
-          <Input label="Occupation" value={form.occupation} onChange={(e) => setForm({ ...form, occupation: e.target.value })} />
-          <Input label="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-        </div>
+        )}
       </Modal>
 
-      {/* Edit Parent Modal */}
-      <Modal open={editModalOpen} onClose={() => setEditModalOpen(false)} title="Edit Parent" size="lg"
-        footer={<><Button variant="outline" onClick={() => setEditModalOpen(false)}>Cancel</Button><Button onClick={handleUpdate} loading={saving}>Save</Button></>}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Input label="Full Name" value={editForm.full_name || ''} onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} />
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Phone</label>
-            <div className="flex">
-              <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">+91</span>
-              <input
-                type="tel"
-                maxLength={10}
-                value={editForm.phone || ''}
-                onChange={(e) => {
-                  const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
-                  setEditForm({ ...editForm, phone: digits });
-                }}
-                className="flex-1 rounded-r-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
-                placeholder="10-digit mobile number"
-              />
-            </div>
-          </div>
-          <Input label="Occupation" value={editForm.occupation || ''} onChange={(e) => setEditForm({ ...editForm, occupation: e.target.value })} />
-          <Input label="Address" value={editForm.address || ''} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} />
-          <Select label="Status" value={editForm.status || 'active'} onChange={(e) => setEditForm({ ...editForm, status: e.target.value as 'active' | 'inactive' })}>
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
-          </Select>
-        </div>
-      </Modal>
-
-      {/* Link Student Modal */}
-      <Modal open={linkModalOpen} onClose={() => setLinkModalOpen(false)} title="Link Student to Parent" description={linkParent?.full_name} size="md"
-        footer={<><Button variant="outline" onClick={() => setLinkModalOpen(false)}>Close</Button></>}>
-        <div className="space-y-4">
-          <div className="flex items-end gap-3">
-            <Select label="Select Student" value={linkStudentId} onChange={(e) => setLinkStudentId(e.target.value)} className="flex-1">
-              <option value="">Choose student...</option>
-              {allStudents.map((s) => <option key={s.id} value={s.id}>{s.full_name} ({s.admission_number})</option>)}
-            </Select>
-            <Select label="Relationship" value={linkRelationship} onChange={(e) => setLinkRelationship(e.target.value)} className="w-32">
-              <option value="father">Father</option>
-              <option value="mother">Mother</option>
-              <option value="guardian">Guardian</option>
-            </Select>
-            <Button onClick={handleLink}>Link</Button>
-          </div>
-          <div>
-            <h4 className="text-sm font-medium text-gray-700 mb-2">Currently Linked Students</h4>
-            {currentLinks.length === 0 ? (
-              <p className="text-sm text-gray-400">No students linked yet</p>
-            ) : (
-              <div className="space-y-2">
-                {currentLinks.map((link) => (
-                  <div key={link.id} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">{link.student?.full_name}</p>
-                      <p className="text-xs text-gray-400 capitalize">{link.relationship}</p>
-                    </div>
-                    <button onClick={() => handleUnlink(link.id)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600">
-                      <Unlink className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))}
+      {/* Credentials Modal */}
+      <Modal
+        open={credModalOpen && !!credParent}
+        onClose={() => {
+          setCredModalOpen(false);
+          setCredParent(null);
+        }}
+        title="Parent Login Credentials"
+        description={credParent ? `${credParent.full_name} · ${school?.name || 'Veducore School'}` : ''}
+        size="md"
+        footer={
+          <Button
+            variant="outline"
+            onClick={() => {
+              setCredModalOpen(false);
+              setCredParent(null);
+            }}
+          >
+            Close
+          </Button>
+        }
+      >
+        {credParent && (
+          <div className="space-y-4">
+            {/* Linked Student(s) Preview */}
+            {credParent.parent_students && credParent.parent_students.length > 0 && (
+              <div className="rounded-xl bg-blue-50/60 border border-blue-100 p-3">
+                <p className="text-xs font-semibold text-blue-900 mb-1.5 flex items-center gap-1.5">
+                  <GraduationCap className="h-3.5 w-3.5 text-blue-600" /> Linked Student(s)
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {credParent.parent_students.map((ps) => (
+                    <span
+                      key={ps.id}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-blue-200 text-blue-800 text-xs font-medium shadow-2xs"
+                    >
+                      {ps.student?.full_name || 'Student'} ({ps.relationship || 'Child'})
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
+
+            <div className="rounded-xl border border-cyan-200 bg-gradient-to-br from-cyan-50/70 to-blue-50/50 p-4 space-y-3">
+              <div className="flex items-center justify-between pb-3 border-b border-cyan-100">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-0.5">Username / Email</p>
+                  <p className="font-mono text-sm font-semibold text-cyan-900">{credParent.email}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(credParent.email);
+                    toast('Username copied', 'success');
+                  }}
+                  className="rounded-lg p-1.5 bg-white shadow-2xs border border-gray-200 text-gray-500 hover:text-cyan-700 hover:border-cyan-300 transition-all"
+                  title="Copy username"
+                >
+                  <Copy className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-0.5">Portal Password</p>
+                  <p className="font-mono text-sm font-semibold text-gray-900 tracking-wide">
+                    {credVisible ? (credParent.password || '(not stored)') : '••••••••'}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setCredVisible((v) => !v)}
+                    className="rounded-lg p-1.5 bg-white shadow-2xs border border-gray-200 text-gray-500 hover:text-gray-800 hover:border-gray-300 transition-all"
+                    title={credVisible ? 'Hide' : 'Show'}
+                  >
+                    {credVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const pw = credParent.password ?? '';
+                      navigator.clipboard.writeText(pw);
+                      setCredCopied(true);
+                      toast('Password copied', 'success');
+                      setTimeout(() => setCredCopied(false), 1500);
+                    }}
+                    className="rounded-lg p-1.5 bg-white shadow-2xs border border-gray-200 text-gray-500 hover:text-cyan-700 hover:border-cyan-300 transition-all"
+                    title="Copy password"
+                  >
+                    {credCopied ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <Button
+              variant="outline"
+              className="w-full flex items-center justify-center gap-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium shadow-2xs"
+              onClick={() => {
+                const students = credParent.parent_students?.map((ps) => ps.student?.full_name).filter(Boolean).join(', ') || 'N/A';
+                const text = `Parent Login Credentials\nSchool: ${school?.name || 'Veducore School'}\nParent: ${credParent.full_name}\nStudent: ${students}\nUsername: ${credParent.email}\nPassword: ${credParent.password || ''}\nPortal: Veducore Parent App / Portal`;
+                navigator.clipboard.writeText(text);
+                toast('Username & Password copied to clipboard', 'success');
+              }}
+            >
+              <Copy className="h-4 w-4" /> Copy All Credentials
+            </Button>
           </div>
-        </div>
+        )}
       </Modal>
 
-      <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete} title="Delete Parent" message="Are you sure?" confirmText="Delete" variant="danger" />
+      <ConfirmDialog
+        open={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        title="Delete Parent"
+        message="Are you sure you want to delete this parent account?"
+        confirmText="Delete"
+        variant="danger"
+      />
     </div>
   );
 }

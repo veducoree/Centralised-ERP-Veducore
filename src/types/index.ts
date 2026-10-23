@@ -84,10 +84,12 @@ export interface Parent {
   full_name: string;
   email: string;
   phone: string | null;
-  occupation: string | null;
+  occupation?: string | null;
   address: string | null;
   avatar_url: string | null;
   status: ActiveStatus;
+  password?: string;
+  parent_students?: (ParentStudent & { student?: Student })[];
   created_at: string;
   updated_at: string;
 }
@@ -100,6 +102,8 @@ export interface Student {
   father_name: string | null;
   mother_name?: string | null;
   parent_email?: string | null;
+  emergency_contact?: string | null;
+  parent_phone?: string | null;
   date_of_birth: string | null;
   gender: string | null;
   class_id: string | null;

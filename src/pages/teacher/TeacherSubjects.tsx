@@ -18,74 +18,7 @@ import {
 import type { Subject, ClassAssignment } from '@/types';
 import { Badge } from '@/components/ui/Badge';
 
-// ── Subject code helpers ──────────────────────────────────────────────────────
-
-const SUBJECT_OVERRIDES: Record<string, string> = {
-  english: 'ENG',
-  hindi: 'HIN',
-  mathematics: 'MAT',
-  maths: 'MAT',
-  math: 'MAT',
-  science: 'SCI',
-  'social science': 'SSC',
-  'social studies': 'SST',
-  history: 'HIS',
-  geography: 'GEO',
-  civics: 'CIV',
-  physics: 'PHY',
-  chemistry: 'CHE',
-  biology: 'BIO',
-  computer: 'COM',
-  'computer science': 'CS',
-  'information technology': 'IT',
-  art: 'ART',
-  music: 'MUS',
-  'physical education': 'PE',
-  pe: 'PE',
-  evs: 'EVS',
-  'environmental science': 'EVS',
-  sanskrit: 'SAN',
-  urdu: 'URD',
-  french: 'FRE',
-  german: 'GER',
-  economics: 'ECO',
-  accountancy: 'ACC',
-  accounts: 'ACC',
-  commerce: 'COM',
-  business: 'BUS',
-  psychology: 'PSY',
-  philosophy: 'PHI',
-  'political science': 'POL',
-};
-
-/** Get the 3-letter base code for a subject name */
-function getBaseCode(name: string): string {
-  const lower = name.trim().toLowerCase();
-
-  // Check overrides (longest match wins)
-  const matched = Object.entries(SUBJECT_OVERRIDES)
-    .filter(([k]) => lower.startsWith(k) || lower.includes(k))
-    .sort((a, b) => b[0].length - a[0].length)[0];
-
-  if (matched) return matched[1];
-
-  // Fallback: first 3 chars (letters only) uppercased
-  const letters = name.replace(/[^a-zA-Z]/g, '');
-  return letters.slice(0, 3).toUpperCase() || 'SUB';
-}
-
-/** Generate a unique code: ENG01, ENG02, ... based on existing codes */
-function generateCode(name: string, existingCodes: string[]): string {
-  if (!name.trim()) return '';
-  const base = getBaseCode(name);
-  let n = 1;
-  let code = `${base}${String(n).padStart(2, '0')}`;
-  while (existingCodes.map((c) => c.toUpperCase()).includes(code.toUpperCase())) {
-    n++;
-    code = `${base}${String(n).padStart(2, '0')}`;
-  }
-  return code;
-}
+import { generateSubjectCode } from '@/lib/subjectUtils';
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function TeacherSubjects() {
@@ -113,7 +46,7 @@ export default function TeacherSubjects() {
       const teacher = await fetchTeacherByUserId(profile.id);
       if (teacher) {
         const assignments: ClassAssignment[] = await fetchTeacherAssignments(teacher.id);
-        const incharge = assignments.some((a) => a.is_class_teacher);
+        const incharge = assignments.some((a) => a.is_class_teacher || !a.subject_id);
         setIsClassIncharge(incharge);
         if (incharge) {
           const s = await fetchSubjects(profile.school_id);
@@ -142,7 +75,7 @@ export default function TeacherSubjects() {
     if (!codeManuallyEdited) {
       // Re-generate code live as user types, excluding existing codes
       const existingCodes = subjects.map((s) => s.code || '');
-      setSubjectCode(generateCode(val, existingCodes));
+      setSubjectCode(generateSubjectCode(val, existingCodes));
     }
   }
 
@@ -161,7 +94,7 @@ export default function TeacherSubjects() {
     const existingCodes = subjects.map((s) => s.code || '');
     let finalCode = subjectCode.trim();
     if (!finalCode) {
-      finalCode = generateCode(subjectName, existingCodes);
+      finalCode = generateSubjectCode(subjectName, existingCodes);
     }
 
     setSaving(true);
@@ -328,7 +261,7 @@ export default function TeacherSubjects() {
                     onClick={() => {
                       setCodeManuallyEdited(false);
                       const existingCodes = subjects.map((s) => s.code || '');
-                      setSubjectCode(generateCode(subjectName, existingCodes));
+                      setSubjectCode(generateSubjectCode(subjectName, existingCodes));
                     }}
                     className="text-xs text-gray-400 underline hover:text-blue-600"
                   >

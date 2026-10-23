@@ -14,7 +14,7 @@ import { useAuth } from '@/auth/AuthContext';
 import {
   fetchClasses, createClass, deleteClass,
   createSection, deleteSection,
-  fetchSubjects,
+  fetchSubjects, createSubject, generateSubjectCode,
   fetchTeachers,
   fetchClassTeacherForSection, assignClassTeacher, removeClassTeacher,
   fetchSubjectAssignmentsForSection, assignSubjectTeacher, removeSubjectTeacher,
@@ -110,6 +110,13 @@ export default function AdminClasses() {
   } | null>(null);
   const [selectedSTId, setSelectedSTId] = useState('');
   const [savingST, setSavingST] = useState(false);
+
+  // ── Add Subject Modal ─────────────────────────────────────────────────
+  const [addSubjectOpen, setAddSubjectOpen] = useState(false);
+  const [newSubName, setNewSubName] = useState('');
+  const [newSubCode, setNewSubCode] = useState('');
+  const [savingSub, setSavingSub] = useState(false);
+  const [activeSectionIdForSub, setActiveSectionIdForSub] = useState<string | null>(null);
 
   // ── Delete confirms ──────────────────────────────────────────────────
   const [deleteClassId, setDeleteClassId] = useState<string | null>(null);
@@ -316,6 +323,43 @@ export default function AdminClasses() {
     }
   }
 
+  // ── Add Subject Handlers ─────────────────────────────────────────────
+  function openAddSubject(sectionId?: string) {
+    setNewSubName('');
+    setNewSubCode('');
+    setActiveSectionIdForSub(sectionId || null);
+    setAddSubjectOpen(true);
+  }
+
+  function handleSubNameChange(name: string) {
+    setNewSubName(name);
+    const autoCode = generateSubjectCode(name, subjects.map((s) => s.code));
+    setNewSubCode(autoCode);
+  }
+
+  async function handleCreateSubject() {
+    if (!profile?.school_id || !newSubName.trim()) {
+      toast('Enter a subject name', 'error');
+      return;
+    }
+    setSavingSub(true);
+    try {
+      const finalCode = newSubCode.trim() || generateSubjectCode(newSubName, subjects.map((s) => s.code));
+      await createSubject(profile.school_id, newSubName.trim(), finalCode);
+      toast(`Subject "${newSubName.trim()}" added with code ${finalCode}`, 'success');
+      setAddSubjectOpen(false);
+      const freshSubs = await fetchSubjects(profile.school_id);
+      setSubjects(freshSubs);
+      if (activeSectionIdForSub) {
+        refreshSubjectsAndSection(activeSectionIdForSub);
+      }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to add subject', 'error');
+    } finally {
+      setSavingSub(false);
+    }
+  }
+
   // ── Deletes ──────────────────────────────────────────────────────────
   async function handleDeleteClass() {
     if (!deleteClassId) return;
@@ -336,12 +380,21 @@ export default function AdminClasses() {
           title="Classes & Sections"
           description="Manage classes, assign class teachers, and assign subject teachers"
           action={
-            <Button
-              icon={<Plus className="h-4 w-4" />}
-              onClick={() => { setNewClasses([{ name: '', gradeLevel: '', sections: ['A'] }]); setAddClassesOpen(true); }}
-            >
-              Add Classes
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                icon={<BookOpen className="h-4 w-4" />}
+                onClick={() => openAddSubject()}
+              >
+                Add Subject
+              </Button>
+              <Button
+                icon={<Plus className="h-4 w-4" />}
+                onClick={() => { setNewClasses([{ name: '', gradeLevel: '', sections: ['A'] }]); setAddClassesOpen(true); }}
+              >
+                Add Classes
+              </Button>
+            </div>
           }
         />
 
@@ -458,12 +511,20 @@ export default function AdminClasses() {
                                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                                   Subject Teachers — {cls.name} Section {sec.name}
                                 </p>
-                                <button
-                                  onClick={() => refreshSubjectsAndSection(sec.id)}
-                                  className="text-xs text-blue-500 hover:text-blue-700 transition-colors"
-                                >
-                                  ↻ Refresh
-                                </button>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => openAddSubject(sec.id)}
+                                    className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors flex items-center gap-1"
+                                  >
+                                    <Plus className="h-3 w-3" /> Add Subject
+                                  </button>
+                                  <button
+                                    onClick={() => refreshSubjectsAndSection(sec.id)}
+                                    className="text-xs text-blue-500 hover:text-blue-700 transition-colors"
+                                  >
+                                    ↻ Refresh
+                                  </button>
+                                </div>
                               </div>
 
                               {subjects.length === 0 ? (
@@ -684,6 +745,50 @@ export default function AdminClasses() {
             </option>
           ))}
         </Select>
+      </Modal>
+
+      {/* ══ Add Subject Modal ════════════════════════════════════════════ */}
+      <Modal
+        open={addSubjectOpen}
+        onClose={() => setAddSubjectOpen(false)}
+        title="Add New Subject"
+        description="Type the subject name — the subject code is generated automatically"
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setAddSubjectOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateSubject} loading={savingSub}>Create Subject</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Input
+            label="Subject Name"
+            required
+            placeholder="e.g. Mathematics, Science, French"
+            value={newSubName}
+            onChange={(e) => handleSubNameChange(e.target.value)}
+            autoFocus
+          />
+
+          <div>
+            <Input
+              label="Subject Code"
+              placeholder="Auto-generated"
+              value={newSubCode}
+              onChange={(e) => setNewSubCode(e.target.value.toUpperCase())}
+              hint="Auto-generated from name. You can modify if needed."
+            />
+            {newSubCode && (
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-xs text-gray-500">Auto Code:</span>
+                <span className="rounded-md bg-emerald-50 px-2.5 py-1 font-mono text-sm font-semibold text-emerald-700 border border-emerald-200">
+                  {newSubCode}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
       </Modal>
 
       {/* ══ Confirm Deletes ═══════════════════════════════════════════════ */}

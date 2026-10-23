@@ -1,4 +1,7 @@
 import { supabase } from '@/lib/supabase';
+export { generateSubjectCode } from '@/lib/subjectUtils';
+import { generateSubjectCode } from '@/lib/subjectUtils';
+import { generateParentCredentials } from '@/lib/parentUtils';
 import type {
   Teacher, Parent, Student, Class, Section, Subject,
   ClassAssignment, TeacherSchedule, Attendance, StudentRecord,
@@ -68,8 +71,19 @@ export async function createTeacherAccount(params: {
     }
   );
 
-  const result = await response.json();
+    const result = await response.json();
   if (!response.ok) throw new Error(result.error || 'Failed to create teacher account');
+  if (params.password) {
+    try {
+      await supabase
+        .from('teachers')
+        .update({ password: params.password })
+        .eq('school_id', params.school_id)
+        .eq('email', params.email);
+    } catch {
+      // fallback
+    }
+  }
   return result;
 }
 
@@ -110,6 +124,17 @@ export async function createParentAccount(params: {
 
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || 'Failed to create parent account');
+  if (params.password) {
+    try {
+      await supabase
+        .from('parents')
+        .update({ password: params.password })
+        .eq('school_id', params.school_id)
+        .eq('email', params.email);
+    } catch {
+      // fallback
+    }
+  }
   return result;
 }
 
@@ -125,6 +150,17 @@ export async function deleteTeacher(id: string) {
 }
 
 export async function fetchParents(schoolId: string) {
+  try {
+    const { data, error } = await supabase
+      .from('parents')
+      .select('*, parent_students(*, student:students(*, class:classes(*), section:sections(*)))')
+      .eq('school_id', schoolId)
+      .order('full_name');
+    if (!error && data) return data as Parent[];
+  } catch {
+    // fallback if relationship join is restricted
+  }
+
   const { data, error } = await supabase
     .from('parents')
     .select('*')
@@ -137,6 +173,31 @@ export async function fetchParents(schoolId: string) {
 export async function updateParent(id: string, updates: Partial<Parent>) {
   const { data, error } = await supabase.from('parents').update(updates).eq('id', id).select().maybeSingle();
   if (error) throw error;
+
+  // Sync phone and address to linked students in database
+  if (updates.phone !== undefined || updates.address !== undefined) {
+    try {
+      const { data: links } = await supabase
+        .from('parent_students')
+        .select('student_id')
+        .eq('parent_id', id);
+
+      if (links && links.length > 0) {
+        const studentIds = links.map((l) => l.student_id);
+        const studentUpdates: Record<string, any> = {};
+        if (updates.phone !== undefined) studentUpdates.emergency_contact = updates.phone;
+        if (updates.address !== undefined) studentUpdates.address = updates.address;
+
+        await supabase
+          .from('students')
+          .update(studentUpdates)
+          .in('id', studentIds);
+      }
+    } catch (syncErr) {
+      console.warn('Syncing parent update to student warning:', syncErr);
+    }
+  }
+
   return data as Parent | null;
 }
 
@@ -177,9 +238,168 @@ export async function fetchStudentById(id: string) {
   return data as Student | null;
 }
 
+export async function ensureParentForStudent(
+  student: Student,
+  schoolName = 'school'
+): Promise<{ parent: Parent | null; credentials: { username: string; password: string }; created: boolean }> {
+  try {
+    // 1. Check if this student is already linked to a parent
+    const { data: existingLinks } = await supabase
+      .from('parent_students')
+      .select('*, parent:parents(*)')
+      .eq('student_id', student.id);
+
+    if (existingLinks && existingLinks.length > 0 && existingLinks[0].parent) {
+      const p = existingLinks[0].parent as Parent;
+      return {
+        parent: p,
+        credentials: { username: p.email, password: (p as any).password || '******' },
+        created: false,
+      };
+    }
+
+    // 2. Generate credentials & determine fields
+    let activeSchoolName = schoolName;
+    if ((!activeSchoolName || activeSchoolName === 'school') && student.school_id) {
+      try {
+        const { data: sch } = await supabase.from('schools').select('name').eq('id', student.school_id).maybeSingle();
+        if (sch?.name) activeSchoolName = sch.name;
+      } catch {
+        // fallback
+      }
+    }
+    const creds = generateParentCredentials(student.full_name, student.admission_number || 'ADM', activeSchoolName, student.date_of_birth);
+    const parentEmail = creds.username.toLowerCase();
+
+    const parentFullName = (student.father_name && student.father_name.trim())
+      ? student.father_name.trim()
+      : (student.mother_name && student.mother_name.trim())
+      ? student.mother_name.trim()
+      : `${student.full_name}'s Parent`;
+
+    const relationship = (student.father_name && student.father_name.trim())
+      ? 'Father'
+      : (student.mother_name && student.mother_name.trim())
+      ? 'Mother'
+      : 'Guardian';
+
+    const phone = (student as any).emergency_contact || null;
+    const address = student.address || null;
+
+    // 3. Check if parent already exists with this email in the school
+    const { data: existingParent } = await supabase
+      .from('parents')
+      .select('*')
+      .eq('school_id', student.school_id)
+      .eq('email', parentEmail)
+      .maybeSingle();
+
+    let parentId = existingParent?.id;
+    let created = false;
+
+    if (!parentId) {
+      // Attempt edge function to create auth user + profile + parent
+      try {
+        await createParentAccount({
+          email: parentEmail,
+          password: creds.password,
+          full_name: parentFullName,
+          school_id: student.school_id,
+          phone: phone || undefined,
+          address: address || undefined,
+        });
+        created = true;
+      } catch (authErr) {
+        // Fallback: direct insert into parents table
+        console.warn('createParentAccount auth fallback, creating direct parent record:', authErr);
+      }
+
+      // Check or fetch parent record
+      const { data: createdParent } = await supabase
+        .from('parents')
+        .select('*')
+        .eq('school_id', student.school_id)
+        .eq('email', parentEmail)
+        .maybeSingle();
+
+      if (createdParent) {
+        parentId = createdParent.id;
+        created = true;
+      } else {
+        // Direct insert into parents table if edge function couldn't create it
+        const { data: directParent, error: directErr } = await supabase
+          .from('parents')
+          .insert({
+            school_id: student.school_id,
+            full_name: parentFullName,
+            email: parentEmail,
+            password: creds.password,
+            phone,
+            address,
+            status: 'active',
+          })
+          .select()
+          .maybeSingle();
+
+        if (directErr) {
+          console.error('Direct parent insert error:', directErr);
+        } else if (directParent) {
+          parentId = directParent.id;
+          created = true;
+        }
+      }
+    }
+
+    // 4. Link parent to student in parent_students table
+    if (parentId) {
+      const { error: linkErr } = await supabase
+        .from('parent_students')
+        .insert({
+          school_id: student.school_id,
+          parent_id: parentId,
+          student_id: student.id,
+          relationship,
+        });
+
+      if (linkErr && linkErr.code !== '23505') {
+        console.error('Failed to link parent to student:', linkErr);
+      }
+    }
+
+    const { data: finalParent } = parentId
+      ? await supabase.from('parents').select('*').eq('id', parentId).maybeSingle()
+      : { data: null };
+
+    return {
+      parent: (finalParent as Parent) || null,
+      credentials: { username: parentEmail, password: creds.password },
+      created,
+    };
+  } catch (err) {
+    console.error('ensureParentForStudent error:', err);
+    return {
+      parent: null,
+      credentials: generateParentCredentials(student.full_name, student.admission_number || 'ADM', schoolName, student.date_of_birth),
+      created: false,
+    };
+  }
+}
+
 export async function createStudent(student: Partial<Student> & { school_id: string; admission_number: string; full_name: string }) {
   const { data, error } = await supabase.from('students').insert(student).select().maybeSingle();
   if (error) throw error;
+  let parentResult: { parent: Parent | null; credentials: { username: string; password: string }; created: boolean } | null = null;
+  if (data) {
+    // Automatically ensure parent account exists and is linked
+    try {
+      parentResult = await ensureParentForStudent(data as Student);
+    } catch (parentErr) {
+      console.warn('Auto-parent creation warning:', parentErr);
+    }
+  }
+  if (data && parentResult) {
+    return { ...(data as Student), _parentResult: parentResult } as Student & { _parentResult?: typeof parentResult };
+  }
   return data as Student | null;
 }
 
@@ -251,9 +471,15 @@ export async function fetchSubjects(schoolId: string) {
 }
 
 export async function createSubject(schoolId: string, name: string, code?: string) {
+  let finalCode = (code || '').trim().toUpperCase();
+  if (!finalCode) {
+    const existing = await fetchSubjects(schoolId);
+    finalCode = generateSubjectCode(name, existing.map(s => s.code));
+  }
+
   const { data, error } = await supabase
     .from('subjects')
-    .insert({ school_id: schoolId, name, code })
+    .insert({ school_id: schoolId, name: name.trim(), code: finalCode })
     .select()
     .maybeSingle();
   if (error) throw error;
@@ -730,7 +956,7 @@ export async function assignClassTeacher(params: {
 
   const { data, error } = await supabase
     .from('class_assignments')
-    .insert({ ...params, subject_id: null })
+    .insert({ ...params, subject_id: null, is_class_teacher: true })
     .select()
     .maybeSingle();
   if (error) throw error;
