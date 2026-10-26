@@ -1,58 +1,67 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Suspense, lazy } from 'react';
 import { AuthProvider } from '@/auth/AuthContext';
 import { ToastProvider } from '@/components/ui/Toast';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import LoginPage from '@/pages/LoginPage';
 
+// Loading fallback
+const PageLoader = () => (
+  <div className="flex items-center justify-center min-h-screen bg-gray-50">
+    <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-blue-500" />
+  </div>
+);
+
 // Management portal
-import VeducoreManagement from '@/pages/management/VeducoreManagement';
+const VeducoreManagement = lazy(() => import('@/pages/management/VeducoreManagement'));
 
 // Admin pages
-import AdminDashboard from '@/pages/admin/AdminDashboard';
-import AdminStudents from '@/pages/admin/AdminStudents';
-import AdminTeachers from '@/pages/admin/AdminTeachers';
-import AdminParents from '@/pages/admin/AdminParents';
-import AdminClasses from '@/pages/admin/AdminClasses';
-import AdminAttendance from '@/pages/admin/AdminAttendance';
-import AdminFees from '@/pages/admin/AdminFees';
-import AdminAssignments from '@/pages/admin/AdminAssignments';
-import AdminTracking from '@/pages/admin/AdminTracking';
-import AdminNotifications from '@/pages/admin/AdminNotifications';
-import AdminSettings from '@/pages/admin/AdminSettings';
-import AdminIDCard from '@/pages/admin/AdminIDCard';
-import AdminDocuments from '@/pages/admin/AdminDocuments';
-import AdminHolidays from '@/pages/admin/AdminHolidays';
-import ProfilePage from '@/pages/shared/ProfilePage';
-import StudentDetailPage from '@/pages/admin/StudentDetailPage';
-import NewAdmissionPage from '@/pages/admin/NewAdmissionPage';
+const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'));
+const AdminStudents = lazy(() => import('@/pages/admin/AdminStudents'));
+const AdminTeachers = lazy(() => import('@/pages/admin/AdminTeachers'));
+const AdminParents = lazy(() => import('@/pages/admin/AdminParents'));
+const AdminClasses = lazy(() => import('@/pages/admin/AdminClasses'));
+const AdminAttendance = lazy(() => import('@/pages/admin/AdminAttendance'));
+const AdminFees = lazy(() => import('@/pages/admin/AdminFees'));
+const AdminAssignments = lazy(() => import('@/pages/admin/AdminAssignments'));
+const AdminTracking = lazy(() => import('@/pages/admin/AdminTracking'));
+const AdminNotifications = lazy(() => import('@/pages/admin/AdminNotifications'));
+const AdminSettings = lazy(() => import('@/pages/admin/AdminSettings'));
+const AdminIDCard = lazy(() => import('@/pages/admin/AdminIDCard'));
+const AdminDocuments = lazy(() => import('@/pages/admin/AdminDocuments'));
+const AdminHolidays = lazy(() => import('@/pages/admin/AdminHolidays'));
+const ProfilePage = lazy(() => import('@/pages/shared/ProfilePage'));
+const StudentDetailPage = lazy(() => import('@/pages/admin/StudentDetailPage'));
+const NewAdmissionPage = lazy(() => import('@/pages/admin/NewAdmissionPage'));
 
 // Teacher pages
-import TeacherDashboard from '@/pages/teacher/TeacherDashboard';
-import TeacherClasses from '@/pages/teacher/TeacherClasses';
-import TeacherAssignments from '@/pages/teacher/TeacherAssignments';
-import TeacherSubjects from '@/pages/teacher/TeacherSubjects';
-import TeacherStudents from '@/pages/teacher/TeacherStudents';
-import TeacherAddStudent from '@/pages/teacher/TeacherAddStudent';
-import TeacherNewAdmission from '@/pages/teacher/TeacherNewAdmission';
-import TeacherAttendance from '@/pages/teacher/TeacherAttendance';
-import TeacherExamMarks from '@/pages/teacher/TeacherExamMarks';
-import TeacherRecords from '@/pages/teacher/TeacherRecords';
-import TeacherRemarks from '@/pages/teacher/TeacherRemarks';
-import TeacherSchedule from '@/pages/teacher/TeacherSchedule';
+const TeacherDashboard = lazy(() => import('@/pages/teacher/TeacherDashboard'));
+const TeacherClasses = lazy(() => import('@/pages/teacher/TeacherClasses'));
+const TeacherAssignments = lazy(() => import('@/pages/teacher/TeacherAssignments'));
+const TeacherSubjects = lazy(() => import('@/pages/teacher/TeacherSubjects'));
+const TeacherStudents = lazy(() => import('@/pages/teacher/TeacherStudents'));
+const TeacherAddStudent = lazy(() => import('@/pages/teacher/TeacherAddStudent'));
+const TeacherNewAdmission = lazy(() => import('@/pages/teacher/TeacherNewAdmission'));
+const TeacherAttendance = lazy(() => import('@/pages/teacher/TeacherAttendance'));
+const TeacherExamMarks = lazy(() => import('@/pages/teacher/TeacherExamMarks'));
+const TeacherRecords = lazy(() => import('@/pages/teacher/TeacherRecords'));
+const TeacherRemarks = lazy(() => import('@/pages/teacher/TeacherRemarks'));
+const TeacherSchedule = lazy(() => import('@/pages/teacher/TeacherSchedule'));
 
 // Parent pages
-import ParentDashboard from '@/pages/parent/ParentDashboard';
-import ParentChild from '@/pages/parent/ParentChild';
-import ParentAttendance from '@/pages/parent/ParentAttendance';
-import ParentFees from '@/pages/parent/ParentFees';
-import ParentRecords from '@/pages/parent/ParentRecords';
-import ParentRemarks from '@/pages/parent/ParentRemarks';
+const ParentDashboard = lazy(() => import('@/pages/parent/ParentDashboard'));
+const ParentChild = lazy(() => import('@/pages/parent/ParentChild'));
+const ParentAttendance = lazy(() => import('@/pages/parent/ParentAttendance'));
+const ParentFees = lazy(() => import('@/pages/parent/ParentFees'));
+const ParentRecords = lazy(() => import('@/pages/parent/ParentRecords'));
+const ParentRemarks = lazy(() => import('@/pages/parent/ParentRemarks'));
 
 function App() {
   return (
     <AuthProvider>
       <ToastProvider>
         <BrowserRouter>
+          <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<LoginPage />} />
@@ -112,6 +121,7 @@ function App() {
 
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
+          </Suspense>
         </BrowserRouter>
       </ToastProvider>
     </AuthProvider>
