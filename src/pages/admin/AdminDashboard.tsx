@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { Users, GraduationCap, BookOpen, UserCog, IndianRupee, TrendingUp, ClipboardCheck } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { StatCard, Card } from '@/components/ui/Card';
+import { DashboardSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/auth/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 
 interface DashboardStats {
   totalStudents: number;
@@ -19,17 +20,9 @@ interface DashboardStats {
   outstandingFees: number;
 }
 
-interface RecentActivity {
-  id: string;
-  action: string;
-  created_at: string;
-  metadata: Record<string, unknown> | null;
-}
-
 export default function AdminDashboard() {
   const { profile } = useAuth();
   const [stats, setStats] = useState<DashboardStats | null>(null);
-  const [recentActivity, setRecentActivity] = useState<RecentActivity[]>([]);
   const [attendanceTrend, setAttendanceTrend] = useState<{ date: string; present: number; absent: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [barsAnimated, setBarsAnimated] = useState(false);
@@ -50,14 +43,21 @@ export default function AdminDashboard() {
     setLoading(true);
 
     try {
-      const [students, teachers, classes, parents, todayAttendance, fees, logs] = await Promise.all([
+      const dates: string[] = [];
+      for (let i = 1; i <= 5; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        dates.push(d.toISOString().split('T')[0]);
+      }
+
+      const [students, teachers, classes, parents, todayAttendance, fees, trendRes] = await Promise.all([
         supabase.from('students').select('id', { count: 'exact', head: true }).eq('school_id', sid).eq('status', 'active'),
         supabase.from('teachers').select('id', { count: 'exact', head: true }).eq('school_id', sid).eq('status', 'active'),
         supabase.from('classes').select('id', { count: 'exact', head: true }).eq('school_id', sid),
         supabase.from('parents').select('id', { count: 'exact', head: true }).eq('school_id', sid).eq('status', 'active'),
         supabase.from('attendance').select('status').eq('school_id', sid).eq('attendance_date', new Date().toISOString().split('T')[0]),
         supabase.from('fees').select('amount, paid_amount, status').eq('school_id', sid),
-        supabase.from('audit_logs').select('id, action, created_at, metadata').eq('school_id', sid).order('created_at', { ascending: false }).limit(10),
+        supabase.from('attendance').select('attendance_date, status').eq('school_id', sid).in('attendance_date', dates),
       ]);
 
       const todayPresent = todayAttendance.data?.filter((a: { status: string }) => a.status === 'present').length || 0;
@@ -78,21 +78,8 @@ export default function AdminDashboard() {
         collectedFees: collected,
         outstandingFees: outstanding,
       });
-      setRecentActivity(logs.data as RecentActivity[] || []);
 
-      // Attendance trend for last 5 days (single batched query)
-      const dates: string[] = [];
-      for (let i = 1; i <= 5; i++) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        dates.push(d.toISOString().split('T')[0]);
-      }
-      const { data: trendRows } = await supabase
-        .from('attendance')
-        .select('attendance_date, status')
-        .eq('school_id', sid)
-        .in('attendance_date', dates);
-
+      const trendRows = trendRes.data;
       const attData = dates.map((date) => {
         const dayRows = trendRows?.filter((r) => r.attendance_date === date) || [];
         const present = dayRows.filter((r) => r.status === 'present').length;
@@ -116,14 +103,6 @@ export default function AdminDashboard() {
   const C = 2 * Math.PI * 50; // ~314.16
   const paidDash = paidPct * C;
   const outstandingDash = outstandingPct * C;
-
-  // Activity dot color
-  const activityColor = (action: string) => {
-    if (action.includes('create') || action.includes('add') || action.includes('insert')) return 'bg-emerald-500';
-    if (action.includes('update') || action.includes('edit') || action.includes('modify')) return 'bg-blue-500';
-    if (action.includes('delete') || action.includes('remove')) return 'bg-red-400';
-    return 'bg-gray-400';
-  };
 
   // Greeting
   const hour = new Date().getHours();
@@ -150,9 +129,7 @@ export default function AdminDashboard() {
       `}</style>
       <div className="space-y-6">
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-blue-500" />
-          </div>
+          <DashboardSkeleton cards={8} />
         ) : (
           <>
             {/* Greeting */}
@@ -292,27 +269,6 @@ export default function AdminDashboard() {
                 </div>
               </Card>
             </div>
-
-            {/* Recent Activity — timeline */}
-            <Card className="p-5">
-              <h3 className="mb-4 text-sm font-semibold text-gray-900">Recent Activity</h3>
-              {recentActivity.length === 0 ? (
-                <p className="text-sm text-gray-400">No recent activity</p>
-              ) : (
-                <div className="relative pl-6">
-                  <div className="absolute left-2 top-1 bottom-1 w-px bg-gray-100" />
-                  <div className="space-y-4">
-                    {recentActivity.map((log) => (
-                      <div key={log.id} className="relative">
-                        <span className={`absolute -left-[18px] mt-1 h-2.5 w-2.5 rounded-full ${activityColor(log.action)} ring-2 ring-white`} />
-                        <p className="text-sm text-gray-700 capitalize">{log.action.replace(/_/g, ' ')}</p>
-                        <p className="text-xs text-gray-400">{formatDate(log.created_at)}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </Card>
           </>
         )}
       </div>

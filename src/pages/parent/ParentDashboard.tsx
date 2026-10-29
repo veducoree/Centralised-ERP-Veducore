@@ -65,7 +65,6 @@ export default function ParentDashboard() {
   const presentCount = attendance.filter((a) => a.status === 'present').length;
   const attendanceRate = attendance.length > 0 ? Math.round((presentCount / attendance.length) * 100) : 0;
   const pendingFees = fees.filter((f) => f.status !== 'paid').length;
-  const latestRecord = records[0];
   const latestRemark = remarks[0];
 
   // Attendance ring chart values
@@ -75,7 +74,7 @@ export default function ParentDashboard() {
   const ringColor = attendanceRate >= 85 ? '#10b981' : attendanceRate >= 70 ? '#f59e0b' : '#ef4444';
   const ringTextColor = attendanceRate >= 85 ? 'text-emerald-600' : attendanceRate >= 70 ? 'text-amber-600' : 'text-red-600';
 
-  if (loading) return <DashboardLayout title="Dashboard"><LoadingSpinner /></DashboardLayout>;
+  if (loading) return <DashboardLayout title="Dashboard"><LoadingSpinner variant="dashboard" /></DashboardLayout>;
 
   return (
     <DashboardLayout title="Dashboard">

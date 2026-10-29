@@ -102,7 +102,7 @@ export default function TeacherRemarks() {
         </Card>
 
         {loading ? (
-          <LoadingSpinner />
+          <LoadingSpinner variant="cards" />
         ) : remarks.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
             <Megaphone className="h-12 w-12 text-gray-300 mb-3" />

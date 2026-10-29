@@ -151,13 +151,18 @@ function AuthScreen({ onLogin }: { onLogin: (fullName: string) => void }) {
   const [loading, setLoading]     = useState(false);
 
   useEffect(() => {
+    const startTime = Date.now();
+    const MIN_MS = 1600;
+
     try {
       const saved = localStorage.getItem('veducore_mgmt_admin');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.name) {
-          onLogin(parsed.name);
-          return;
+          const timer = window.setTimeout(() => {
+            onLogin(parsed.name);
+          }, MIN_MS);
+          return () => window.clearTimeout(timer);
         }
       }
     } catch {
@@ -165,8 +170,16 @@ function AuthScreen({ onLogin }: { onLogin: (fullName: string) => void }) {
     }
 
     callMgmt({ action: 'check' }).then(res => {
-      setMode(res.is_setup_done ? 'login' : 'setup');
-    }).catch(() => setMode('login'));
+      const wait = Math.max(0, MIN_MS - (Date.now() - startTime));
+      window.setTimeout(() => {
+        setMode(res.is_setup_done ? 'login' : 'setup');
+      }, wait);
+    }).catch(() => {
+      const wait = Math.max(0, MIN_MS - (Date.now() - startTime));
+      window.setTimeout(() => {
+        setMode('login');
+      }, wait);
+    });
   }, [onLogin]);
 
   async function handleSetup(e: React.FormEvent) {
@@ -198,7 +211,10 @@ function AuthScreen({ onLogin }: { onLogin: (fullName: string) => void }) {
       if (res.error) { setError(res.error as string); return; }
       const admin = (res.full_name as string) || 'Veducore Admin';
       localStorage.setItem('veducore_mgmt_admin', JSON.stringify({ name: admin, loggedInAt: Date.now() }));
-      onLogin(admin);
+      setMode('checking');
+      window.setTimeout(() => {
+        onLogin(admin);
+      }, 1400);
     } catch (err) {
       setLoading(false);
       setError(err instanceof Error ? err.message : 'Login failed — check your network connection');
@@ -207,10 +223,20 @@ function AuthScreen({ onLogin }: { onLogin: (fullName: string) => void }) {
 
   if (mode === 'checking') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-sm font-medium text-gray-500">Checking authentication...</p>
+      <div className="fixed inset-0 z-50 min-h-screen w-screen flex flex-col items-center justify-center bg-gray-50 select-none">
+        <div className="relative inline-block">
+          <span
+            className="block text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-200"
+            style={{ WebkitTextStroke: '1px #cbd5e1' }}
+          >
+            Veducore
+          </span>
+          <span
+            aria-hidden="true"
+            className="veducore-fill-text pointer-events-none absolute inset-0 block text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-950"
+          >
+            Veducore
+          </span>
         </div>
       </div>
     );
@@ -412,10 +438,26 @@ function OverviewDashboard({
       </div>
 
       {loading ? (
-        <div className="min-h-[55vh] flex flex-col items-center justify-center py-16">
-          <div className="flex flex-col items-center gap-3">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-            <span className="text-sm font-semibold text-gray-600">Loading data...</span>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="skeleton-shimmer h-3.5 w-24 rounded-md" />
+                  <div className="skeleton-shimmer h-10 w-10 rounded-lg" />
+                </div>
+                <div className="skeleton-shimmer h-8 w-16 rounded-md" />
+                <div className="skeleton-shimmer h-3 w-32 rounded-md" />
+              </div>
+            ))}
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+            <div className="skeleton-shimmer h-4 w-48 rounded-md" />
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="skeleton-shimmer h-12 w-full rounded-lg" />
+              ))}
+            </div>
           </div>
         </div>
       ) : (
@@ -769,10 +811,26 @@ Use these credentials to sign into the Veducore Admin Dashboard.`;
       </div>
 
       {loading ? (
-        <div className="min-h-[55vh] flex flex-col items-center justify-center py-16">
-          <div className="flex flex-col items-center gap-3">
-            <div className="h-10 w-10 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-            <span className="text-sm font-semibold text-gray-600">Loading data...</span>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 shadow-2xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="skeleton-shimmer h-3.5 w-24 rounded-md" />
+                  <div className="skeleton-shimmer h-10 w-10 rounded-lg" />
+                </div>
+                <div className="skeleton-shimmer h-8 w-16 rounded-md" />
+                <div className="skeleton-shimmer h-3 w-32 rounded-md" />
+              </div>
+            ))}
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+            <div className="skeleton-shimmer h-4 w-48 rounded-md" />
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="skeleton-shimmer h-12 w-full rounded-lg" />
+              ))}
+            </div>
           </div>
         </div>
       ) : (

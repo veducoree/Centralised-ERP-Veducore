@@ -10,15 +10,55 @@ import type {
   Holiday, ExamDef, FeeStructure, PaymentSetup,
 } from '@/types';
 
+// Lightweight in-memory cache with TTL and in-flight request deduplication
+const apiCache = new Map<string, { data: unknown; expiresAt: number }>();
+const inFlight = new Map<string, Promise<unknown>>();
+const DEFAULT_TTL_MS = 60_000; // 60 seconds
+
+async function cachedFetch<T>(key: string, fetcher: () => Promise<T>, ttlMs = DEFAULT_TTL_MS): Promise<T> {
+  const now = Date.now();
+  const cached = apiCache.get(key);
+  if (cached && cached.expiresAt > now) {
+    return cached.data as T;
+  }
+  const existing = inFlight.get(key);
+  if (existing) {
+    return existing as Promise<T>;
+  }
+  const promise = fetcher()
+    .then((res) => {
+      apiCache.set(key, { data: res, expiresAt: Date.now() + ttlMs });
+      inFlight.delete(key);
+      return res;
+    })
+    .catch((err) => {
+      inFlight.delete(key);
+      throw err;
+    });
+  inFlight.set(key, promise);
+  return promise;
+}
+
+function invalidateCache(prefix: string) {
+  for (const key of apiCache.keys()) {
+    if (key.startsWith(prefix)) {
+      apiCache.delete(key);
+    }
+  }
+}
+
 export async function fetchSchool(schoolId: string) {
-  const { data, error } = await supabase.from('schools').select('*').eq('id', schoolId).maybeSingle();
-  if (error) throw error;
-  return data as School | null;
+  return cachedFetch(`school:${schoolId}`, async () => {
+    const { data, error } = await supabase.from('schools').select('*').eq('id', schoolId).maybeSingle();
+    if (error) throw error;
+    return data as School | null;
+  }, 5 * 60_000);
 }
 
 export async function updateSchool(schoolId: string, updates: Partial<School>) {
   const { data, error } = await supabase.from('schools').update(updates).eq('id', schoolId).select().maybeSingle();
   if (error) throw error;
+  invalidateCache(`school:${schoolId}`);
   return data as School | null;
 }
 
@@ -415,13 +455,15 @@ export async function deleteStudent(id: string) {
 }
 
 export async function fetchClasses(schoolId: string) {
-  const { data, error } = await supabase
-    .from('classes')
-    .select('*, sections(*)')
-    .eq('school_id', schoolId)
-    .order('grade_level');
-  if (error) throw error;
-  return data as (Class & { sections: Section[] })[];
+  return cachedFetch(`classes:${schoolId}`, async () => {
+    const { data, error } = await supabase
+      .from('classes')
+      .select('*, sections(*)')
+      .eq('school_id', schoolId)
+      .order('grade_level');
+    if (error) throw error;
+    return data as (Class & { sections: Section[] })[];
+  });
 }
 
 export async function createClass(schoolId: string, name: string, gradeLevel?: number) {
@@ -431,18 +473,21 @@ export async function createClass(schoolId: string, name: string, gradeLevel?: n
     .select()
     .maybeSingle();
   if (error) throw error;
+  invalidateCache(`classes:${schoolId}`);
   return data as Class | null;
 }
 
 export async function updateClass(id: string, updates: Partial<Class>) {
   const { data, error } = await supabase.from('classes').update(updates).eq('id', id).select().maybeSingle();
   if (error) throw error;
+  invalidateCache('classes:');
   return data as Class | null;
 }
 
 export async function deleteClass(id: string) {
   const { error } = await supabase.from('classes').delete().eq('id', id);
   if (error) throw error;
+  invalidateCache('classes:');
 }
 
 export async function createSection(schoolId: string, classId: string, name: string, capacity?: number) {
@@ -452,22 +497,26 @@ export async function createSection(schoolId: string, classId: string, name: str
     .select()
     .maybeSingle();
   if (error) throw error;
+  invalidateCache(`classes:${schoolId}`);
   return data as Section | null;
 }
 
 export async function deleteSection(id: string) {
   const { error } = await supabase.from('sections').delete().eq('id', id);
   if (error) throw error;
+  invalidateCache('classes:');
 }
 
 export async function fetchSubjects(schoolId: string) {
-  const { data, error } = await supabase
-    .from('subjects')
-    .select('*')
-    .eq('school_id', schoolId)
-    .order('name');
-  if (error) throw error;
-  return data as Subject[];
+  return cachedFetch(`subjects:${schoolId}`, async () => {
+    const { data, error } = await supabase
+      .from('subjects')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('name');
+    if (error) throw error;
+    return data as Subject[];
+  });
 }
 
 export async function createSubject(schoolId: string, name: string, code?: string) {
@@ -483,12 +532,14 @@ export async function createSubject(schoolId: string, name: string, code?: strin
     .select()
     .maybeSingle();
   if (error) throw error;
+  invalidateCache(`subjects:${schoolId}`);
   return data as Subject | null;
 }
 
 export async function deleteSubject(id: string) {
   const { error } = await supabase.from('subjects').delete().eq('id', id);
   if (error) throw error;
+  invalidateCache('subjects:');
 }
 
 export async function fetchClassAssignments(schoolId: string) {
@@ -863,12 +914,14 @@ export async function fetchAuditLogs(schoolId: string) {
 }
 
 export async function fetchParentStudents(parentId: string) {
-  const { data, error } = await supabase
-    .from('parent_students')
-    .select('*, student:students(*, class:classes(*), section:sections(*)), parent:parents(*)')
-    .eq('parent_id', parentId);
-  if (error) throw error;
-  return data as (ParentStudent & { student: Student })[];
+  return cachedFetch(`parentStudents:${parentId}`, async () => {
+    const { data, error } = await supabase
+      .from('parent_students')
+      .select('*, student:students(*, class:classes(*), section:sections(*)), parent:parents(*)')
+      .eq('parent_id', parentId);
+    if (error) throw error;
+    return data as (ParentStudent & { student: Student })[];
+  });
 }
 
 export async function linkParentStudent(schoolId: string, parentId: string, studentId: string, relationship: string) {
@@ -878,12 +931,14 @@ export async function linkParentStudent(schoolId: string, parentId: string, stud
     .select()
     .maybeSingle();
   if (error) throw error;
+  invalidateCache(`parentStudents:${parentId}`);
   return data as ParentStudent | null;
 }
 
 export async function unlinkParentStudent(id: string) {
   const { error } = await supabase.from('parent_students').delete().eq('id', id);
   if (error) throw error;
+  invalidateCache('parentStudents:');
 }
 
 export async function updateProfile(id: string, updates: Partial<Profile>) {
@@ -899,23 +954,27 @@ export async function updateProfile(id: string, updates: Partial<Profile>) {
 
 // Helper to get current user's teacher record
 export async function fetchTeacherByUserId(userId: string) {
-  const { data, error } = await supabase
-    .from('teachers')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (error) throw error;
-  return data as Teacher | null;
+  return cachedFetch(`teacherByUser:${userId}`, async () => {
+    const { data, error } = await supabase
+      .from('teachers')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) throw error;
+    return data as Teacher | null;
+  }, 5 * 60_000);
 }
 
 export async function fetchParentByUserId(userId: string) {
-  const { data, error } = await supabase
-    .from('parents')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle();
-  if (error) throw error;
-  return data as Parent | null;
+  return cachedFetch(`parentByUser:${userId}`, async () => {
+    const { data, error } = await supabase
+      .from('parents')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error) throw error;
+    return data as Parent | null;
+  }, 5 * 60_000);
 }
 
 export async function fetchTeacherProfileForDisplay(teacherId: string) {

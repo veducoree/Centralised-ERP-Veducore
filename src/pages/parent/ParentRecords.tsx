@@ -6,32 +6,35 @@ import { Select } from '@/components/ui/Form';
 import { PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
 import { useAuth } from '@/auth/AuthContext';
 import { fetchParentByUserId, fetchParentStudents, fetchStudentRecords } from '@/services/api';
-import type { Parent, Student, StudentRecord } from '@/types';
+import type { Student, StudentRecord } from '@/types';
 import { formatDate } from '@/lib/utils';
 
 export default function ParentRecords() {
   const { profile } = useAuth();
-  const [parent, setParent] = useState<Parent | null>(null);
   const [children, setChildren] = useState<Student[]>([]);
   const [selectedChildId, setSelectedChildId] = useState('');
   const [records, setRecords] = useState<StudentRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
-    if (!profile?.id) return;
+    if (!profile?.id) { setLoading(false); return; }
     setLoading(true);
     try {
       const p = await fetchParentByUserId(profile.id);
       if (p) {
-        setParent(p);
         const links = await fetchParentStudents(p.id);
         const kids = links.map((l) => l.student).filter(Boolean) as Student[];
         setChildren(kids);
-        if (kids.length > 0 && !selectedChildId) setSelectedChildId(kids[0].id);
+        if (kids.length > 0) {
+          const initialChildId = kids[0].id;
+          setSelectedChildId((prev) => prev || initialChildId);
+          const r = await fetchStudentRecords({ studentId: initialChildId });
+          setRecords(r);
+        }
       }
     } catch { /* handled */ }
     finally { setLoading(false); }
-  }, [profile?.id, selectedChildId]);
+  }, [profile?.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
 

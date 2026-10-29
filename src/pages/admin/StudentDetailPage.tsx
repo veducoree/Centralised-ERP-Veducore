@@ -85,7 +85,7 @@ export default function StudentDetailPage() {
     { key: 'parent', label: 'Parent Info', icon: Users },
   ];
 
-  if (loading) return <DashboardLayout title="Student Profile"><LoadingSpinner /></DashboardLayout>;
+  if (loading) return <DashboardLayout title="Student Profile"><LoadingSpinner variant="profile" /></DashboardLayout>;
   if (!student) return (
     <DashboardLayout title="Student Profile">
       <Card className="p-8 text-center"><p className="text-gray-500">Student not found</p></Card>

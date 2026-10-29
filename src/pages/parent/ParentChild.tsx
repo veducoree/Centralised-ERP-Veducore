@@ -6,13 +6,12 @@ import { Select } from '@/components/ui/Form';
 import { PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
 import { useAuth } from '@/auth/AuthContext';
 import { fetchParentByUserId, fetchParentStudents, fetchStudentById } from '@/services/api';
-import type { Parent, Student } from '@/types';
+import type { Student } from '@/types';
 import { formatDate, getInitials } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/Badge';
 
 export default function ParentChild() {
   const { profile } = useAuth();
-  const [parent, setParent] = useState<Parent | null>(null);
   const [children, setChildren] = useState<Student[]>([]);
   const [selectedChildId, setSelectedChildId] = useState('');
   const [child, setChild] = useState<Student | null>(null);
@@ -24,15 +23,19 @@ export default function ParentChild() {
     try {
       const p = await fetchParentByUserId(profile.id);
       if (p) {
-        setParent(p);
         const links = await fetchParentStudents(p.id);
         const kids = links.map((l) => l.student).filter(Boolean) as Student[];
         setChildren(kids);
-        if (kids.length > 0 && !selectedChildId) setSelectedChildId(kids[0].id);
+        if (kids.length > 0) {
+          const initialChildId = kids[0].id;
+          setSelectedChildId((prev) => prev || initialChildId);
+          const c = await fetchStudentById(initialChildId);
+          setChild(c);
+        }
       }
     } catch { /* handled */ }
     finally { setLoading(false); }
-  }, [profile?.id, selectedChildId]);
+  }, [profile?.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -46,7 +49,7 @@ export default function ParentChild() {
 
   useEffect(() => { loadChild(); }, [loadChild]);
 
-  if (loading) return <DashboardLayout title="My Child"><LoadingSpinner /></DashboardLayout>;
+  if (loading) return <DashboardLayout title="My Child"><LoadingSpinner variant="profile" /></DashboardLayout>;
 
   return (
     <DashboardLayout title="My Child">

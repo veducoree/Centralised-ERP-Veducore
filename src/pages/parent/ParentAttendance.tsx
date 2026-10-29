@@ -6,13 +6,12 @@ import { Select } from '@/components/ui/Form';
 import { PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
 import { useAuth } from '@/auth/AuthContext';
 import { fetchParentByUserId, fetchParentStudents, fetchAttendance } from '@/services/api';
-import type { Parent, Student, Attendance } from '@/types';
+import type { Student, Attendance } from '@/types';
 import { formatDate } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/Badge';
 
 export default function ParentAttendance() {
   const { profile } = useAuth();
-  const [parent, setParent] = useState<Parent | null>(null);
   const [children, setChildren] = useState<Student[]>([]);
   const [selectedChildId, setSelectedChildId] = useState('');
   const [records, setRecords] = useState<Attendance[]>([]);
@@ -24,15 +23,19 @@ export default function ParentAttendance() {
     try {
       const p = await fetchParentByUserId(profile.id);
       if (p) {
-        setParent(p);
         const links = await fetchParentStudents(p.id);
         const kids = links.map((l) => l.student).filter(Boolean) as Student[];
         setChildren(kids);
-        if (kids.length > 0 && !selectedChildId) setSelectedChildId(kids[0].id);
+        if (kids.length > 0) {
+          const initialChildId = kids[0].id;
+          setSelectedChildId((prev) => prev || initialChildId);
+          const a = await fetchAttendance({ studentId: initialChildId });
+          setRecords(a);
+        }
       }
     } catch { /* handled */ }
     finally { setLoading(false); }
-  }, [profile?.id, selectedChildId]);
+  }, [profile?.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
 

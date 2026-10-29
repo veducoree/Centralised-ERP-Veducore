@@ -334,7 +334,9 @@ export default function AdminDocumentGenerator() {
         {/* Left — student list */}
         <div className="w-72 flex-shrink-0 border-r border-gray-200 bg-white overflow-y-auto">
           {loading ? (
-            <div className="flex justify-center py-10"><LoadingSpinner /></div>
+            <div className="flex h-full min-h-[60vh] items-center justify-center p-4">
+              <LoadingSpinner size="sm" variant="spinner" />
+            </div>
           ) : filtered.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-10">No students found</p>
           ) : (

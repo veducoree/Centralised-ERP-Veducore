@@ -1,15 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Suspense, lazy } from 'react';
-import { AuthProvider } from '@/auth/AuthContext';
+import { Suspense, lazy, useEffect } from 'react';
+import { AuthProvider, useAuth } from '@/auth/AuthContext';
 import { ToastProvider } from '@/components/ui/Toast';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import LoginPage from '@/pages/LoginPage';
+import { CenteredLoader } from '@/components/ui/Skeleton';
 
-// Loading fallback
+// Dead-centered Veducore text-fill loading fallback for route transitions
 const PageLoader = () => (
-  <div className="flex items-center justify-center min-h-screen bg-gray-50">
-    <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-blue-500" />
-  </div>
+  <CenteredLoader size="lg" fullScreen />
 );
 
 // Management portal
@@ -56,9 +55,50 @@ const ParentFees = lazy(() => import('@/pages/parent/ParentFees'));
 const ParentRecords = lazy(() => import('@/pages/parent/ParentRecords'));
 const ParentRemarks = lazy(() => import('@/pages/parent/ParentRemarks'));
 
+function RoutePrefetcher() {
+  const { profile } = useAuth();
+
+  useEffect(() => {
+    if (!profile?.role) return;
+    const timer = window.setTimeout(() => {
+      if (profile.role === 'admin') {
+        import('@/pages/admin/AdminDashboard');
+        import('@/pages/admin/AdminStudents');
+        import('@/pages/admin/AdminTeachers');
+        import('@/pages/admin/AdminParents');
+        import('@/pages/admin/AdminClasses');
+        import('@/pages/admin/AdminAttendance');
+        import('@/pages/admin/AdminFees');
+        import('@/pages/admin/AdminSettings');
+        import('@/pages/shared/ProfilePage');
+      } else if (profile.role === 'teacher') {
+        import('@/pages/teacher/TeacherDashboard');
+        import('@/pages/teacher/TeacherClasses');
+        import('@/pages/teacher/TeacherStudents');
+        import('@/pages/teacher/TeacherAttendance');
+        import('@/pages/teacher/TeacherExamMarks');
+        import('@/pages/teacher/TeacherRecords');
+        import('@/pages/shared/ProfilePage');
+      } else if (profile.role === 'parent') {
+        import('@/pages/parent/ParentDashboard');
+        import('@/pages/parent/ParentChild');
+        import('@/pages/parent/ParentAttendance');
+        import('@/pages/parent/ParentFees');
+        import('@/pages/parent/ParentRecords');
+        import('@/pages/shared/ProfilePage');
+      }
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [profile?.role]);
+
+  return null;
+}
+
 function App() {
   return (
     <AuthProvider>
+      <RoutePrefetcher />
       <ToastProvider>
         <BrowserRouter>
           <Suspense fallback={<PageLoader />}>

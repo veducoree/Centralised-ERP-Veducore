@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Eye, EyeOff, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth, getDashboardPath } from '@/auth/AuthContext';
+import { CenteredLoader } from '@/components/ui/Skeleton';
 import veducoreLogo from '@/assets/veducore-logo.png';
 
 // ── Image Captcha Helper ──────────────────────────────────────────────────────
@@ -142,6 +143,10 @@ export default function LoginPage() {
       navigate(from ?? getDashboardPath(profile.role), { replace: true });
     }
   }, [authLoading, session, profile, navigate, location.state]);
+
+  if (authLoading) {
+    return <CenteredLoader size="lg" fullScreen />;
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

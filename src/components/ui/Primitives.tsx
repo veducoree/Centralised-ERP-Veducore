@@ -1,4 +1,21 @@
 import { Search } from 'lucide-react';
+import {
+  Skeleton,
+  TableSkeleton,
+  CardGridSkeleton,
+  ProfileSkeleton,
+  DashboardSkeleton,
+  CenteredLoader,
+} from '@/components/ui/Skeleton';
+
+export {
+  Skeleton,
+  TableSkeleton,
+  CardGridSkeleton,
+  ProfileSkeleton,
+  DashboardSkeleton,
+  CenteredLoader,
+};
 
 interface SearchInputProps {
   value: string;
@@ -40,13 +57,36 @@ export function PageHeader({ title, description, action }: PageHeaderProps) {
   );
 }
 
-export function LoadingSpinner({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
-  const sizes = { sm: 'h-4 w-4', md: 'h-8 w-8', lg: 'h-12 w-12' };
-  return (
-    <div className="flex items-center justify-center py-16">
-      <div className={`${sizes[size]} animate-spin rounded-full border-2 border-gray-200 border-t-blue-500`} />
-    </div>
-  );
+export function LoadingSpinner({
+  size = 'md',
+  fullScreen = false,
+  variant = 'table',
+}: {
+  size?: 'sm' | 'md' | 'lg';
+  fullScreen?: boolean;
+  variant?: 'table' | 'cards' | 'profile' | 'dashboard' | 'spinner';
+}) {
+  if (fullScreen || size === 'lg') {
+    return <CenteredLoader size="lg" fullScreen />;
+  }
+
+  if (size === 'sm' || variant === 'spinner') {
+    return <CenteredLoader size={size} />;
+  }
+
+  if (variant === 'dashboard') {
+    return <DashboardSkeleton />;
+  }
+
+  if (variant === 'cards') {
+    return <CardGridSkeleton />;
+  }
+
+  if (variant === 'profile') {
+    return <ProfileSkeleton />;
+  }
+
+  return <TableSkeleton />;
 }
 
 export function EmptyState({ title, message }: { title: string; message?: string }) {

@@ -6,13 +6,12 @@ import { Select } from '@/components/ui/Form';
 import { PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
 import { useAuth } from '@/auth/AuthContext';
 import { fetchParentByUserId, fetchParentStudents, fetchRemarks } from '@/services/api';
-import type { Parent, Student, Remark } from '@/types';
+import type { Student, Remark } from '@/types';
 import { formatDate } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
 
 export default function ParentRemarks() {
   const { profile } = useAuth();
-  const [parent, setParent] = useState<Parent | null>(null);
   const [children, setChildren] = useState<Student[]>([]);
   const [selectedChildId, setSelectedChildId] = useState('');
   const [remarks, setRemarks] = useState<Remark[]>([]);
@@ -24,15 +23,19 @@ export default function ParentRemarks() {
     try {
       const p = await fetchParentByUserId(profile.id);
       if (p) {
-        setParent(p);
         const links = await fetchParentStudents(p.id);
         const kids = links.map((l) => l.student).filter(Boolean) as Student[];
         setChildren(kids);
-        if (kids.length > 0 && !selectedChildId) setSelectedChildId(kids[0].id);
+        if (kids.length > 0) {
+          const initialChildId = kids[0].id;
+          setSelectedChildId((prev) => prev || initialChildId);
+          const r = await fetchRemarks({ studentId: initialChildId });
+          setRemarks(r);
+        }
       }
     } catch { /* handled */ }
     finally { setLoading(false); }
-  }, [profile?.id, selectedChildId]);
+  }, [profile?.id]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -46,7 +49,7 @@ export default function ParentRemarks() {
 
   useEffect(() => { loadRemarks(); }, [loadRemarks]);
 
-  if (loading) return <DashboardLayout title="Remarks"><LoadingSpinner /></DashboardLayout>;
+  if (loading) return <DashboardLayout title="Remarks"><LoadingSpinner variant="cards" /></DashboardLayout>;
 
   return (
     <DashboardLayout title="Remarks">

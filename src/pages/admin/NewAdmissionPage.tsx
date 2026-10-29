@@ -878,8 +878,15 @@ export default function NewAdmissionPage() {
         </div>
 
         {classesLoading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
+          <div className="rounded-2xl border border-gray-200 bg-white p-6 space-y-5">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="space-y-2">
+                  <div className="skeleton-shimmer h-3.5 w-28 rounded-md" />
+                  <div className="skeleton-shimmer h-10 w-full rounded-xl" />
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200">

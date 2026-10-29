@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { CalendarDays, Megaphone } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { StatCard, Card } from '@/components/ui/Card';
+import { DashboardSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/auth/AuthContext';
 import { fetchTeacherByUserId, fetchTeacherScheduleByTeacher, fetchRemarks } from '@/services/api';
 import type { Teacher, TeacherSchedule, Remark } from '@/types';
@@ -67,9 +68,7 @@ export default function TeacherDashboard() {
 
   if (loading) return (
     <DashboardLayout title="Dashboard">
-      <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-blue-500" />
-      </div>
+      <DashboardSkeleton cards={2} />
     </DashboardLayout>
   );
 

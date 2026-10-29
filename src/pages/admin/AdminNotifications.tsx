@@ -82,7 +82,7 @@ export default function AdminNotifications() {
           action={<Button icon={<Plus className="h-4 w-4" />} onClick={() => setModalOpen(true)}>Send Notification</Button>} />
 
         {loading ? (
-          <LoadingSpinner />
+          <LoadingSpinner variant="cards" />
         ) : notifications.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
             <Bell className="h-12 w-12 text-gray-300 mb-3" />

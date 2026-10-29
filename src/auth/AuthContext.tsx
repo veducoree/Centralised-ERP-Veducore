@@ -17,10 +17,33 @@ export interface AuthContextValue {
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+const PROFILE_CACHE_KEY = 'veducore_cached_profile';
+
+function getCachedProfile(): Profile | null {
+  try {
+    const raw = sessionStorage.getItem(PROFILE_CACHE_KEY);
+    return raw ? (JSON.parse(raw) as Profile) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedProfile(profile: Profile | null) {
+  try {
+    if (profile) {
+      sessionStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile));
+    } else {
+      sessionStorage.removeItem(PROFILE_CACHE_KEY);
+    }
+  } catch {
+    // ignore storage quota errors
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(() => getCachedProfile());
   const [loading, setLoading] = useState(true);
 
   const fetchProfile = useCallback(async (uid: string) => {
@@ -34,33 +57,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error('Error fetching profile:', error);
       return;
     }
-    if (data) setProfile(data as Profile);
+    if (data) {
+      const p = data as Profile;
+      setProfile(p);
+      setCachedProfile(p);
+    }
   }, []);
 
   useEffect(() => {
-    // Initial session check
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        fetchProfile(session.user.id).finally(() => setLoading(false));
-      } else {
-        setLoading(false);
-      }
-    });
+    let mounted = true;
+    let initialResolved = false;
+    const startTime = Date.now();
+    const MIN_LOADER_MS = 1600;
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        await fetchProfile(session.user.id);
+    const finishInitialLoad = () => {
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, MIN_LOADER_MS - elapsed);
+      window.setTimeout(() => {
+        if (mounted) {
+          setLoading(false);
+          initialResolved = true;
+        }
+      }, remaining);
+    };
+
+    // Initial session check
+    supabase.auth.getSession().then(({ data: { session: initSession } }) => {
+      if (!mounted) return;
+      setSession(initSession);
+      setUser(initSession?.user ?? null);
+      if (initSession?.user) {
+        const cached = getCachedProfile();
+        if (cached && cached.id === initSession.user.id) {
+          setProfile(cached);
+          finishInitialLoad();
+          // Refresh silently in background
+          fetchProfile(initSession.user.id);
+        } else {
+          fetchProfile(initSession.user.id).finally(() => {
+            finishInitialLoad();
+          });
+        }
       } else {
         setProfile(null);
+        setCachedProfile(null);
+        finishInitialLoad();
       }
-      setLoading(false);
     });
 
-    return () => { authListener.subscription.unsubscribe(); };
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+      if (!mounted) return;
+      // Avoid duplicate fetch during INITIAL_SESSION since getSession() handles it
+      if (event === 'INITIAL_SESSION') return;
+
+      setSession(nextSession);
+      setUser(nextSession?.user ?? null);
+      if (nextSession?.user) {
+        await fetchProfile(nextSession.user.id);
+      } else {
+        setProfile(null);
+        setCachedProfile(null);
+      }
+      if (mounted && initialResolved) setLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+      authListener.subscription.unsubscribe();
+    };
   }, [fetchProfile]);
 
   const signIn = async (identifier: string, password: string) => {
@@ -73,15 +137,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     let lastError: string | null = null;
     for (const email of emailsToTry) {
-      const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
-      if (!error) return { error: null };
-      lastError = error.message;
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password: pw });
+      if (!error && data?.user) {
+        setLoading(true);
+        await Promise.all([
+          fetchProfile(data.user.id),
+          new Promise((resolve) => window.setTimeout(resolve, 1400)),
+        ]);
+        setLoading(false);
+        return { error: null };
+      }
+      if (error) lastError = error.message;
     }
     return { error: lastError };
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    setCachedProfile(null);
     setProfile(null);
     setUser(null);
     setSession(null);

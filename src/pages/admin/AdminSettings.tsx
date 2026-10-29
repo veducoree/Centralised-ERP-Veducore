@@ -148,7 +148,7 @@ export default function AdminSettings() {
         />
 
         {loading ? (
-          <LoadingSpinner />
+          <LoadingSpinner variant="profile" />
         ) : (
           <div className="space-y-6">
             {/* ── SECTION 1: OFFICIAL INSTITUTIONAL PROFILE (READ-ONLY) ── */}

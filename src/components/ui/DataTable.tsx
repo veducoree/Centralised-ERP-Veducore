@@ -1,5 +1,6 @@
 import { type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { TableSkeleton } from '@/components/ui/Skeleton';
 
 interface Column<T> {
   key: string;
@@ -27,13 +28,7 @@ export function DataTable<T extends Record<string, unknown>>({
   keyField,
 }: DataTableProps<T>) {
   if (loading) {
-    return (
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-        <div className="flex items-center justify-center py-16">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-gray-200 border-t-blue-500" />
-        </div>
-      </div>
-    );
+    return <TableSkeleton columns={Math.min(Math.max(columns.length, 3), 6)} />;
   }
 
   if (data.length === 0) {
