@@ -15,12 +15,8 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
 
   if (loading) return <LoadingSpinner size="lg" />;
 
-  if (!session) {
+  if (!session || !profile) {
     return <Navigate to="/login" state={{ from: location }} replace />;
-  }
-
-  if (!profile) {
-    return <LoadingSpinner size="lg" />;
   }
 
   if (!allowedRoles.includes(profile.role)) {

@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
+import { clearApiCache } from '@/services/api';
 import type { Profile, Student, UserRole } from '@/types';
 
 export interface AuthContextValue {
@@ -40,85 +41,142 @@ function setCachedProfile(profile: Profile | null) {
   }
 }
 
+function clearSupabaseStorageTokens() {
+  try {
+    for (const storage of [localStorage, sessionStorage]) {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < storage.length; i++) {
+        const key = storage.key(i);
+        if (key && (key.startsWith('sb-') || key === PROFILE_CACHE_KEY)) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach((k) => storage.removeItem(k));
+    }
+  } catch {
+    // ignore storage errors
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(() => getCachedProfile());
   const [loading, setLoading] = useState(true);
+  const currentUserIdRef = useRef<string | null>(null);
+  const profileInFlightRef = useRef<{ uid: string; promise: Promise<Profile | null> } | null>(null);
 
-  const fetchProfile = useCallback(async (uid: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', uid)
-      .maybeSingle();
+  const fetchProfile = useCallback(async (uid: string): Promise<Profile | null> => {
+    if (profileInFlightRef.current?.uid === uid) {
+      return profileInFlightRef.current.promise;
+    }
 
-    if (error) {
-      console.error('Error fetching profile:', error);
-      return;
-    }
-    if (data) {
-      const p = data as Profile;
-      setProfile(p);
-      setCachedProfile(p);
-    }
+    const promise = (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', uid)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error fetching profile:', error);
+          return null;
+        }
+        if (data) {
+          const p = data as Profile;
+          setProfile(p);
+          setCachedProfile(p);
+          return p;
+        }
+        return null;
+      } catch (err) {
+        console.error('Profile fetch exception:', err);
+        return null;
+      } finally {
+        if (profileInFlightRef.current?.uid === uid) {
+          profileInFlightRef.current = null;
+        }
+      }
+    })();
+
+    profileInFlightRef.current = { uid, promise };
+    return promise;
   }, []);
 
   useEffect(() => {
     let mounted = true;
-    let initialResolved = false;
-    const startTime = Date.now();
-    const MIN_LOADER_MS = 1600;
-
-    const finishInitialLoad = () => {
-      const elapsed = Date.now() - startTime;
-      const remaining = Math.max(0, MIN_LOADER_MS - elapsed);
-      window.setTimeout(() => {
-        if (mounted) {
-          setLoading(false);
-          initialResolved = true;
-        }
-      }, remaining);
-    };
 
     // Initial session check
-    supabase.auth.getSession().then(({ data: { session: initSession } }) => {
-      if (!mounted) return;
-      setSession(initSession);
-      setUser(initSession?.user ?? null);
-      if (initSession?.user) {
-        const cached = getCachedProfile();
-        if (cached && cached.id === initSession.user.id) {
-          setProfile(cached);
-          finishInitialLoad();
-          // Refresh silently in background
-          fetchProfile(initSession.user.id);
-        } else {
-          fetchProfile(initSession.user.id).finally(() => {
-            finishInitialLoad();
-          });
-        }
-      } else {
-        setProfile(null);
-        setCachedProfile(null);
-        finishInitialLoad();
-      }
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session: initSession } }) => {
+        if (!mounted) return;
+        setSession(initSession);
+        setUser(initSession?.user ?? null);
+        currentUserIdRef.current = initSession?.user?.id ?? null;
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, nextSession) => {
+        if (initSession?.user) {
+          const cached = getCachedProfile();
+          if (cached && cached.id === initSession.user.id) {
+            setProfile(cached);
+            setLoading(false);
+            // Refresh silently in background outside current tick
+            window.setTimeout(() => {
+              if (mounted) fetchProfile(initSession.user.id);
+            }, 0);
+          } else {
+            fetchProfile(initSession.user.id).finally(() => {
+              if (mounted) setLoading(false);
+            });
+          }
+        } else {
+          setProfile(null);
+          setCachedProfile(null);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        console.error('getSession error:', err);
+        if (mounted) {
+          setProfile(null);
+          setCachedProfile(null);
+          setLoading(false);
+        }
+      });
+
+    // IMPORTANT: Keep onAuthStateChange strictly synchronous (do NOT make it async or await
+    // Supabase queries inside it), otherwise GoTrueClient._notifyAllSubscribers will hold
+    // its internal lock while waiting for getSession() inside fetchProfile(), causing a deadlock!
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!mounted) return;
-      // Avoid duplicate fetch during INITIAL_SESSION since getSession() handles it
       if (event === 'INITIAL_SESSION') return;
 
-      setSession(nextSession);
-      setUser(nextSession?.user ?? null);
-      if (nextSession?.user) {
-        await fetchProfile(nextSession.user.id);
-      } else {
+      if (event === 'SIGNED_OUT' || !nextSession?.user) {
+        currentUserIdRef.current = null;
+        setSession(null);
+        setUser(null);
         setProfile(null);
         setCachedProfile(null);
+        setLoading(false);
+        return;
       }
-      if (mounted && initialResolved) setLoading(false);
+
+      const prevUserId = currentUserIdRef.current;
+      const nextUserId = nextSession.user.id;
+      currentUserIdRef.current = nextUserId;
+      setSession(nextSession);
+      setUser(nextSession.user);
+
+      // Defer profile fetch outside the GoTrueClient auth lock
+      if (prevUserId !== nextUserId || event === 'USER_UPDATED') {
+        window.setTimeout(() => {
+          if (!mounted) return;
+          fetchProfile(nextUserId).finally(() => {
+            if (mounted) setLoading(false);
+          });
+        }, 0);
+      }
     });
 
     return () => {
@@ -139,11 +197,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     for (const email of emailsToTry) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password: pw });
       if (!error && data?.user) {
-        setLoading(true);
-        await Promise.all([
-          fetchProfile(data.user.id),
-          new Promise((resolve) => window.setTimeout(resolve, 1400)),
-        ]);
+        currentUserIdRef.current = data.user.id;
+        setSession(data.session);
+        setUser(data.user);
+        await fetchProfile(data.user.id);
         setLoading(false);
         return { error: null };
       }
@@ -153,11 +210,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    // Clear all local state & caches immediately so UI transitions in 0ms without hanging
+    currentUserIdRef.current = null;
+    clearApiCache();
     setCachedProfile(null);
     setProfile(null);
     setUser(null);
     setSession(null);
+    setLoading(false);
+
+    try {
+      await Promise.race([
+        supabase.auth.signOut({ scope: 'local' }),
+        new Promise((resolve) => window.setTimeout(resolve, 400)),
+      ]);
+    } catch {
+      // ignore signOut errors
+    } finally {
+      clearSupabaseStorageTokens();
+      // Best-effort server token revocation in background
+      supabase.auth.signOut().catch(() => {});
+    }
   };
 
   const refreshProfile = async () => {

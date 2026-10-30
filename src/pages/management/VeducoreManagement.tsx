@@ -151,35 +151,26 @@ function AuthScreen({ onLogin }: { onLogin: (fullName: string) => void }) {
   const [loading, setLoading]     = useState(false);
 
   useEffect(() => {
-    const startTime = Date.now();
-    const MIN_MS = 1600;
-
     try {
       const saved = localStorage.getItem('veducore_mgmt_admin');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.name) {
-          const timer = window.setTimeout(() => {
-            onLogin(parsed.name);
-          }, MIN_MS);
-          return () => window.clearTimeout(timer);
+          onLogin(parsed.name);
+          return;
         }
       }
     } catch {
       // ignore
     }
 
-    callMgmt({ action: 'check' }).then(res => {
-      const wait = Math.max(0, MIN_MS - (Date.now() - startTime));
-      window.setTimeout(() => {
+    callMgmt({ action: 'check' })
+      .then((res) => {
         setMode(res.is_setup_done ? 'login' : 'setup');
-      }, wait);
-    }).catch(() => {
-      const wait = Math.max(0, MIN_MS - (Date.now() - startTime));
-      window.setTimeout(() => {
+      })
+      .catch(() => {
         setMode('login');
-      }, wait);
-    });
+      });
   }, [onLogin]);
 
   async function handleSetup(e: React.FormEvent) {
@@ -211,10 +202,7 @@ function AuthScreen({ onLogin }: { onLogin: (fullName: string) => void }) {
       if (res.error) { setError(res.error as string); return; }
       const admin = (res.full_name as string) || 'Veducore Admin';
       localStorage.setItem('veducore_mgmt_admin', JSON.stringify({ name: admin, loggedInAt: Date.now() }));
-      setMode('checking');
-      window.setTimeout(() => {
-        onLogin(admin);
-      }, 1400);
+      onLogin(admin);
     } catch (err) {
       setLoading(false);
       setError(err instanceof Error ? err.message : 'Login failed — check your network connection');

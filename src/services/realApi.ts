@@ -47,6 +47,79 @@ function invalidateCache(prefix: string) {
   }
 }
 
+export function clearApiCache() {
+  apiCache.clear();
+  inFlight.clear();
+}
+
+export interface AdminDashboardData {
+  stats: {
+    totalStudents: number;
+    totalTeachers: number;
+    totalClasses: number;
+    totalParents: number;
+    todayPresent: number;
+    todayAbsent: number;
+    todayTotal: number;
+    pendingFees: number;
+    collectedFees: number;
+    outstandingFees: number;
+  };
+  attendanceTrend: { date: string; present: number; absent: number }[];
+}
+
+export async function fetchAdminDashboardData(schoolId: string): Promise<AdminDashboardData> {
+  return cachedFetch(`adminDashboard:${schoolId}`, async () => {
+    const dates: string[] = [];
+    for (let i = 1; i <= 5; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      dates.push(d.toISOString().split('T')[0]);
+    }
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const [students, teachers, classes, parents, todayAttendance, fees, trendRes] = await Promise.all([
+      supabase.from('students').select('id', { count: 'exact', head: true }).eq('school_id', schoolId).eq('status', 'active'),
+      supabase.from('teachers').select('id', { count: 'exact', head: true }).eq('school_id', schoolId).eq('status', 'active'),
+      supabase.from('classes').select('id', { count: 'exact', head: true }).eq('school_id', schoolId),
+      supabase.from('parents').select('id', { count: 'exact', head: true }).eq('school_id', schoolId).eq('status', 'active'),
+      supabase.from('attendance').select('status').eq('school_id', schoolId).eq('attendance_date', todayStr),
+      supabase.from('fees').select('amount, paid_amount, status').eq('school_id', schoolId),
+      supabase.from('attendance').select('attendance_date, status').eq('school_id', schoolId).in('attendance_date', dates),
+    ]);
+
+    const todayPresent = todayAttendance.data?.filter((a: { status: string }) => a.status === 'present').length || 0;
+    const todayAbsent = todayAttendance.data?.filter((a: { status: string }) => a.status === 'absent').length || 0;
+    const collected = fees.data?.reduce((sum: number, f: { paid_amount: number }) => sum + Number(f.paid_amount), 0) || 0;
+    const outstanding = fees.data?.reduce((sum: number, f: { amount: number; paid_amount: number }) => sum + (Number(f.amount) - Number(f.paid_amount)), 0) || 0;
+    const pendingCount = fees.data?.filter((f: { status: string }) => f.status === 'pending').length || 0;
+
+    const trendRows = trendRes.data;
+    const attendanceTrend = dates.map((date) => {
+      const dayRows = trendRows?.filter((r) => r.attendance_date === date) || [];
+      const present = dayRows.filter((r) => r.status === 'present').length;
+      const absent = dayRows.filter((r) => r.status === 'absent').length;
+      return { date, present, absent };
+    });
+
+    return {
+      stats: {
+        totalStudents: students.count || 0,
+        totalTeachers: teachers.count || 0,
+        totalClasses: classes.count || 0,
+        totalParents: parents.count || 0,
+        todayPresent,
+        todayAbsent,
+        todayTotal: todayAttendance.data?.length || 0,
+        pendingFees: pendingCount,
+        collectedFees: collected,
+        outstandingFees: outstanding,
+      },
+      attendanceTrend,
+    };
+  }, 45_000);
+}
+
 export async function fetchSchool(schoolId: string) {
   return cachedFetch(`school:${schoolId}`, async () => {
     const { data, error } = await supabase.from('schools').select('*').eq('id', schoolId).maybeSingle();
@@ -63,13 +136,15 @@ export async function updateSchool(schoolId: string, updates: Partial<School>) {
 }
 
 export async function fetchTeachers(schoolId: string) {
-  const { data, error } = await supabase
-    .from('teachers')
-    .select('*')
-    .eq('school_id', schoolId)
-    .order('full_name');
-  if (error) throw error;
-  return data as Teacher[];
+  return cachedFetch(`teachers:${schoolId}`, async () => {
+    const { data, error } = await supabase
+      .from('teachers')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('full_name');
+    if (error) throw error;
+    return data as Teacher[];
+  });
 }
 
 export async function createTeacherAccount(params: {
@@ -124,6 +199,8 @@ export async function createTeacherAccount(params: {
       // fallback
     }
   }
+  invalidateCache(`teachers:${params.school_id}`);
+  invalidateCache(`adminDashboard:${params.school_id}`);
   return result;
 }
 
@@ -175,39 +252,49 @@ export async function createParentAccount(params: {
       // fallback
     }
   }
+  invalidateCache(`parents:${params.school_id}`);
+  invalidateCache(`adminDashboard:${params.school_id}`);
   return result;
 }
 
 export async function updateTeacher(id: string, updates: Partial<Teacher>) {
   const { data, error } = await supabase.from('teachers').update(updates).eq('id', id).select().maybeSingle();
   if (error) throw error;
+  invalidateCache('teachers:');
+  invalidateCache('teacherByUser:');
+  invalidateCache('adminDashboard:');
   return data as Teacher | null;
 }
 
 export async function deleteTeacher(id: string) {
   const { error } = await supabase.from('teachers').delete().eq('id', id);
   if (error) throw error;
+  invalidateCache('teachers:');
+  invalidateCache('teacherByUser:');
+  invalidateCache('adminDashboard:');
 }
 
 export async function fetchParents(schoolId: string) {
-  try {
+  return cachedFetch(`parents:${schoolId}`, async () => {
+    try {
+      const { data, error } = await supabase
+        .from('parents')
+        .select('*, parent_students(*, student:students(*, class:classes(*), section:sections(*)))')
+        .eq('school_id', schoolId)
+        .order('full_name');
+      if (!error && data) return data as Parent[];
+    } catch {
+      // fallback if relationship join is restricted
+    }
+
     const { data, error } = await supabase
       .from('parents')
-      .select('*, parent_students(*, student:students(*, class:classes(*), section:sections(*)))')
+      .select('*')
       .eq('school_id', schoolId)
       .order('full_name');
-    if (!error && data) return data as Parent[];
-  } catch {
-    // fallback if relationship join is restricted
-  }
-
-  const { data, error } = await supabase
-    .from('parents')
-    .select('*')
-    .eq('school_id', schoolId)
-    .order('full_name');
-  if (error) throw error;
-  return data as Parent[];
+    if (error) throw error;
+    return data as Parent[];
+  });
 }
 
 export async function updateParent(id: string, updates: Partial<Parent>) {
@@ -238,12 +325,18 @@ export async function updateParent(id: string, updates: Partial<Parent>) {
     }
   }
 
+  invalidateCache('parents:');
+  invalidateCache('parentByUser:');
+  invalidateCache('students:');
   return data as Parent | null;
 }
 
 export async function deleteParent(id: string) {
   const { error } = await supabase.from('parents').delete().eq('id', id);
   if (error) throw error;
+  invalidateCache('parents:');
+  invalidateCache('parentByUser:');
+  invalidateCache('adminDashboard:');
 }
 
 export async function fetchStudents(schoolId: string, filters?: {
@@ -251,21 +344,24 @@ export async function fetchStudents(schoolId: string, filters?: {
   sectionId?: string;
   search?: string;
 }) {
-  let query = supabase
-    .from('students')
-    .select('*, class:classes(*), section:sections(*)')
-    .eq('school_id', schoolId)
-    .order('full_name');
+  const key = `students:${schoolId}:${filters?.classId || ''}:${filters?.sectionId || ''}:${filters?.search || ''}`;
+  return cachedFetch(key, async () => {
+    let query = supabase
+      .from('students')
+      .select('*, class:classes(*), section:sections(*)')
+      .eq('school_id', schoolId)
+      .order('full_name');
 
-  if (filters?.classId) query = query.eq('class_id', filters.classId);
-  if (filters?.sectionId) query = query.eq('section_id', filters.sectionId);
-  if (filters?.search) {
-    query = query.or(`full_name.ilike.%${filters.search}%,admission_number.ilike.%${filters.search}%`);
-  }
+    if (filters?.classId) query = query.eq('class_id', filters.classId);
+    if (filters?.sectionId) query = query.eq('section_id', filters.sectionId);
+    if (filters?.search) {
+      query = query.or(`full_name.ilike.%${filters.search}%,admission_number.ilike.%${filters.search}%`);
+    }
 
-  const { data, error } = await query;
-  if (error) throw error;
-  return data as Student[];
+    const { data, error } = await query;
+    if (error) throw error;
+    return data as Student[];
+  });
 }
 
 export async function fetchStudentById(id: string) {
@@ -428,6 +524,10 @@ export async function ensureParentForStudent(
 export async function createStudent(student: Partial<Student> & { school_id: string; admission_number: string; full_name: string }) {
   const { data, error } = await supabase.from('students').insert(student).select().maybeSingle();
   if (error) throw error;
+  invalidateCache('students:');
+  invalidateCache('studentsBySection:');
+  invalidateCache('parents:');
+  invalidateCache('adminDashboard:');
   let parentResult: { parent: Parent | null; credentials: { username: string; password: string }; created: boolean } | null = null;
   if (data) {
     // Automatically ensure parent account exists and is linked
@@ -446,12 +546,20 @@ export async function createStudent(student: Partial<Student> & { school_id: str
 export async function updateStudent(id: string, updates: Partial<Student>) {
   const { data, error } = await supabase.from('students').update(updates).eq('id', id).select().maybeSingle();
   if (error) throw error;
+  invalidateCache('students:');
+  invalidateCache('studentsBySection:');
+  invalidateCache('parentStudents:');
+  invalidateCache('adminDashboard:');
   return data as Student | null;
 }
 
 export async function deleteStudent(id: string) {
   const { error } = await supabase.from('students').delete().eq('id', id);
   if (error) throw error;
+  invalidateCache('students:');
+  invalidateCache('studentsBySection:');
+  invalidateCache('parentStudents:');
+  invalidateCache('adminDashboard:');
 }
 
 export async function fetchClasses(schoolId: string) {
@@ -565,12 +673,14 @@ export async function createClassAssignment(assignment: {
     .select()
     .maybeSingle();
   if (error) throw error;
+  invalidateCache('teacherAssignments:');
   return data as ClassAssignment | null;
 }
 
 export async function deleteClassAssignment(id: string) {
   const { error } = await supabase.from('class_assignments').delete().eq('id', id);
   if (error) throw error;
+  invalidateCache('teacherAssignments:');
 }
 
 export async function fetchTeacherSchedules(schoolId: string) {
@@ -601,44 +711,52 @@ export async function createTeacherSchedule(schedule: {
     .select()
     .maybeSingle();
   if (error) throw error;
+  invalidateCache('teacherSchedulesByTeacher:');
   return data as TeacherSchedule | null;
 }
 
 export async function deleteTeacherSchedule(id: string) {
   const { error } = await supabase.from('teacher_schedules').delete().eq('id', id);
   if (error) throw error;
+  invalidateCache('teacherSchedulesByTeacher:');
 }
 
 // Teacher-specific: get their assigned sections
 export async function fetchTeacherAssignments(teacherId: string) {
-  const { data, error } = await supabase
-    .from('class_assignments')
-    .select('*, class:classes(*), section:sections(*), subject:subjects(*)')
-    .eq('teacher_id', teacherId);
-  if (error) throw error;
-  return data as ClassAssignment[];
+  return cachedFetch(`teacherAssignments:${teacherId}`, async () => {
+    const { data, error } = await supabase
+      .from('class_assignments')
+      .select('*, class:classes(*), section:sections(*), subject:subjects(*)')
+      .eq('teacher_id', teacherId);
+    if (error) throw error;
+    return data as ClassAssignment[];
+  });
 }
 
 export async function fetchTeacherScheduleByTeacher(teacherId: string) {
-  const { data, error } = await supabase
-    .from('teacher_schedules')
-    .select('*, class:classes(*), section:sections(*), subject:subjects(*)')
-    .eq('teacher_id', teacherId)
-    .order('day_of_week')
-    .order('start_time');
-  if (error) throw error;
-  return data as TeacherSchedule[];
+  return cachedFetch(`teacherSchedulesByTeacher:${teacherId}`, async () => {
+    const { data, error } = await supabase
+      .from('teacher_schedules')
+      .select('*, class:classes(*), section:sections(*), subject:subjects(*)')
+      .eq('teacher_id', teacherId)
+      .order('day_of_week')
+      .order('start_time');
+    if (error) throw error;
+    return data as TeacherSchedule[];
+  });
 }
 
 export async function fetchStudentsBySection(sectionId: string) {
-  const { data, error } = await supabase
-    .from('students')
-    .select('*, class:classes(*), section:sections(*)')
-    .eq('section_id', sectionId)
-    .eq('status', 'active')
-    .order('roll_number');
-  if (error) throw error;
-  return data as Student[];
+  return cachedFetch(`studentsBySection:${sectionId}`, async () => {
+    const { data, error } = await supabase
+      .from('students')
+      .select('*, class:classes(*), section:sections(*)')
+      .eq('section_id', sectionId)
+      .eq('status', 'active')
+      .order('roll_number');
+    if (error) throw error;
+    return data as Student[];
+  });
 }
 
 export async function fetchAttendance(filters: {

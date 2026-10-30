@@ -167,8 +167,10 @@ export function DashboardLayout({ children, title }: { children: ReactNode; titl
   }, [profile?.school_id]);
 
   const handleSignOut = async () => {
+    setUserMenuOpen(false);
+    setSidebarOpen(false);
     await signOut();
-    navigate('/login');
+    navigate('/login', { replace: true });
   };
 
   const sidebarProps: SidebarContentProps = {

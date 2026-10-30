@@ -4,21 +4,10 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { StatCard, Card } from '@/components/ui/Card';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/auth/AuthContext';
-import { supabase } from '@/lib/supabase';
+import { fetchAdminDashboardData, type AdminDashboardData } from '@/services/api';
 import { formatCurrency } from '@/lib/utils';
 
-interface DashboardStats {
-  totalStudents: number;
-  totalTeachers: number;
-  totalClasses: number;
-  totalParents: number;
-  todayPresent: number;
-  todayAbsent: number;
-  todayTotal: number;
-  pendingFees: number;
-  collectedFees: number;
-  outstandingFees: number;
-}
+type DashboardStats = AdminDashboardData['stats'];
 
 export default function AdminDashboard() {
   const { profile } = useAuth();
@@ -39,54 +28,11 @@ export default function AdminDashboard() {
 
   async function loadDashboard() {
     if (!profile?.school_id) return;
-    const sid = profile.school_id;
     setLoading(true);
-
     try {
-      const dates: string[] = [];
-      for (let i = 1; i <= 5; i++) {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        dates.push(d.toISOString().split('T')[0]);
-      }
-
-      const [students, teachers, classes, parents, todayAttendance, fees, trendRes] = await Promise.all([
-        supabase.from('students').select('id', { count: 'exact', head: true }).eq('school_id', sid).eq('status', 'active'),
-        supabase.from('teachers').select('id', { count: 'exact', head: true }).eq('school_id', sid).eq('status', 'active'),
-        supabase.from('classes').select('id', { count: 'exact', head: true }).eq('school_id', sid),
-        supabase.from('parents').select('id', { count: 'exact', head: true }).eq('school_id', sid).eq('status', 'active'),
-        supabase.from('attendance').select('status').eq('school_id', sid).eq('attendance_date', new Date().toISOString().split('T')[0]),
-        supabase.from('fees').select('amount, paid_amount, status').eq('school_id', sid),
-        supabase.from('attendance').select('attendance_date, status').eq('school_id', sid).in('attendance_date', dates),
-      ]);
-
-      const todayPresent = todayAttendance.data?.filter((a: { status: string }) => a.status === 'present').length || 0;
-      const todayAbsent = todayAttendance.data?.filter((a: { status: string }) => a.status === 'absent').length || 0;
-      const collected = fees.data?.reduce((sum: number, f: { paid_amount: number }) => sum + Number(f.paid_amount), 0) || 0;
-      const outstanding = fees.data?.reduce((sum: number, f: { amount: number; paid_amount: number }) => sum + (Number(f.amount) - Number(f.paid_amount)), 0) || 0;
-      const pendingCount = fees.data?.filter((f: { status: string }) => f.status === 'pending').length || 0;
-
-      setStats({
-        totalStudents: students.count || 0,
-        totalTeachers: teachers.count || 0,
-        totalClasses: classes.count || 0,
-        totalParents: parents.count || 0,
-        todayPresent,
-        todayAbsent,
-        todayTotal: todayAttendance.data?.length || 0,
-        pendingFees: pendingCount,
-        collectedFees: collected,
-        outstandingFees: outstanding,
-      });
-
-      const trendRows = trendRes.data;
-      const attData = dates.map((date) => {
-        const dayRows = trendRows?.filter((r) => r.attendance_date === date) || [];
-        const present = dayRows.filter((r) => r.status === 'present').length;
-        const absent = dayRows.filter((r) => r.status === 'absent').length;
-        return { date, present, absent };
-      });
-      setAttendanceTrend(attData);
+      const data = await fetchAdminDashboardData(profile.school_id);
+      setStats(data.stats);
+      setAttendanceTrend(data.attendanceTrend);
     } catch (err) {
       console.error('Dashboard load error:', err);
     } finally {

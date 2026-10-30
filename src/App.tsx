@@ -64,20 +64,34 @@ function RoutePrefetcher() {
       if (profile.role === 'admin') {
         import('@/pages/admin/AdminDashboard');
         import('@/pages/admin/AdminStudents');
+        import('@/pages/admin/StudentDetailPage');
+        import('@/pages/admin/NewAdmissionPage');
         import('@/pages/admin/AdminTeachers');
         import('@/pages/admin/AdminParents');
         import('@/pages/admin/AdminClasses');
         import('@/pages/admin/AdminAttendance');
         import('@/pages/admin/AdminFees');
+        import('@/pages/admin/AdminAssignments');
+        import('@/pages/admin/AdminTracking');
+        import('@/pages/admin/AdminIDCard');
+        import('@/pages/admin/AdminDocuments');
+        import('@/pages/admin/AdminHolidays');
+        import('@/pages/admin/AdminNotifications');
         import('@/pages/admin/AdminSettings');
         import('@/pages/shared/ProfilePage');
       } else if (profile.role === 'teacher') {
         import('@/pages/teacher/TeacherDashboard');
         import('@/pages/teacher/TeacherClasses');
+        import('@/pages/teacher/TeacherAssignments');
+        import('@/pages/teacher/TeacherSubjects');
         import('@/pages/teacher/TeacherStudents');
+        import('@/pages/teacher/TeacherAddStudent');
+        import('@/pages/teacher/TeacherNewAdmission');
         import('@/pages/teacher/TeacherAttendance');
         import('@/pages/teacher/TeacherExamMarks');
         import('@/pages/teacher/TeacherRecords');
+        import('@/pages/teacher/TeacherRemarks');
+        import('@/pages/teacher/TeacherSchedule');
         import('@/pages/shared/ProfilePage');
       } else if (profile.role === 'parent') {
         import('@/pages/parent/ParentDashboard');
@@ -85,9 +99,10 @@ function RoutePrefetcher() {
         import('@/pages/parent/ParentAttendance');
         import('@/pages/parent/ParentFees');
         import('@/pages/parent/ParentRecords');
+        import('@/pages/parent/ParentRemarks');
         import('@/pages/shared/ProfilePage');
       }
-    }, 300);
+    }, 100);
 
     return () => window.clearTimeout(timer);
   }, [profile?.role]);

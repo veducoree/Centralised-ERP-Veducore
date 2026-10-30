@@ -1,4 +1,7 @@
 export {
+  clearApiCache,
+  fetchAdminDashboardData,
+  type AdminDashboardData,
   fetchSchool,
   updateSchool,
   fetchTeachers,

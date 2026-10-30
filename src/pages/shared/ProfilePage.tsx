@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { KeyRound, Eye, EyeOff } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { KeyRound, Eye, EyeOff, LogOut } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -14,7 +15,8 @@ import { generateTeacherUsername } from '@/lib/parentUtils';
 import type { Teacher, School } from '@/types';
 
 export default function ProfilePage() {
-  const { profile } = useAuth();
+  const { profile, signOut } = useAuth();
+  const navigate = useNavigate();
   const toast = useToast();
 
   const [teacher, setTeacher] = useState<Teacher | null>(null);
@@ -192,19 +194,33 @@ export default function ProfilePage() {
           </div>
 
           {/* Info Banner */}
-          <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs text-blue-800 flex items-center justify-between">
+          <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs text-blue-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <p>
               Institutional records, mobile numbers, and login credentials are centrally managed by the school administration and cannot be edited directly.
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              icon={<KeyRound className="h-4 w-4" />}
-              onClick={openPwModal}
-              className="bg-white hover:bg-gray-50 flex-shrink-0 ml-4 shadow-sm"
-            >
-              Change Password
-            </Button>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                icon={<KeyRound className="h-4 w-4" />}
+                onClick={openPwModal}
+                className="bg-white hover:bg-gray-50 shadow-sm"
+              >
+                Change Password
+              </Button>
+              <Button
+                variant="danger"
+                size="sm"
+                icon={<LogOut className="h-4 w-4" />}
+                onClick={async () => {
+                  await signOut();
+                  navigate('/login', { replace: true });
+                }}
+                className="shadow-sm"
+              >
+                Sign Out
+              </Button>
+            </div>
           </div>
         </Card>
       </div>

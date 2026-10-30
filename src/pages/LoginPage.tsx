@@ -120,12 +120,23 @@ export default function LoginPage() {
   const [captchaError, setCaptchaError] = useState('');
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Redraw canvas whenever captchaCode changes
+  // Redraw canvas whenever captchaCode changes or authLoading finishes
   useEffect(() => {
-    if (canvasRef.current) {
+    if (!authLoading && canvasRef.current) {
       renderCaptchaToCanvas(canvasRef.current, captchaCode);
     }
-  }, [captchaCode]);
+  }, [captchaCode, authLoading]);
+
+  // Callback ref ensures the captcha renders immediately the instant <canvas> mounts in the DOM
+  const handleCanvasRef = useCallback(
+    (node: HTMLCanvasElement | null) => {
+      canvasRef.current = node;
+      if (node) {
+        renderCaptchaToCanvas(node, captchaCode);
+      }
+    },
+    [captchaCode]
+  );
 
   const refreshCaptcha = useCallback(() => {
     const newCode = generateRandomCaptcha(5);
@@ -271,7 +282,7 @@ export default function LoginPage() {
                   title="Click image to reload captcha"
                 >
                   <canvas
-                    ref={canvasRef}
+                    ref={handleCanvasRef}
                     width={130}
                     height={40}
                     className="block group-hover:opacity-90 transition-opacity"
