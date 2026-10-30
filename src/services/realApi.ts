@@ -120,11 +120,41 @@ export async function fetchAdminDashboardData(schoolId: string): Promise<AdminDa
   }, 45_000);
 }
 
+const SCHOOL_STORAGE_PREFIX = 'veducore_cached_school:';
+
+export function getCachedSchoolSync(schoolId?: string | null): School | null {
+  if (!schoolId) return null;
+  const mem = apiCache.get(`school:${schoolId}`);
+  if (mem && mem.expiresAt > Date.now() && mem.data) {
+    return mem.data as School;
+  }
+  try {
+    const raw = sessionStorage.getItem(`${SCHOOL_STORAGE_PREFIX}${schoolId}`);
+    return raw ? (JSON.parse(raw) as School) : null;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedSchoolSync(schoolId: string, school: School | null) {
+  try {
+    if (school) {
+      sessionStorage.setItem(`${SCHOOL_STORAGE_PREFIX}${schoolId}`, JSON.stringify(school));
+    } else {
+      sessionStorage.removeItem(`${SCHOOL_STORAGE_PREFIX}${schoolId}`);
+    }
+  } catch {
+    // ignore storage quota errors
+  }
+}
+
 export async function fetchSchool(schoolId: string) {
   return cachedFetch(`school:${schoolId}`, async () => {
     const { data, error } = await supabase.from('schools').select('*').eq('id', schoolId).maybeSingle();
     if (error) throw error;
-    return data as School | null;
+    const school = data as School | null;
+    setCachedSchoolSync(schoolId, school);
+    return school;
   }, 5 * 60_000);
 }
 
@@ -132,7 +162,9 @@ export async function updateSchool(schoolId: string, updates: Partial<School>) {
   const { data, error } = await supabase.from('schools').update(updates).eq('id', schoolId).select().maybeSingle();
   if (error) throw error;
   invalidateCache(`school:${schoolId}`);
-  return data as School | null;
+  const school = data as School | null;
+  setCachedSchoolSync(schoolId, school);
+  return school;
 }
 
 export async function fetchTeachers(schoolId: string) {

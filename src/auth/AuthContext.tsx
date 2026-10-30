@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
-import { clearApiCache } from '@/services/api';
+import { clearApiCache, fetchSchool } from '@/services/api';
 import type { Profile, Student, UserRole } from '@/types';
 
 export interface AuthContextValue {
@@ -47,7 +47,7 @@ function clearSupabaseStorageTokens() {
       const keysToRemove: string[] = [];
       for (let i = 0; i < storage.length; i++) {
         const key = storage.key(i);
-        if (key && (key.startsWith('sb-') || key === PROFILE_CACHE_KEY)) {
+        if (key && (key.startsWith('sb-') || key === PROFILE_CACHE_KEY || key.startsWith('veducore_cached_school:'))) {
           keysToRemove.push(key);
         }
       }
@@ -85,6 +85,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         if (data) {
           const p = data as Profile;
+          if (p.school_id) {
+            await fetchSchool(p.school_id).catch(() => {});
+          }
           setProfile(p);
           setCachedProfile(p);
           return p;

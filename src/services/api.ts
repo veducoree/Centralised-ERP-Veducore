@@ -3,6 +3,7 @@ export {
   fetchAdminDashboardData,
   type AdminDashboardData,
   fetchSchool,
+  getCachedSchoolSync,
   updateSchool,
   fetchTeachers,
   createTeacherAccount,
