@@ -211,7 +211,7 @@ export default function LoginPage() {
         </div>
 
         {/* Login Card */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-8 shadow-sm">
 
           {error && (
             <div className="mb-4 flex items-start gap-2.5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -267,41 +267,44 @@ export default function LoginPage() {
 
             {/* Image Captcha */}
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-sm font-medium text-gray-700">
+              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-1">
+                <label htmlFor="captcha-input" className="block text-sm font-medium text-gray-700">
                   Security Code (CAPTCHA)
                 </label>
                 <span className="text-[11px] text-gray-400">Click image or icon to refresh</span>
               </div>
 
-              <div className="flex items-center gap-2">
-                {/* Canvas Captcha Image */}
-                <div
-                  className="relative flex items-center justify-center overflow-hidden rounded-lg border border-gray-300 bg-gray-100 shadow-2xs select-none cursor-pointer group"
-                  onClick={refreshCaptcha}
-                  title="Click image to reload captcha"
-                >
-                  <canvas
-                    ref={handleCanvasRef}
-                    width={130}
-                    height={40}
-                    className="block group-hover:opacity-90 transition-opacity"
-                  />
-                </div>
+              <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:gap-2">
+                <div className="flex items-center gap-2">
+                  {/* Canvas Captcha Image */}
+                  <div
+                    className="relative flex flex-shrink-0 items-center justify-center overflow-hidden rounded-lg border border-gray-300 bg-gray-100 shadow-2xs select-none cursor-pointer group"
+                    onClick={refreshCaptcha}
+                    title="Click image to reload captcha"
+                  >
+                    <canvas
+                      ref={handleCanvasRef}
+                      width={130}
+                      height={40}
+                      className="block group-hover:opacity-90 transition-opacity"
+                    />
+                  </div>
 
-                {/* Refresh Button */}
-                <button
-                  type="button"
-                  onClick={refreshCaptcha}
-                  disabled={loading}
-                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-2xs hover:bg-gray-50 hover:text-blue-600 transition-colors disabled:opacity-40"
-                  title="Refresh Captcha Image"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </button>
+                  {/* Refresh Button */}
+                  <button
+                    type="button"
+                    onClick={refreshCaptcha}
+                    disabled={loading}
+                    className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-2xs hover:bg-gray-50 hover:text-blue-600 transition-colors disabled:opacity-40"
+                    title="Refresh Captcha Image"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </button>
+                </div>
 
                 {/* Captcha Input */}
                 <input
+                  id="captcha-input"
                   type="text"
                   value={captchaInput}
                   onChange={(e) => {
@@ -310,7 +313,7 @@ export default function LoginPage() {
                   }}
                   placeholder="Enter code"
                   maxLength={6}
-                  className={`flex-1 rounded-lg border px-3 py-2 text-sm font-mono tracking-widest text-gray-900 placeholder-gray-400 uppercase transition-colors focus:outline-none focus:ring-2 ${
+                  className={`w-full min-w-0 sm:flex-1 rounded-lg border px-3.5 py-2.5 sm:px-3 sm:py-2 text-sm font-mono tracking-widest text-gray-900 placeholder-gray-400 uppercase transition-colors focus:outline-none focus:ring-2 ${
                     captchaError
                       ? 'border-red-400 bg-red-50/50 focus:border-red-500 focus:ring-red-500/20'
                       : 'border-gray-300 bg-white focus:border-blue-500 focus:ring-blue-500/30'
