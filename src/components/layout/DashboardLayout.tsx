@@ -19,43 +19,43 @@ interface NavItem {
 }
 
 const adminNav: NavItem[] = [
-  { label: 'Dashboard', path: '/admin/dashboard', icon: <LayoutDashboard className="h-[18px] w-[18px]" /> },
-  { label: 'Students', path: '/admin/students', icon: <Users className="h-[18px] w-[18px]" /> },
-  { label: 'Teachers', path: '/admin/teachers', icon: <GraduationCap className="h-[18px] w-[18px]" /> },
-  { label: 'Parents', path: '/admin/parents', icon: <User className="h-[18px] w-[18px]" /> },
-  { label: 'Classes & Sections', path: '/admin/classes', icon: <BookOpen className="h-[18px] w-[18px]" /> },
-  { label: 'Attendance', path: '/admin/attendance', icon: <ClipboardList className="h-[18px] w-[18px]" /> },
-  { label: 'Fees', path: '/admin/fees', icon: <IndianRupee className="h-[18px] w-[18px]" /> },
-  { label: 'Student Tracking', path: '/admin/tracking', icon: <Shield className="h-[18px] w-[18px]" /> },
-  { label: 'ID Cards', path: '/admin/id-cards', icon: <CreditCard className="h-[18px] w-[18px]" /> },
-  { label: 'Documents', path: '/admin/documents', icon: <FileText className="h-[18px] w-[18px]" /> },
-  { label: 'Holidays', path: '/admin/holidays', icon: <CalendarDays className="h-[18px] w-[18px]" /> },
-  { label: 'Notifications', path: '/admin/notifications', icon: <Bell className="h-[18px] w-[18px]" /> },
-  { label: 'Settings', path: '/admin/settings', icon: <Settings className="h-[18px] w-[18px]" /> },
-  { label: 'Profile', path: '/admin/profile', icon: <UserCircle className="h-[18px] w-[18px]" /> },
+  { label: 'Dashboard', path: '/admin/dashboard', icon: <LayoutDashboard className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Students', path: '/admin/students', icon: <Users className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Teachers', path: '/admin/teachers', icon: <GraduationCap className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Parents', path: '/admin/parents', icon: <User className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Classes & Sections', path: '/admin/classes', icon: <BookOpen className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Attendance', path: '/admin/attendance', icon: <ClipboardList className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Fees', path: '/admin/fees', icon: <IndianRupee className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Student Tracking', path: '/admin/tracking', icon: <Shield className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'ID Cards', path: '/admin/id-cards', icon: <CreditCard className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Documents', path: '/admin/documents', icon: <FileText className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Holidays', path: '/admin/holidays', icon: <CalendarDays className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Notifications', path: '/admin/notifications', icon: <Bell className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Settings', path: '/admin/settings', icon: <Settings className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Profile', path: '/admin/profile', icon: <UserCircle className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
 ];
 
 const teacherNav: NavItem[] = [
-  { label: 'Dashboard', path: '/teacher/dashboard', icon: <LayoutDashboard className="h-[18px] w-[18px]" /> },
-  { label: 'My Classes', path: '/teacher/classes', icon: <BookOpen className="h-[18px] w-[18px]" /> },
-  { label: 'Subjects', path: '/teacher/subjects', icon: <BookOpen className="h-[18px] w-[18px]" /> },
-  { label: 'Students', path: '/teacher/students', icon: <Users className="h-[18px] w-[18px]" /> },
-  { label: 'Add Student', path: '/teacher/add-student', icon: <UserPlus className="h-[18px] w-[18px]" /> },
-  { label: 'Attendance', path: '/teacher/attendance', icon: <ClipboardList className="h-[18px] w-[18px]" /> },
-  { label: 'Exam Marks', path: '/teacher/exam-marks', icon: <ClipboardCheck className="h-[18px] w-[18px]" /> },
-  { label: 'Student Records', path: '/teacher/records', icon: <FileText className="h-[18px] w-[18px]" /> },
-  { label: 'Remarks', path: '/teacher/remarks', icon: <Megaphone className="h-[18px] w-[18px]" /> },
-  { label: 'Profile', path: '/teacher/profile', icon: <UserCircle className="h-[18px] w-[18px]" /> },
+  { label: 'Dashboard', path: '/teacher/dashboard', icon: <LayoutDashboard className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'My Classes', path: '/teacher/classes', icon: <BookOpen className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Subjects', path: '/teacher/subjects', icon: <BookOpen className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Students', path: '/teacher/students', icon: <Users className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Add Student', path: '/teacher/add-student', icon: <UserPlus className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Attendance', path: '/teacher/attendance', icon: <ClipboardList className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Exam Marks', path: '/teacher/exam-marks', icon: <ClipboardCheck className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Student Records', path: '/teacher/records', icon: <FileText className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Remarks', path: '/teacher/remarks', icon: <Megaphone className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Profile', path: '/teacher/profile', icon: <UserCircle className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
 ];
 
 const parentNav: NavItem[] = [
-  { label: 'Dashboard', path: '/parent/dashboard', icon: <LayoutDashboard className="h-[18px] w-[18px]" /> },
-  { label: 'My Child', path: '/parent/child', icon: <Users className="h-[18px] w-[18px]" /> },
-  { label: 'Attendance', path: '/parent/attendance', icon: <ClipboardList className="h-[18px] w-[18px]" /> },
-  { label: 'Fees', path: '/parent/fees', icon: <IndianRupee className="h-[18px] w-[18px]" /> },
-  { label: 'Academic Records', path: '/parent/records', icon: <FileText className="h-[18px] w-[18px]" /> },
-  { label: 'Remarks', path: '/parent/remarks', icon: <Megaphone className="h-[18px] w-[18px]" /> },
-  { label: 'Profile', path: '/parent/profile', icon: <UserCircle className="h-[18px] w-[18px]" /> },
+  { label: 'Dashboard', path: '/parent/dashboard', icon: <LayoutDashboard className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'My Child', path: '/parent/child', icon: <Users className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Attendance', path: '/parent/attendance', icon: <ClipboardList className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Fees', path: '/parent/fees', icon: <IndianRupee className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Academic Records', path: '/parent/records', icon: <FileText className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Remarks', path: '/parent/remarks', icon: <Megaphone className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
+  { label: 'Profile', path: '/parent/profile', icon: <UserCircle className="h-[18px] w-[18px]" strokeWidth={2.5} /> },
 ];
 
 // ── Sidebar inner content — defined OUTSIDE DashboardLayout so it never
@@ -109,7 +109,7 @@ function SidebarContent({ navItems, location, school, roleLabel, onNavigate, onS
                   </span>
                   <span className="truncate">{item.label}</span>
                   {!active && (
-                    <ChevronRight className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 ml-auto h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                    <ChevronRight className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 ml-auto h-3.5 w-3.5 text-gray-400 flex-shrink-0" strokeWidth={2.5} />
                   )}
                 </button>
               </li>
@@ -134,7 +134,7 @@ function SidebarContent({ navItems, location, school, roleLabel, onNavigate, onS
           onClick={onSignOut}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600"
         >
-          <LogOut className="h-[18px] w-[18px]" />
+          <LogOut className="h-[18px] w-[18px]" strokeWidth={2.5} />
           Sign Out
         </button>
       </div>
