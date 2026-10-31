@@ -360,3 +360,54 @@ export interface OnlinePayment {
   created_at: string;
   updated_at: string;
 }
+
+export interface TransportStop {
+  id: string;
+  stop_name: string;
+  amount: number;
+  bus_id?: string;
+  bus_number?: string;
+  route_name?: string;
+  stop_order?: number;
+  area_landmark?: string;
+  distance_km?: number;
+  latitude?: number;
+  longitude?: number;
+  pickup_time?: string;
+  drop_time?: string;
+  driver_name?: string;
+  driver_phone?: string;
+  created_at: string;
+}
+
+export interface TransportBus {
+  id: string;
+  bus_number: string;
+  route_name: string;
+  driver_name?: string;
+  driver_phone?: string;
+  total_stops: number;
+  stops: TransportStop[];
+  created_at: string;
+}
+
+export interface StudentTransportAssignment {
+  student_id: string;
+  student_name?: string;
+  class_name?: string;
+  section_name?: string;
+  bus_id?: string;
+  stop_id: string;
+  stop_name: string;
+  amount: number;
+  route_name?: string;
+  bus_number?: string;
+  area_landmark?: string;
+  pickup_time?: string;
+  drop_time?: string;
+  driver_name?: string;
+  driver_phone?: string;
+  status?: 'pending' | 'active';
+  applied_by_parent?: boolean;
+  assigned_at: string;
+}

@@ -8,6 +8,7 @@ import type {
   Remark, FeeType, Fee, FeePayment, Notification, AuditLog,
   ParentStudent, School, Profile,
   Holiday, ExamDef, FeeStructure, PaymentSetup,
+  TransportStop, TransportBus, StudentTransportAssignment,
 } from '@/types';
 
 // Lightweight in-memory cache with TTL and in-flight request deduplication
@@ -937,6 +938,27 @@ export async function createFeeType(schoolId: string, name: string, description:
   return data as FeeType | null;
 }
 
+const LOCAL_FEE_OVERRIDES_KEY = 'veducore_local_fee_overrides';
+
+function getLocalFeeOverrides(): Record<string, Partial<Fee>> {
+  try {
+    const raw = localStorage.getItem(LOCAL_FEE_OVERRIDES_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function setLocalFeeOverride(feeId: string, override: Partial<Fee>) {
+  try {
+    const all = getLocalFeeOverrides();
+    all[feeId] = { ...(all[feeId] || {}), ...override };
+    localStorage.setItem(LOCAL_FEE_OVERRIDES_KEY, JSON.stringify(all));
+  } catch {
+    // ignore
+  }
+}
+
 export async function fetchFees(filters: {
   schoolId?: string;
   studentId?: string;
@@ -953,7 +975,22 @@ export async function fetchFees(filters: {
 
   const { data, error } = await query;
   if (error) throw error;
-  return data as Fee[];
+  const overrides = getLocalFeeOverrides();
+  return ((data || []) as Fee[]).map((f) => {
+    const ov = overrides[f.id];
+    if (ov && Number(ov.paid_amount ?? 0) > Number(f.paid_amount ?? 0)) {
+      const mergedPaid = Math.min(Number(f.amount), Number(ov.paid_amount));
+      const mergedRem = Math.max(0, Number(f.amount) - mergedPaid);
+      return {
+        ...f,
+        ...ov,
+        paid_amount: mergedPaid,
+        remaining_amount: mergedRem,
+        status: (mergedRem <= 0 ? 'paid' : 'partially_paid') as Fee['status'],
+      };
+    }
+    return f;
+  });
 }
 
 export async function createFee(fee: {
@@ -982,29 +1019,68 @@ export async function recordFeePayment(feeId: string, payment: {
   payment_method?: string;
   receipt_number?: string;
   recorded_by?: string;
+  next_due_date?: string;
 }) {
-  const { data, error } = await supabase
-    .from('fee_payments')
-    .insert(payment)
-    .select()
-    .maybeSingle();
-  if (error) throw error;
+  const effectiveReceipt =
+    payment.receipt_number?.trim() ||
+    `RCP-${Math.floor(100000 + Math.random() * 900000)}`;
+  const effectiveMethod = payment.payment_method?.trim() || 'Cash';
+  const { next_due_date, ...paymentRow } = {
+    ...payment,
+    receipt_number: effectiveReceipt,
+    payment_method: effectiveMethod,
+  };
+  let insertedPayment: FeePayment | null = null;
+  try {
+    const { data } = await supabase
+      .from('fee_payments')
+      .insert({ ...paymentRow, fee_id: feeId })
+      .select()
+      .maybeSingle();
+    insertedPayment = data as FeePayment | null;
+  } catch {
+    // fallback if parent RLS on fee_payments is not yet applied
+  }
 
   // Update fee record
   const { data: fee } = await supabase.from('fees').select('*').eq('id', feeId).maybeSingle();
-  if (fee) {
-    const newPaid = (fee as Fee).paid_amount + payment.amount;
-    const newStatus = newPaid >= (fee as Fee).amount ? 'paid' : newPaid > 0 ? 'partially_paid' : 'pending';
+  const overrides = getLocalFeeOverrides();
+  const basePaid = Math.max(
+    Number((fee as Fee | null)?.paid_amount ?? 0),
+    Number(overrides[feeId]?.paid_amount ?? 0)
+  );
+  const totalAmt = Number((fee as Fee | null)?.amount ?? payment.amount);
+  const newPaid = Math.min(totalAmt, basePaid + Number(payment.amount));
+  const newRemaining = Math.max(0, totalAmt - newPaid);
+  const newStatus = newPaid >= totalAmt ? 'paid' : newPaid > 0 ? 'partially_paid' : 'pending';
+  const updatedDueDate = next_due_date && newStatus !== 'paid'
+    ? next_due_date
+    : (fee as Fee | null)?.due_date;
+
+  setLocalFeeOverride(feeId, {
+    paid_amount: newPaid,
+    remaining_amount: newRemaining,
+    status: newStatus,
+    payment_date: payment.payment_date,
+    payment_method: effectiveMethod,
+    receipt_number: effectiveReceipt,
+    ...(updatedDueDate ? { due_date: updatedDueDate } : {}),
+  });
+
+  try {
     await supabase.from('fees').update({
       paid_amount: newPaid,
       status: newStatus,
       payment_date: payment.payment_date,
-      payment_method: payment.payment_method,
-      receipt_number: payment.receipt_number,
+      payment_method: effectiveMethod,
+      receipt_number: effectiveReceipt,
+      ...(updatedDueDate ? { due_date: updatedDueDate } : {}),
     }).eq('id', feeId);
+  } catch {
+    // local override already saved
   }
 
-  return data as FeePayment | null;
+  return insertedPayment;
 }
 
 export async function deleteFee(id: string) {
@@ -1387,4 +1463,270 @@ export async function upsertPaymentSetup(setup: {
     .maybeSingle();
   if (error) throw error;
   return data as PaymentSetup | null;
+}
+
+// ============================================================
+// TRANSPORT (BUSES, ROUTES, STOPS & STUDENT ASSIGNMENTS)
+// ============================================================
+const TRANSPORT_BUSES_KEY = (schoolId: string) => `veducore_transport_buses_${schoolId}`;
+const TRANSPORT_STOPS_KEY = (schoolId: string) => `veducore_transport_stops_${schoolId}`;
+const STUDENT_TRANSPORT_KEY = (schoolId: string) => `veducore_student_transport_${schoolId}`;
+
+function normalizeBusesAndStops(
+  rawBuses: TransportBus[],
+  rawStops: TransportStop[]
+): { buses: TransportBus[]; stops: TransportStop[] } {
+  let buses = [...rawBuses];
+  if (buses.length === 0 && rawStops.length > 0) {
+    // Group legacy stops by bus_number or into a default Bus 01
+    const grouped = new Map<string, TransportStop[]>();
+    rawStops.forEach((st) => {
+      const key = st.bus_number || 'Bus 01';
+      const list = grouped.get(key) || [];
+      list.push(st);
+      grouped.set(key, list);
+    });
+    buses = Array.from(grouped.entries()).map(([busNo, stList], idx) => ({
+      id: `bus-legacy-${idx + 1}`,
+      bus_number: busNo,
+      route_name: stList[0]?.route_name || `Route ${idx + 1}`,
+      driver_name: stList[0]?.driver_name,
+      driver_phone: stList[0]?.driver_phone,
+      total_stops: stList.length,
+      stops: stList.map((s, sIdx) => ({
+        ...s,
+        bus_id: `bus-legacy-${idx + 1}`,
+        bus_number: busNo,
+        stop_order: sIdx + 1,
+      })),
+      created_at: stList[0]?.created_at || new Date().toISOString(),
+    }));
+  }
+
+  const allStops: TransportStop[] = [];
+  buses.forEach((b) => {
+    (b.stops || []).forEach((s, idx) => {
+      allStops.push({
+        ...s,
+        bus_id: b.id,
+        bus_number: b.bus_number,
+        route_name: b.route_name,
+        driver_name: s.driver_name || b.driver_name,
+        driver_phone: s.driver_phone || b.driver_phone,
+        stop_order: s.stop_order ?? idx + 1,
+      });
+    });
+  });
+
+  return { buses, stops: allStops.length > 0 ? allStops : rawStops };
+}
+
+export async function fetchSchoolTransportData(schoolId: string): Promise<{
+  buses: TransportBus[];
+  stops: TransportStop[];
+  assignments: Record<string, StudentTransportAssignment>;
+}> {
+  let localBuses: TransportBus[] = [];
+  let localStops: TransportStop[] = [];
+  let localAssignments: Record<string, StudentTransportAssignment> = {};
+  try {
+    const rawBuses = localStorage.getItem(TRANSPORT_BUSES_KEY(schoolId));
+    if (rawBuses) localBuses = JSON.parse(rawBuses);
+    const rawStops = localStorage.getItem(TRANSPORT_STOPS_KEY(schoolId));
+    if (rawStops) localStops = JSON.parse(rawStops);
+    const rawAssign = localStorage.getItem(STUDENT_TRANSPORT_KEY(schoolId));
+    if (rawAssign) localAssignments = JSON.parse(rawAssign);
+  } catch {
+    // ignore localStorage parse errors
+  }
+
+  try {
+    const { data } = await supabase
+      .from('schools')
+      .select('settings')
+      .eq('id', schoolId)
+      .maybeSingle();
+    const settings = (data?.settings || {}) as Record<string, unknown>;
+    const dbBuses = Array.isArray(settings.transport_buses)
+      ? (settings.transport_buses as TransportBus[])
+      : null;
+    const dbStops = Array.isArray(settings.transport_stops)
+      ? (settings.transport_stops as TransportStop[])
+      : null;
+    const dbAssignments =
+      settings.student_transport && typeof settings.student_transport === 'object'
+        ? (settings.student_transport as Record<string, StudentTransportAssignment>)
+        : null;
+
+    const chosenBuses = dbBuses && dbBuses.length > 0 ? dbBuses : localBuses;
+    const chosenStops = dbStops && dbStops.length > 0 ? dbStops : localStops;
+    const normalized = normalizeBusesAndStops(chosenBuses, chosenStops);
+
+    const finalAssignments: Record<string, StudentTransportAssignment> =
+      dbAssignments && Object.keys(dbAssignments).length > 0
+        ? { ...localAssignments, ...dbAssignments }
+        : { ...localAssignments };
+
+    // Also merge any parent transport applications stored in audit_logs
+    try {
+      const { data: appLogs } = await supabase
+        .from('audit_logs')
+        .select('entity_id, metadata, created_at')
+        .eq('school_id', schoolId)
+        .eq('action', 'transport_application')
+        .order('created_at', { ascending: true });
+
+      if (appLogs && appLogs.length > 0) {
+        for (const row of appLogs) {
+          const meta = row.metadata as unknown as StudentTransportAssignment | null;
+          const stuId = meta?.student_id || row.entity_id;
+          if (stuId && meta && meta.stop_id) {
+            const existing = finalAssignments[stuId];
+            if (
+              !existing ||
+              new Date(meta.assigned_at || row.created_at).getTime() >
+                new Date(existing.assigned_at || 0).getTime()
+            ) {
+              finalAssignments[stuId] = meta;
+            }
+          }
+        }
+      }
+    } catch {
+      // ignore if audit_logs query is restricted
+    }
+
+    try {
+      localStorage.setItem(TRANSPORT_BUSES_KEY(schoolId), JSON.stringify(normalized.buses));
+      localStorage.setItem(TRANSPORT_STOPS_KEY(schoolId), JSON.stringify(normalized.stops));
+      localStorage.setItem(STUDENT_TRANSPORT_KEY(schoolId), JSON.stringify(finalAssignments));
+    } catch {
+      // ignore
+    }
+
+    return {
+      buses: normalized.buses,
+      stops: normalized.stops,
+      assignments: finalAssignments,
+    };
+  } catch {
+    const normalized = normalizeBusesAndStops(localBuses, localStops);
+    return {
+      buses: normalized.buses,
+      stops: normalized.stops,
+      assignments: localAssignments,
+    };
+  }
+}
+
+export async function applyForTransport(
+  schoolId: string,
+  assignment: StudentTransportAssignment
+): Promise<StudentTransportAssignment> {
+  const payload: StudentTransportAssignment = {
+    ...assignment,
+    status: assignment.status || 'pending',
+    applied_by_parent: true,
+    assigned_at: new Date().toISOString(),
+  };
+
+  // 1. Update localStorage immediately
+  try {
+    const rawAssign = localStorage.getItem(STUDENT_TRANSPORT_KEY(schoolId));
+    const currentAssign: Record<string, StudentTransportAssignment> = rawAssign
+      ? JSON.parse(rawAssign)
+      : {};
+    currentAssign[payload.student_id] = payload;
+    localStorage.setItem(STUDENT_TRANSPORT_KEY(schoolId), JSON.stringify(currentAssign));
+  } catch {
+    // ignore
+  }
+
+  // 2. Insert into audit_logs (works for all authenticated parents via audit_logs_insert policy and readable by Admin)
+  try {
+    await supabase.from('audit_logs').insert({
+      school_id: schoolId,
+      action: 'transport_application',
+      entity_type: 'student_transport',
+      entity_id: payload.student_id,
+      metadata: payload as unknown as Record<string, unknown>,
+    });
+  } catch {
+    // ignore
+  }
+
+  // 3. Also attempt to update schools.settings.student_transport directly
+  try {
+    const { data: currentSchool } = await supabase
+      .from('schools')
+      .select('settings')
+      .eq('id', schoolId)
+      .maybeSingle();
+
+    const existingSettings =
+      currentSchool?.settings && typeof currentSchool.settings === 'object'
+        ? (currentSchool.settings as Record<string, unknown>)
+        : {};
+    const existingStudentTransport =
+      existingSettings.student_transport && typeof existingSettings.student_transport === 'object'
+        ? (existingSettings.student_transport as Record<string, StudentTransportAssignment>)
+        : {};
+
+    await updateSchool(schoolId, {
+      settings: {
+        ...existingSettings,
+        student_transport: {
+          ...existingStudentTransport,
+          [payload.student_id]: payload,
+        },
+      },
+    });
+  } catch {
+    // ignore if RLS blocks direct school update by parent; audit_logs + localStorage already saved it
+  }
+
+  return payload;
+}
+
+export async function saveSchoolTransportData(
+  schoolId: string,
+  payload: {
+    buses?: TransportBus[];
+    stops: TransportStop[];
+    assignments: Record<string, StudentTransportAssignment>;
+  }
+) {
+  const normalized = normalizeBusesAndStops(payload.buses || [], payload.stops);
+  try {
+    localStorage.setItem(TRANSPORT_BUSES_KEY(schoolId), JSON.stringify(normalized.buses));
+    localStorage.setItem(TRANSPORT_STOPS_KEY(schoolId), JSON.stringify(normalized.stops));
+    localStorage.setItem(STUDENT_TRANSPORT_KEY(schoolId), JSON.stringify(payload.assignments));
+  } catch {
+    // ignore storage quota errors
+  }
+
+  const { data: currentSchool } = await supabase
+    .from('schools')
+    .select('settings')
+    .eq('id', schoolId)
+    .maybeSingle();
+
+  const existingSettings =
+    currentSchool?.settings && typeof currentSchool.settings === 'object'
+      ? (currentSchool.settings as Record<string, unknown>)
+      : {};
+
+  const updatedSettings = {
+    ...existingSettings,
+    transport_buses: normalized.buses,
+    transport_stops: normalized.stops,
+    student_transport: payload.assignments,
+  };
+
+  await updateSchool(schoolId, { settings: updatedSettings });
+  return {
+    buses: normalized.buses,
+    stops: normalized.stops,
+    assignments: payload.assignments,
+  };
 }

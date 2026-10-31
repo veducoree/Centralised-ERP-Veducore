@@ -120,7 +120,10 @@ export default function AdminSettings() {
         motto,
         affiliation_board: affiliationBoard,
         affiliation_code: affiliationCode,
-        settings,
+        settings: {
+          ...(school?.settings && typeof school.settings === 'object' ? school.settings : {}),
+          ...settings,
+        },
       };
 
       if (logoBase64 !== null) {

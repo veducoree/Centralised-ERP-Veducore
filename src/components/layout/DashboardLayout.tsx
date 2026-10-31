@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, ClipboardList,
   IndianRupee, FileText, Bell, Settings, LogOut,
   Menu, X, UserCircle, ChevronDown, Shield, User,
-  Megaphone, UserPlus, ClipboardCheck, CreditCard, ChevronRight, CalendarDays,
+  Megaphone, UserPlus, ClipboardCheck, CreditCard, ChevronRight, CalendarDays, Bus,
 } from 'lucide-react';
 import { useAuth } from '@/auth/AuthContext';
 import { fetchSchool, getCachedSchoolSync } from '@/services/api';
@@ -26,6 +26,7 @@ const adminNav: NavItem[] = [
   { label: 'Classes & Sections', path: '/admin/classes', icon: <BookOpen className="h-[18px] w-[18px]" /> },
   { label: 'Attendance', path: '/admin/attendance', icon: <ClipboardList className="h-[18px] w-[18px]" /> },
   { label: 'Fees', path: '/admin/fees', icon: <IndianRupee className="h-[18px] w-[18px]" /> },
+  { label: 'Transport', path: '/admin/transport', icon: <Bus className="h-[18px] w-[18px]" /> },
   { label: 'Student Tracking', path: '/admin/tracking', icon: <Shield className="h-[18px] w-[18px]" /> },
   { label: 'ID Cards', path: '/admin/id-cards', icon: <CreditCard className="h-[18px] w-[18px]" /> },
   { label: 'Documents', path: '/admin/documents', icon: <FileText className="h-[18px] w-[18px]" /> },
@@ -53,6 +54,7 @@ const parentNav: NavItem[] = [
   { label: 'My Child', path: '/parent/child', icon: <Users className="h-[18px] w-[18px]" /> },
   { label: 'Attendance', path: '/parent/attendance', icon: <ClipboardList className="h-[18px] w-[18px]" /> },
   { label: 'Fees', path: '/parent/fees', icon: <IndianRupee className="h-[18px] w-[18px]" /> },
+  { label: 'Transport', path: '/parent/transport', icon: <Bus className="h-[18px] w-[18px]" /> },
   { label: 'Academic Records', path: '/parent/records', icon: <FileText className="h-[18px] w-[18px]" /> },
   { label: 'Remarks', path: '/parent/remarks', icon: <Megaphone className="h-[18px] w-[18px]" /> },
   { label: 'Profile', path: '/parent/profile', icon: <UserCircle className="h-[18px] w-[18px]" /> },

@@ -83,4 +83,7 @@ export {
   deleteFeeStructure,
   fetchPaymentSetup,
   upsertPaymentSetup,
+  fetchSchoolTransportData,
+  saveSchoolTransportData,
+  applyForTransport,
 } from './realApi';

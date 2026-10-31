@@ -9,7 +9,7 @@ import { Modal, ConfirmDialog } from '@/components/ui/Modal';
 import { SearchInput, PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
-import { fetchFees, fetchStudents, fetchFeeTypes, fetchClasses, createFee, recordFeePayment, deleteFee } from '@/services/api';
+import { fetchFees, fetchStudents, fetchFeeTypes, fetchClasses, createFee, recordFeePayment, deleteFee, fetchSchool, updateSchool } from '@/services/api';
 import type { Fee, Student, FeeType, FeeStructure, PaymentSetup, Class } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { StatusBadge, Badge } from '@/components/ui/Badge';
@@ -47,7 +47,7 @@ export default function AdminFees() {
   const [paymentForm, setPaymentForm] = useState({ amount: '', payment_date: new Date().toISOString().split('T')[0], payment_method: 'Cash', receipt_number: '' });
 
   // ── Tab 2: Fee Structure ──
-  const [feeStructures, setFeeStructures] = useState<FeeStructure[]>(SAMPLE_STRUCTURES);
+  const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [structureModalOpen, setStructureModalOpen] = useState(false);
   const [editingStructure, setEditingStructure] = useState<FeeStructure | null>(null);
@@ -121,30 +121,58 @@ export default function AdminFees() {
     }
   }, [profile?.school_id]);
 
-  // Load fee structures from localStorage (falls back to SAMPLE_STRUCTURES)
+  // Load fee structures from school.settings or localStorage
   useEffect(() => {
     if (!profile?.school_id) return;
-    const stored = localStorage.getItem(`veducore_fee_structures_${profile.school_id}`);
+    const schoolId = profile.school_id;
+    const stored = localStorage.getItem(`veducore_fee_structures_${schoolId}`);
     if (stored) {
       try {
         const parsed = JSON.parse(stored) as FeeStructure[];
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setFeeStructures(parsed);
+        if (Array.isArray(parsed)) {
+          // Filter out legacy sample-1/2/3 entries so only admin-created structures remain
+          const real = parsed.filter((s) => !s.id.startsWith('sample-'));
+          setFeeStructures(real);
         }
-      } catch { /* ignore — use sample defaults */ }
+      } catch { /* ignore */ }
     }
+    fetchSchool(schoolId)
+      .then((sch) => {
+        const dbStructures = (sch?.settings as Record<string, unknown> | undefined)?.fee_structures;
+        if (Array.isArray(dbStructures)) {
+          const clean = (dbStructures as FeeStructure[]).filter((s) => !s.id.startsWith('sample-'));
+          setFeeStructures(clean);
+          localStorage.setItem(`veducore_fee_structures_${schoolId}`, JSON.stringify(clean));
+        }
+      })
+      .catch(() => {});
   }, [profile?.school_id]);
 
-  // Persist fee structures to localStorage whenever they change (after initial load)
-  useEffect(() => {
-    if (!profile?.school_id) return;
-    // Don't persist the blank-school_id sample state that exists before profile loads
-    if (feeStructures.every((s) => s.school_id === '')) return;
-    localStorage.setItem(
-      `veducore_fee_structures_${profile.school_id}`,
-      JSON.stringify(feeStructures),
-    );
-  }, [feeStructures, profile?.school_id]);  // ── Tab 1: Filters ──
+  const persistStructuresToSchool = useCallback(
+    async (nextStructures: FeeStructure[]) => {
+      if (!profile?.school_id) return;
+      localStorage.setItem(
+        `veducore_fee_structures_${profile.school_id}`,
+        JSON.stringify(nextStructures)
+      );
+      try {
+        const sch = await fetchSchool(profile.school_id);
+        const existingSettings =
+          sch?.settings && typeof sch.settings === 'object'
+            ? (sch.settings as Record<string, unknown>)
+            : {};
+        await updateSchool(profile.school_id, {
+          settings: {
+            ...existingSettings,
+            fee_structures: nextStructures,
+          },
+        });
+      } catch {
+        // ignore
+      }
+    },
+    [profile?.school_id]
+  );  // ── Tab 1: Filters ──
   const isOnlinePayment = (pm: string | null) =>
     !!pm && (pm.includes('Razorpay') || pm.includes('Simulated') || pm.includes('Online'));
 
@@ -232,12 +260,13 @@ export default function AdminFees() {
       return;
     }
     const now = new Date().toISOString();
+    let updatedList: FeeStructure[] = [];
     if (editingStructure) {
-      setFeeStructures((prev) => prev.map((s) =>
+      updatedList = feeStructures.map((s) =>
         s.id === editingStructure.id
           ? { ...s, ...structureForm, class_id: structureForm.class_id || null, amount: parseFloat(structureForm.amount), due_day: structureForm.due_day ? parseInt(structureForm.due_day) : null, updated_at: now }
           : s
-      ));
+      );
     } else {
       const newEntry: FeeStructure = {
         id: Date.now().toString(),
@@ -253,15 +282,19 @@ export default function AdminFees() {
         created_at: now,
         updated_at: now,
       };
-      setFeeStructures((prev) => [...prev, newEntry]);
+      updatedList = [...feeStructures, newEntry];
     }
+    setFeeStructures(updatedList);
+    persistStructuresToSchool(updatedList);
     setStructureModalOpen(false);
     toast(editingStructure ? 'Fee structure updated' : 'Fee structure added', 'success');
   }
 
   function handleDeleteStructure() {
     if (!deleteStructureId) return;
-    setFeeStructures((prev) => prev.filter((s) => s.id !== deleteStructureId));
+    const updatedList = feeStructures.filter((s) => s.id !== deleteStructureId);
+    setFeeStructures(updatedList);
+    persistStructuresToSchool(updatedList);
     toast('Fee structure deleted', 'success');
   }
 

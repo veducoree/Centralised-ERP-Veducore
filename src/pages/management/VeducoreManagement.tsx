@@ -212,19 +212,20 @@ function AuthScreen({ onLogin }: { onLogin: (fullName: string) => void }) {
   if (mode === 'checking') {
     return (
       <div className="fixed inset-0 z-50 min-h-screen w-screen flex flex-col items-center justify-center bg-gray-50 select-none">
-        <div className="relative inline-block">
-          <span
-            className="block text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-200"
-            style={{ WebkitTextStroke: '1px #cbd5e1' }}
-          >
-            Veducore
-          </span>
-          <span
+        <div className="relative inline-flex items-center justify-center">
+          <img
+            src={veducoreLogo}
+            alt="Veducore"
+            draggable={false}
+            className="h-24 sm:h-28 block w-auto object-contain select-none grayscale opacity-20"
+          />
+          <img
+            src={veducoreLogo}
+            alt=""
             aria-hidden="true"
-            className="veducore-fill-text pointer-events-none absolute inset-0 block text-4xl sm:text-5xl font-extrabold tracking-tight text-gray-950"
-          >
-            Veducore
-          </span>
+            draggable={false}
+            className="veducore-fill-logo pointer-events-none absolute inset-0 h-full w-full block object-contain select-none"
+          />
         </div>
       </div>
     );

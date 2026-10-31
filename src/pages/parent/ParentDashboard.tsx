@@ -1,17 +1,36 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Users } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Users, Bus, MapPin, ChevronRight } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Select } from '@/components/ui/Form';
 import { LoadingSpinner } from '@/components/ui/Primitives';
 import { useAuth } from '@/auth/AuthContext';
-import { fetchParentByUserId, fetchParentStudents, fetchAttendance, fetchFees, fetchStudentRecords, fetchRemarks } from '@/services/api';
-import type { Parent, Student, Attendance, Fee, StudentRecord, Remark } from '@/types';
+import {
+  fetchParentByUserId,
+  fetchParentStudents,
+  fetchAttendance,
+  fetchFees,
+  fetchStudentRecords,
+  fetchRemarks,
+  fetchSchoolTransportData,
+} from '@/services/api';
+import type {
+  Parent,
+  Student,
+  Attendance,
+  Fee,
+  StudentRecord,
+  Remark,
+  TransportStop,
+  StudentTransportAssignment,
+} from '@/types';
 import { formatCurrency, formatDate, getInitials } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/Badge';
 
 export default function ParentDashboard() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [parent, setParent] = useState<Parent | null>(null);
   const [children, setChildren] = useState<Student[]>([]);
   const [selectedChildId, setSelectedChildId] = useState('');
@@ -19,6 +38,8 @@ export default function ParentDashboard() {
   const [fees, setFees] = useState<Fee[]>([]);
   const [records, setRecords] = useState<StudentRecord[]>([]);
   const [remarks, setRemarks] = useState<Remark[]>([]);
+  const [transportStops, setTransportStops] = useState<TransportStop[]>([]);
+  const [transportAssignments, setTransportAssignments] = useState<Record<string, StudentTransportAssignment>>({});
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async () => {
@@ -26,15 +47,22 @@ export default function ParentDashboard() {
     setLoading(true);
     try {
       const p = await fetchParentByUserId(profile.id);
+      let kids: Student[] = [];
       if (p) {
         setParent(p);
         const links = await fetchParentStudents(p.id);
-        const kids = links.map((l) => l.student).filter(Boolean) as Student[];
+        kids = links.map((l) => l.student).filter(Boolean) as Student[];
         setChildren(kids);
+      }
+      const schoolId = profile.school_id || kids[0]?.school_id;
+      if (schoolId) {
+        const tData = await fetchSchoolTransportData(schoolId);
+        setTransportStops(tData.stops);
+        setTransportAssignments(tData.assignments);
       }
     } catch { /* handled */ }
     finally { setLoading(false); }
-  }, [profile?.id]);
+  }, [profile?.id, profile?.school_id]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -62,6 +90,7 @@ export default function ParentDashboard() {
   useEffect(() => { loadChildData(); }, [loadChildData]);
 
   const selectedChild = children.find((c) => c.id === selectedChildId);
+  const childTransport = selectedChild ? transportAssignments[selectedChild.id] : undefined;
   const presentCount = attendance.filter((a) => a.status === 'present').length;
   const attendanceRate = attendance.length > 0 ? Math.round((presentCount / attendance.length) * 100) : 0;
   const pendingFees = fees.filter((f) => f.status !== 'paid').length;
@@ -119,8 +148,101 @@ export default function ParentDashboard() {
                 <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">📊 {attendanceRate}% Attendance</span>
                 <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-700">💰 {pendingFees} Pending</span>
                 <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">📝 {remarks.length} Remarks</span>
+                {childTransport && (
+                  <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-700">
+                    🚌 Stop: {childTransport.stop_name} ({formatCurrency(childTransport.amount, '₹')})
+                  </span>
+                )}
               </div>
             </div>
+
+            {/* ── TRANSPORT SECTION ON PARENT DASHBOARD ── */}
+            <Card className="p-5">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                    <Bus className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900">School Transport</h3>
+                    <p className="text-xs text-gray-400">Apply for transport &amp; view bus stop details</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate('/parent/transport')}
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                >
+                  {childTransport ? 'Manage Transport' : 'Apply for Transport'}
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              {childTransport ? (
+                <div className="rounded-xl border border-blue-100 bg-gradient-to-r from-blue-50/70 to-indigo-50/50 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white">
+                      <MapPin className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <span
+                        className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          childTransport.status === 'pending'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-emerald-100 text-emerald-700'
+                        }`}
+                      >
+                        {childTransport.status === 'pending' ? 'Pending Approval' : 'Active Bus Stop'}
+                      </span>
+                      <p className="mt-1 text-base font-bold text-gray-900">
+                        {childTransport.stop_name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {childTransport.bus_number ? `Bus: ${childTransport.bus_number}` : 'School Bus'}
+                        {childTransport.route_name ? ` (${childTransport.route_name})` : ''}
+                        {childTransport.pickup_time ? ` · Pickup: ${childTransport.pickup_time}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="sm:text-right">
+                    <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block">
+                      Transport Amount
+                    </span>
+                    <span className="text-lg font-extrabold text-emerald-700">
+                      {formatCurrency(childTransport.amount, '₹')}
+                    </span>
+                  </div>
+                </div>
+              ) : transportStops.length > 0 ? (
+                <div className="space-y-2.5">
+                  <p className="text-xs text-gray-500">
+                    Available school transport stops & fare amounts:
+                  </p>
+                  <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                    {transportStops.slice(0, 6).map((stop) => (
+                      <div
+                        key={stop.id}
+                        className="flex items-center justify-between rounded-xl border border-gray-100 bg-gray-50/70 px-3.5 py-2.5"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <MapPin className="h-3.5 w-3.5 text-blue-600 flex-shrink-0" />
+                          <span className="text-xs font-semibold text-gray-800 truncate">
+                            {stop.stop_name}
+                          </span>
+                        </div>
+                        <span className="ml-2 text-xs font-bold text-emerald-700 flex-shrink-0">
+                          {formatCurrency(stop.amount, '₹')}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">
+                  No transport stop assigned yet.
+                </p>
+              )}
+            </Card>
 
             {/* Two column grid: attendance ring + recent results */}
             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

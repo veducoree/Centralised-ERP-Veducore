@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import veducoreLogo from '@/assets/veducore-logo.png';
 
 interface SkeletonProps {
   className?: string;
@@ -17,8 +18,8 @@ export function Skeleton({ className }: SkeletonProps) {
 }
 
 /**
- * Dead-centered "Veducore" text-fill loader (centered from top, bottom, left, and right).
- * Displays "Veducore" with a plain/unfilled interior that smoothly fills up with brand gradient.
+ * Dead-centered Veducore logo-fill loader (centered from top, bottom, left, and right).
+ * Displays the Veducore logo with a muted/unfilled base that smoothly fills up with the brand's actual logo colors.
  * Used wherever skeleton UI is not shown.
  */
 export function CenteredLoader({
@@ -32,10 +33,10 @@ export function CenteredLoader({
   label?: string;
   className?: string;
 }) {
-  const textSizes = {
-    sm: 'text-xl sm:text-2xl',
-    md: 'text-3xl sm:text-4xl',
-    lg: 'text-4xl sm:text-5xl',
+  const logoSizes = {
+    sm: 'h-14 sm:h-16',
+    md: 'h-20 sm:h-24',
+    lg: 'h-24 sm:h-28',
   };
 
   return (
@@ -48,30 +49,29 @@ export function CenteredLoader({
         className
       )}
     >
-      <div className="relative inline-block">
-        {/* Base plain/unfilled Veducore text */}
-        <span
+      <div className="relative inline-flex items-center justify-center">
+        {/* Base muted/unfilled Veducore logo */}
+        <img
+          src={veducoreLogo}
+          alt="Veducore"
+          draggable={false}
           className={cn(
-            textSizes[size],
-            'block font-extrabold tracking-tight text-gray-200'
+            logoSizes[size],
+            'block w-auto object-contain select-none grayscale opacity-20'
           )}
-          style={{
-            WebkitTextStroke: '1px #cbd5e1',
-          }}
-        >
-          Veducore
-        </span>
+        />
 
-        {/* Animated black fill moving smoothly from right to left */}
-        <span
+        {/* Animated full-color Veducore logo fill moving smoothly */}
+        <img
+          src={veducoreLogo}
+          alt=""
           aria-hidden="true"
+          draggable={false}
           className={cn(
-            textSizes[size],
-            'veducore-fill-text pointer-events-none absolute inset-0 block font-extrabold tracking-tight text-gray-950'
+            logoSizes[size],
+            'veducore-fill-logo pointer-events-none absolute inset-0 block h-full w-full object-contain select-none'
           )}
-        >
-          Veducore
-        </span>
+        />
       </div>
 
       {label && (

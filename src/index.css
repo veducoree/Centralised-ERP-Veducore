@@ -24,7 +24,7 @@
 
 @keyframes veducore-fill {
   0% {
-    clip-path: inset(0 0% 0 100%);
+    clip-path: inset(0 0% 0 94%);
   }
   45% {
     clip-path: inset(0 0% 0 0%);
@@ -33,10 +33,11 @@
     clip-path: inset(0 0% 0 0%);
   }
   100% {
-    clip-path: inset(0 100% 0 0%);
+    clip-path: inset(0 94% 0 0%);
   }
 }
 
-.veducore-fill-text {
+.veducore-fill-text,
+.veducore-fill-logo {
   animation: veducore-fill 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }

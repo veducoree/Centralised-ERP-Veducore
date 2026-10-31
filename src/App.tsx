@@ -6,7 +6,7 @@ import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import LoginPage from '@/pages/LoginPage';
 import { CenteredLoader } from '@/components/ui/Skeleton';
 
-// Dead-centered Veducore text-fill loading fallback for route transitions
+// Dead-centered Veducore logo-fill loading fallback for route transitions
 const PageLoader = () => (
   <CenteredLoader size="lg" fullScreen />
 );
@@ -22,6 +22,7 @@ const AdminParents = lazy(() => import('@/pages/admin/AdminParents'));
 const AdminClasses = lazy(() => import('@/pages/admin/AdminClasses'));
 const AdminAttendance = lazy(() => import('@/pages/admin/AdminAttendance'));
 const AdminFees = lazy(() => import('@/pages/admin/AdminFees'));
+const AdminTransport = lazy(() => import('@/pages/admin/AdminTransport'));
 const AdminAssignments = lazy(() => import('@/pages/admin/AdminAssignments'));
 const AdminTracking = lazy(() => import('@/pages/admin/AdminTracking'));
 const AdminNotifications = lazy(() => import('@/pages/admin/AdminNotifications'));
@@ -52,6 +53,7 @@ const ParentDashboard = lazy(() => import('@/pages/parent/ParentDashboard'));
 const ParentChild = lazy(() => import('@/pages/parent/ParentChild'));
 const ParentAttendance = lazy(() => import('@/pages/parent/ParentAttendance'));
 const ParentFees = lazy(() => import('@/pages/parent/ParentFees'));
+const ParentTransport = lazy(() => import('@/pages/parent/ParentTransport'));
 const ParentRecords = lazy(() => import('@/pages/parent/ParentRecords'));
 const ParentRemarks = lazy(() => import('@/pages/parent/ParentRemarks'));
 
@@ -71,6 +73,7 @@ function RoutePrefetcher() {
         import('@/pages/admin/AdminClasses');
         import('@/pages/admin/AdminAttendance');
         import('@/pages/admin/AdminFees');
+        import('@/pages/admin/AdminTransport');
         import('@/pages/admin/AdminAssignments');
         import('@/pages/admin/AdminTracking');
         import('@/pages/admin/AdminIDCard');
@@ -98,6 +101,7 @@ function RoutePrefetcher() {
         import('@/pages/parent/ParentChild');
         import('@/pages/parent/ParentAttendance');
         import('@/pages/parent/ParentFees');
+        import('@/pages/parent/ParentTransport');
         import('@/pages/parent/ParentRecords');
         import('@/pages/parent/ParentRemarks');
         import('@/pages/shared/ProfilePage');
@@ -138,6 +142,7 @@ function App() {
             <Route path="/admin/classes" element={<ProtectedRoute allowedRoles={['admin']}><AdminClasses /></ProtectedRoute>} />
             <Route path="/admin/attendance" element={<ProtectedRoute allowedRoles={['admin']}><AdminAttendance /></ProtectedRoute>} />
             <Route path="/admin/fees" element={<ProtectedRoute allowedRoles={['admin']}><AdminFees /></ProtectedRoute>} />
+            <Route path="/admin/transport" element={<ProtectedRoute allowedRoles={['admin']}><AdminTransport /></ProtectedRoute>} />
             <Route path="/admin/assignments" element={<ProtectedRoute allowedRoles={['admin']}><AdminAssignments /></ProtectedRoute>} />
             <Route path="/admin/tracking" element={<ProtectedRoute allowedRoles={['admin']}><AdminTracking /></ProtectedRoute>} />
             <Route path="/admin/id-cards" element={<ProtectedRoute allowedRoles={['admin']}><AdminIDCard /></ProtectedRoute>} />
@@ -168,6 +173,7 @@ function App() {
             <Route path="/parent/child" element={<ProtectedRoute allowedRoles={['parent']}><ParentChild /></ProtectedRoute>} />
             <Route path="/parent/attendance" element={<ProtectedRoute allowedRoles={['parent']}><ParentAttendance /></ProtectedRoute>} />
             <Route path="/parent/fees" element={<ProtectedRoute allowedRoles={['parent']}><ParentFees /></ProtectedRoute>} />
+            <Route path="/parent/transport" element={<ProtectedRoute allowedRoles={['parent']}><ParentTransport /></ProtectedRoute>} />
             <Route path="/parent/records" element={<ProtectedRoute allowedRoles={['parent']}><ParentRecords /></ProtectedRoute>} />
             <Route path="/parent/remarks" element={<ProtectedRoute allowedRoles={['parent']}><ParentRemarks /></ProtectedRoute>} />
             <Route path="/parent/profile" element={<ProtectedRoute allowedRoles={['parent']}><ProfilePage /></ProtectedRoute>} />
