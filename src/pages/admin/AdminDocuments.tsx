@@ -557,7 +557,7 @@ export default function AdminDocuments() {
 
         {/* Document Types */}
         <div>
-          <h3 className="text-lg font-bold text-gray-900 mb-4">Document Types</h3>
+          <h3 className="text-base font-semibold text-gray-900 mb-4">Document Types</h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {docTypes.map((dt) => (
               <Card

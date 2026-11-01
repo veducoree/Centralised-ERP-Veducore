@@ -80,8 +80,8 @@ export default function AdminDashboard() {
           <>
             {/* Greeting */}
             <div className="rounded-[20px] bg-white px-6 py-5 shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
-              <h2 className="text-xl font-bold text-[#0F172A]">{greeting}, {profile?.full_name || 'Admin'} 👋</h2>
-              <p className="mt-1 text-[15px] text-slate-500">Here's what's happening at your school today.</p>
+              <h2 className="text-lg font-semibold text-[#0F172A]">{greeting}, {profile?.full_name || 'Admin'} 👋</h2>
+              <p className="mt-1 text-sm text-slate-500">Here's what's happening at your school today.</p>
             </div>
 
             {/* Row 1: 4 stat cards */}
@@ -117,7 +117,7 @@ export default function AdminDashboard() {
               {/* Attendance SVG bar chart */}
               <Card className="p-6">
                 <div className="mb-5 flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-[#0F172A]">Attendance Trend (Last 5 Days)</h3>
+                  <h3 className="text-base font-semibold text-[#0F172A]">Attendance Trend (Last 5 Days)</h3>
                   <div className="flex items-center gap-3 text-xs text-slate-500">
                     <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-[#22C08A]"></span>Present</span>
                     <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-[#F87171]"></span>Absent</span>
@@ -175,7 +175,7 @@ export default function AdminDashboard() {
 
               {/* Fee donut chart */}
               <Card className="p-6">
-                <h3 className="mb-5 text-lg font-bold text-[#0F172A]">Fee Collection</h3>
+                <h3 className="mb-5 text-base font-semibold text-[#0F172A]">Fee Collection</h3>
                 <div className="flex items-center gap-8">
                   <div className="relative flex-shrink-0">
                     <svg viewBox="0 0 120 120" className="h-32 w-32">
@@ -201,12 +201,12 @@ export default function AdminDashboard() {
                     </svg>
                   </div>
                   <div className="flex-1 space-y-3">
-                    <div className="flex items-center gap-2.5 text-[15px]">
+                    <div className="flex items-center gap-2.5 text-sm">
                       <span className="h-3 w-3 flex-shrink-0 rounded-full bg-[#22C08A]"></span>
                       <span className="text-slate-500">Collected</span>
                       <span className="ml-auto font-bold text-[#0F172A]">{formatCurrency(feePaid, '₹')}</span>
                     </div>
-                    <div className="flex items-center gap-2.5 text-[15px]">
+                    <div className="flex items-center gap-2.5 text-sm">
                       <span className="h-3 w-3 flex-shrink-0 rounded-full bg-[#F87171]"></span>
                       <span className="text-slate-500">Outstanding</span>
                       <span className="ml-auto font-bold text-[#0F172A]">{formatCurrency(feeOutstanding, '₹')}</span>

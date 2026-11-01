@@ -765,7 +765,7 @@ export default function AdminTransport() {
                   <span className="inline-block rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider">
                     Step 1 · Bus & Route Setup
                   </span>
-                  <h2 className="mt-0.5 text-lg font-bold">
+                  <h2 className="mt-0.5 text-base font-semibold">
                     Add School Bus Number, Route & Stops
                   </h2>
                   <p className="text-xs text-blue-100">
@@ -857,7 +857,7 @@ export default function AdminTransport() {
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-extrabold text-base text-white">
+                              <h4 className="font-semibold text-base text-white">
                                 {bus.bus_number}
                               </h4>
                               <span className="rounded-full bg-blue-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-blue-100">
@@ -951,7 +951,7 @@ export default function AdminTransport() {
                                     {stCount} stu
                                   </span>
                                 )}
-                                <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-extrabold text-emerald-700 border border-emerald-200">
+                                <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
                                   {formatCurrency(stop.amount)}
                                 </span>
                               </div>
@@ -1236,7 +1236,7 @@ export default function AdminTransport() {
                   </p>
                 </div>
               </div>
-              <span className="text-base font-extrabold text-blue-900">
+              <span className="text-base font-semibold text-blue-900">
                 {formatCurrency(selectedAssignStop.amount)}
               </span>
             </div>

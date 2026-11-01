@@ -244,7 +244,7 @@ export default function ParentTransport() {
                       <MapPin className="h-4 w-4" />
                       Selected Bus Stop
                     </div>
-                    <p className="mt-1.5 text-lg font-extrabold text-gray-900">
+                    <p className="mt-1.5 text-base font-semibold text-gray-900">
                       {childAssignment.stop_name}
                     </p>
                     {childAssignment.area_landmark && (
@@ -259,7 +259,7 @@ export default function ParentTransport() {
                       <Clock className="h-4 w-4" />
                       Bus &amp; Route
                     </div>
-                    <p className="mt-1.5 text-base font-extrabold text-indigo-900">
+                    <p className="mt-1.5 text-base font-semibold text-indigo-900">
                       {childAssignment.bus_number || 'School Bus'}
                     </p>
                     <p className="text-xs text-gray-600 mt-0.5">
@@ -273,7 +273,7 @@ export default function ParentTransport() {
                       <IndianRupee className="h-4 w-4" />
                       Transport Fare Amount
                     </div>
-                    <p className="mt-1.5 text-lg font-extrabold text-emerald-700">
+                    <p className="mt-1.5 text-base font-semibold text-emerald-700">
                       {formatCurrency(childAssignment.amount, '₹')}
                     </p>
                   </div>
@@ -396,7 +396,7 @@ export default function ParentTransport() {
                             </p>
                           )}
                         </div>
-                        <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-sm font-extrabold text-emerald-700 border border-emerald-200 flex-shrink-0">
+                        <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-sm font-semibold text-emerald-700 border border-emerald-200 flex-shrink-0">
                           {formatCurrency(stop.amount, '₹')}
                         </span>
                       </div>

@@ -107,7 +107,7 @@ export default function ProfilePage() {
               {getInitials(profile.full_name)}
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">{profile.full_name}</h2>
+              <h2 className="text-base font-semibold text-gray-900">{profile.full_name}</h2>
               <p className="text-sm font-mono text-blue-700">{displayUsername}</p>
               <span className="mt-1 inline-block rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-200">
                 {roleLabel}

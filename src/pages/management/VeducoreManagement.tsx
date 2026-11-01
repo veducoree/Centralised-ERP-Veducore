@@ -1238,7 +1238,7 @@ function DeleteSchoolModal({
             <p className="text-xs font-bold text-red-900">
               You are about to permanently delete:
             </p>
-            <p className="text-sm font-extrabold text-red-700">{school.name}</p>
+            <p className="text-sm font-bold text-red-700">{school.name}</p>
             <p className="text-xs text-red-800 leading-relaxed">
               This action cannot be undone. The backend will permanently purge:
             </p>
@@ -1413,7 +1413,7 @@ function StudentIdCardCard({
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <h4 className="text-[11px] font-extrabold uppercase tracking-tight truncate leading-tight">
+            <h4 className="text-[11px] font-bold uppercase tracking-tight truncate leading-tight">
               {school.name}
             </h4>
             <p className="text-[9px] text-white/80 uppercase tracking-widest truncate leading-none mt-0.5">
@@ -1806,7 +1806,7 @@ function IdCardsSection({
                 <div className="h-8 w-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
                   <Contact2 className="h-4 w-4" />
                 </div>
-                <h2 className="text-lg font-bold text-gray-900 tracking-tight">
+                <h2 className="text-base font-semibold text-gray-900 tracking-tight">
                   Registered School Applications — ID Card Portals
                 </h2>
               </div>

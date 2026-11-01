@@ -12,8 +12,8 @@ export function Card({ children, className, onClick }: CardProps) {
     <div
       onClick={onClick}
       className={cn(
-        'rounded-xl border border-gray-200 bg-white shadow-sm',
-        onClick && 'cursor-pointer transition-shadow hover:shadow-md',
+        'rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)]',
+        onClick && 'cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_8px_28px_rgba(91,110,232,0.14)]',
         className
       )}
     >
@@ -31,34 +31,45 @@ interface StatCardProps {
   color?: 'blue' | 'emerald' | 'amber' | 'red' | 'cyan' | 'violet';
 }
 
-const colorClasses = {
-  blue: 'bg-blue-50 text-blue-600',
-  emerald: 'bg-emerald-50 text-emerald-600',
-  amber: 'bg-amber-50 text-amber-600',
-  red: 'bg-red-50 text-red-600',
-  cyan: 'bg-cyan-50 text-cyan-600',
-  violet: 'bg-violet-50 text-violet-600',
+const tileClasses = {
+  blue: 'bg-gradient-to-br from-[#5B6EE8] to-[#7B8CF7]',
+  emerald: 'bg-gradient-to-br from-[#22C08A] to-[#3DD9A3]',
+  amber: 'bg-gradient-to-br from-[#F5A623] to-[#FFC24D]',
+  red: 'bg-gradient-to-br from-[#EF4444] to-[#F87171]',
+  cyan: 'bg-gradient-to-br from-[#06B6D4] to-[#22D3EE]',
+  violet: 'bg-gradient-to-br from-[#8B5CF6] to-[#A78BFA]',
+};
+
+const circleClasses = {
+  blue: 'bg-[#EEF0FD]',
+  emerald: 'bg-[#E6F8F1]',
+  amber: 'bg-[#FEF3E0]',
+  red: 'bg-[#FEECEC]',
+  cyan: 'bg-[#E0F7FB]',
+  violet: 'bg-[#F0EBFE]',
 };
 
 export function StatCard({ label, value, icon, trend, trendUp, color = 'blue' }: StatCardProps) {
   return (
-    <Card className="p-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm font-medium text-gray-500">{label}</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">{value}</p>
-          {trend && (
-            <p className={cn('mt-1 text-xs font-medium', trendUp ? 'text-emerald-600' : 'text-gray-400')}>
-              {trend}
-            </p>
+    <Card className="relative h-full overflow-hidden p-6">
+      <div className={cn('absolute -right-10 -top-10 h-28 w-28 rounded-full', circleClasses[color])} />
+      {icon && (
+        <div
+          className={cn(
+            'relative mb-4 flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-md [&_svg]:h-6 [&_svg]:w-6',
+            tileClasses[color]
           )}
+        >
+          {icon}
         </div>
-        {icon && (
-          <div className={cn('flex h-11 w-11 items-center justify-center rounded-xl', colorClasses[color])}>
-            {icon}
-          </div>
-        )}
-      </div>
+      )}
+      <p className="relative text-2xl font-bold leading-tight text-[#0F172A]">{value}</p>
+      <p className="relative mt-1 text-sm text-slate-500">{label}</p>
+      {trend && (
+        <p className={cn('relative mt-1.5 text-xs font-semibold', trendUp ? 'text-emerald-600' : 'text-slate-400')}>
+          {trend}
+        </p>
+      )}
     </Card>
   );
 }

@@ -481,7 +481,7 @@ export default function ParentFees() {
                     <Icon className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-sm font-extrabold">{mode.title}</p>
+                    <p className="text-sm font-semibold">{mode.title}</p>
                     <p className={`text-xs ${active ? 'text-blue-100' : 'text-gray-500'}`}>
                       {mode.sub}
                     </p>
@@ -726,7 +726,7 @@ export default function ParentFees() {
               <span className="inline-block rounded-full bg-blue-600 px-3 py-0.5 text-[11px] font-bold text-white uppercase">
                 {activeModalPlan.currentPeriodLabel}
               </span>
-              <p className="mt-2 text-2xl font-extrabold text-blue-700">
+              <p className="mt-2 text-2xl font-bold text-blue-700">
                 {formatCurrency(activeModalPlan.installmentAmount, '₹')}
               </p>
               {activeModalPlan.nextPeriodLabel && (
@@ -795,7 +795,7 @@ export default function ParentFees() {
                 />
               )}
               <div>
-                <h2 className="text-lg font-bold text-gray-900">{school?.name || 'School'}</h2>
+                <h2 className="text-base font-semibold text-gray-900">{school?.name || 'School'}</h2>
                 {school?.address && <p className="text-gray-500 text-xs">{school.address}</p>}
                 {school?.contact_number && (
                   <p className="text-gray-500 text-xs">Tel: {school.contact_number}</p>

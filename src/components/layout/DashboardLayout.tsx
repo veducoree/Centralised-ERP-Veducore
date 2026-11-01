@@ -79,7 +79,7 @@ function SidebarContent({ navItems, location, school, roleLabel, onNavigate, onS
         )}
         <div className="min-w-0 flex-1">
           {school?.name ? (
-            <p className="line-clamp-2 break-words text-[15px] font-bold leading-snug tracking-tight text-[#5B6EE8]" title={school.name}>
+            <p className="line-clamp-2 break-words text-sm font-semibold leading-snug tracking-tight text-[#5B6EE8]" title={school.name}>
               {school.name}
             </p>
           ) : (
@@ -106,7 +106,7 @@ function SidebarContent({ navItems, location, school, roleLabel, onNavigate, onS
                 <button
                   onClick={() => onNavigate(item.path)}
                   className={cn(
-                    'group flex w-full items-center gap-3.5 rounded-[14px] px-4 py-3 text-[15px] font-medium transition-all duration-200',
+                    'group flex w-full items-center gap-3.5 rounded-[14px] px-4 py-3 text-sm font-medium transition-all duration-200',
                     active
                       ? 'bg-gradient-to-br from-[#5B6EE8] to-[#6F82F5] text-white shadow-[0_6px_16px_rgba(91,110,232,0.35)]'
                       : 'text-slate-600 hover:bg-[#EEF0FD] hover:text-[#5B6EE8]'
@@ -130,7 +130,7 @@ function SidebarContent({ navItems, location, school, roleLabel, onNavigate, onS
       <div className="space-y-2 border-t border-[#E8EAF3] p-3">
         <button
           onClick={onSignOut}
-          className="flex w-full items-center gap-3.5 rounded-[14px] px-4 py-3 text-[15px] font-medium text-slate-600 transition-colors hover:bg-red-50 hover:text-red-600"
+          className="flex w-full items-center gap-3.5 rounded-[14px] px-4 py-3 text-sm font-medium text-slate-600 transition-colors hover:bg-red-50 hover:text-red-600"
         >
           <LogOut className="h-5 w-5" />
           Sign Out
@@ -223,7 +223,7 @@ export function DashboardLayout({ children, title }: { children: ReactNode; titl
             <Menu className="h-5 w-5" />
           </button>
 
-          <h1 className="flex-1 truncate text-2xl font-extrabold tracking-tight text-[#0F172A] sm:text-[28px]">{title}</h1>
+          <h1 className="flex-1 truncate text-xl font-bold tracking-tight text-[#0F172A] sm:text-2xl">{title}</h1>
 
           {/* User menu */}
           <div className="relative">

@@ -208,7 +208,7 @@ export default function ParentDashboard() {
                     <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider block">
                       Transport Amount
                     </span>
-                    <span className="text-lg font-extrabold text-emerald-700">
+                    <span className="text-base font-semibold text-emerald-700">
                       {formatCurrency(childTransport.amount, '₹')}
                     </span>
                   </div>

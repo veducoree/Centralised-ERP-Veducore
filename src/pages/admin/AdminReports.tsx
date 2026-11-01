@@ -136,9 +136,9 @@ export default function AdminReports() {
               <>
                 <h3 className="mb-3 text-sm font-semibold text-gray-900">Fee Report</h3>
                 <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <div className="rounded-lg bg-emerald-50 p-3"><p className="text-xs text-emerald-600">Collected</p><p className="text-lg font-bold text-emerald-700">{formatCurrency(totalCollected, '₹')}</p></div>
-                  <div className="rounded-lg bg-red-50 p-3"><p className="text-xs text-red-600">Outstanding</p><p className="text-lg font-bold text-red-700">{formatCurrency(totalOutstanding, '₹')}</p></div>
-                  <div className="rounded-lg bg-blue-50 p-3"><p className="text-xs text-blue-600">Total Records</p><p className="text-lg font-bold text-blue-700">{fees.length}</p></div>
+                  <div className="rounded-lg bg-emerald-50 p-3"><p className="text-xs text-emerald-600">Collected</p><p className="text-base font-semibold text-emerald-700">{formatCurrency(totalCollected, '₹')}</p></div>
+                  <div className="rounded-lg bg-red-50 p-3"><p className="text-xs text-red-600">Outstanding</p><p className="text-base font-semibold text-red-700">{formatCurrency(totalOutstanding, '₹')}</p></div>
+                  <div className="rounded-lg bg-blue-50 p-3"><p className="text-xs text-blue-600">Total Records</p><p className="text-base font-semibold text-blue-700">{fees.length}</p></div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
