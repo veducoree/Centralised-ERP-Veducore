@@ -67,6 +67,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const profileInFlightRef = useRef<{ uid: string; promise: Promise<Profile | null> } | null>(null);
 
   const fetchProfile = useCallback(async (uid: string): Promise<Profile | null> => {
+    if (!supabase) {
+      console.error('[AuthContext] Supabase client is null — check your .env variables.');
+      return null;
+    }
+
     if (profileInFlightRef.current?.uid === uid) {
       return profileInFlightRef.current.promise;
     }
@@ -109,6 +114,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
+
+    // Guard: if supabase client is null (env vars missing), skip all auth setup
+    if (!supabase) {
+      console.error(
+        '[AuthContext] Supabase client is null — app cannot authenticate.\n' +
+        'Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file and restart the dev server.'
+      );
+      setLoading(false);
+      return;
+    }
 
     // Initial session check
     supabase.auth
@@ -189,6 +204,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchProfile]);
 
   const signIn = async (identifier: string, password: string) => {
+    if (!supabase) {
+      console.error('[AuthContext] Supabase client is null — cannot sign in. Check your .env variables.');
+      return { error: 'Supabase environment variables are missing. Please contact the administrator.' };
+    }
+
     const raw = identifier.trim();
     const pw = password.trim();
     const emailsToTry = [raw];
@@ -221,6 +241,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setLoading(false);
+
+    if (!supabase) return; // nothing to sign out from if client is null
 
     try {
       await Promise.race([

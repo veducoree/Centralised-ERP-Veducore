@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, ClipboardList,
   IndianRupee, FileText, Bell, Settings, LogOut,
   Menu, X, UserCircle, ChevronDown, Shield, User,
-  Megaphone, UserPlus, ClipboardCheck, CreditCard, ChevronRight, CalendarDays, Bus,
+  Megaphone, UserPlus, ClipboardCheck, CreditCard, CalendarDays, Bus,
 } from 'lucide-react';
 import { useAuth } from '@/auth/AuthContext';
 import { fetchSchool, getCachedSchoolSync } from '@/services/api';
@@ -19,50 +19,47 @@ interface NavItem {
 }
 
 const adminNav: NavItem[] = [
-  { label: 'Dashboard', path: '/admin/dashboard', icon: <LayoutDashboard className="h-[18px] w-[18px]" /> },
-  { label: 'Students', path: '/admin/students', icon: <Users className="h-[18px] w-[18px]" /> },
-  { label: 'Teachers', path: '/admin/teachers', icon: <GraduationCap className="h-[18px] w-[18px]" /> },
-  { label: 'Parents', path: '/admin/parents', icon: <User className="h-[18px] w-[18px]" /> },
-  { label: 'Classes & Sections', path: '/admin/classes', icon: <BookOpen className="h-[18px] w-[18px]" /> },
-  { label: 'Attendance', path: '/admin/attendance', icon: <ClipboardList className="h-[18px] w-[18px]" /> },
-  { label: 'Fees', path: '/admin/fees', icon: <IndianRupee className="h-[18px] w-[18px]" /> },
-  { label: 'Transport', path: '/admin/transport', icon: <Bus className="h-[18px] w-[18px]" /> },
-  { label: 'Student Tracking', path: '/admin/tracking', icon: <Shield className="h-[18px] w-[18px]" /> },
-  { label: 'ID Cards', path: '/admin/id-cards', icon: <CreditCard className="h-[18px] w-[18px]" /> },
-  { label: 'Documents', path: '/admin/documents', icon: <FileText className="h-[18px] w-[18px]" /> },
-  { label: 'Holidays', path: '/admin/holidays', icon: <CalendarDays className="h-[18px] w-[18px]" /> },
-  { label: 'Notifications', path: '/admin/notifications', icon: <Bell className="h-[18px] w-[18px]" /> },
-  { label: 'Settings', path: '/admin/settings', icon: <Settings className="h-[18px] w-[18px]" /> },
-  { label: 'Profile', path: '/admin/profile', icon: <UserCircle className="h-[18px] w-[18px]" /> },
+  { label: 'Dashboard', path: '/admin/dashboard', icon: <LayoutDashboard className="h-5 w-5" /> },
+  { label: 'Students', path: '/admin/students', icon: <Users className="h-5 w-5" /> },
+  { label: 'Teachers', path: '/admin/teachers', icon: <GraduationCap className="h-5 w-5" /> },
+  { label: 'Parents', path: '/admin/parents', icon: <User className="h-5 w-5" /> },
+  { label: 'Classes & Sections', path: '/admin/classes', icon: <BookOpen className="h-5 w-5" /> },
+  { label: 'Attendance', path: '/admin/attendance', icon: <ClipboardList className="h-5 w-5" /> },
+  { label: 'Fees', path: '/admin/fees', icon: <IndianRupee className="h-5 w-5" /> },
+  { label: 'Transport', path: '/admin/transport', icon: <Bus className="h-5 w-5" /> },
+  { label: 'Student Tracking', path: '/admin/tracking', icon: <Shield className="h-5 w-5" /> },
+  { label: 'ID Cards', path: '/admin/id-cards', icon: <CreditCard className="h-5 w-5" /> },
+  { label: 'Documents', path: '/admin/documents', icon: <FileText className="h-5 w-5" /> },
+  { label: 'Holidays', path: '/admin/holidays', icon: <CalendarDays className="h-5 w-5" /> },
+  { label: 'Notifications', path: '/admin/notifications', icon: <Bell className="h-5 w-5" /> },
+  { label: 'Settings', path: '/admin/settings', icon: <Settings className="h-5 w-5" /> },
+  { label: 'Profile', path: '/admin/profile', icon: <UserCircle className="h-5 w-5" /> },
 ];
 
 const teacherNav: NavItem[] = [
-  { label: 'Dashboard', path: '/teacher/dashboard', icon: <LayoutDashboard className="h-[18px] w-[18px]" /> },
-  { label: 'My Classes', path: '/teacher/classes', icon: <BookOpen className="h-[18px] w-[18px]" /> },
-  { label: 'Subjects', path: '/teacher/subjects', icon: <BookOpen className="h-[18px] w-[18px]" /> },
-  { label: 'Students', path: '/teacher/students', icon: <Users className="h-[18px] w-[18px]" /> },
-  { label: 'Add Student', path: '/teacher/add-student', icon: <UserPlus className="h-[18px] w-[18px]" /> },
-  { label: 'Attendance', path: '/teacher/attendance', icon: <ClipboardList className="h-[18px] w-[18px]" /> },
-  { label: 'Exam Marks', path: '/teacher/exam-marks', icon: <ClipboardCheck className="h-[18px] w-[18px]" /> },
-  { label: 'Student Records', path: '/teacher/records', icon: <FileText className="h-[18px] w-[18px]" /> },
-  { label: 'Remarks', path: '/teacher/remarks', icon: <Megaphone className="h-[18px] w-[18px]" /> },
-  { label: 'Profile', path: '/teacher/profile', icon: <UserCircle className="h-[18px] w-[18px]" /> },
+  { label: 'Dashboard', path: '/teacher/dashboard', icon: <LayoutDashboard className="h-5 w-5" /> },
+  { label: 'My Classes', path: '/teacher/classes', icon: <BookOpen className="h-5 w-5" /> },
+  { label: 'Subjects', path: '/teacher/subjects', icon: <BookOpen className="h-5 w-5" /> },
+  { label: 'Students', path: '/teacher/students', icon: <Users className="h-5 w-5" /> },
+  { label: 'Add Student', path: '/teacher/add-student', icon: <UserPlus className="h-5 w-5" /> },
+  { label: 'Attendance', path: '/teacher/attendance', icon: <ClipboardList className="h-5 w-5" /> },
+  { label: 'Exam Marks', path: '/teacher/exam-marks', icon: <ClipboardCheck className="h-5 w-5" /> },
+  { label: 'Student Records', path: '/teacher/records', icon: <FileText className="h-5 w-5" /> },
+  { label: 'Remarks', path: '/teacher/remarks', icon: <Megaphone className="h-5 w-5" /> },
+  { label: 'Profile', path: '/teacher/profile', icon: <UserCircle className="h-5 w-5" /> },
 ];
 
 const parentNav: NavItem[] = [
-  { label: 'Dashboard', path: '/parent/dashboard', icon: <LayoutDashboard className="h-[18px] w-[18px]" /> },
-  { label: 'My Child', path: '/parent/child', icon: <Users className="h-[18px] w-[18px]" /> },
-  { label: 'Attendance', path: '/parent/attendance', icon: <ClipboardList className="h-[18px] w-[18px]" /> },
-  { label: 'Fees', path: '/parent/fees', icon: <IndianRupee className="h-[18px] w-[18px]" /> },
-  { label: 'Transport', path: '/parent/transport', icon: <Bus className="h-[18px] w-[18px]" /> },
-  { label: 'Academic Records', path: '/parent/records', icon: <FileText className="h-[18px] w-[18px]" /> },
-  { label: 'Remarks', path: '/parent/remarks', icon: <Megaphone className="h-[18px] w-[18px]" /> },
-  { label: 'Profile', path: '/parent/profile', icon: <UserCircle className="h-[18px] w-[18px]" /> },
+  { label: 'Dashboard', path: '/parent/dashboard', icon: <LayoutDashboard className="h-5 w-5" /> },
+  { label: 'My Child', path: '/parent/child', icon: <Users className="h-5 w-5" /> },
+  { label: 'Attendance', path: '/parent/attendance', icon: <ClipboardList className="h-5 w-5" /> },
+  { label: 'Fees', path: '/parent/fees', icon: <IndianRupee className="h-5 w-5" /> },
+  { label: 'Transport', path: '/parent/transport', icon: <Bus className="h-5 w-5" /> },
+  { label: 'Academic Records', path: '/parent/records', icon: <FileText className="h-5 w-5" /> },
+  { label: 'Remarks', path: '/parent/remarks', icon: <Megaphone className="h-5 w-5" /> },
+  { label: 'Profile', path: '/parent/profile', icon: <UserCircle className="h-5 w-5" /> },
 ];
 
-// ── Sidebar inner content — defined OUTSIDE DashboardLayout so it never
-//    re-creates on parent re-renders, preventing the fade animation from
-//    re-triggering on every navigation click. ──────────────────────────────────
 interface SidebarContentProps {
   navItems: NavItem[];
   location: ReturnType<typeof useLocation>;
@@ -75,33 +72,33 @@ interface SidebarContentProps {
 function SidebarContent({ navItems, location, school, roleLabel, onNavigate, onSignOut }: SidebarContentProps) {
   return (
     <>
-      {/* ── Header: School Name & Academic Year ── */}
-      <div className="flex min-h-[4.5rem] items-center justify-center gap-2 border-b border-gray-200 px-3 py-2.5">
+      {/* Header: School Name & Academic Year */}
+      <div className="flex min-h-[5rem] items-center gap-3 border-b border-[#E8EAF3] px-5 py-4">
         {school?.logo_url && (
-          <img src={school.logo_url} alt={school.name} className="h-12 w-12 flex-shrink-0 rounded-lg object-contain" />
+          <img src={school.logo_url} alt={school.name} className="h-11 w-11 flex-shrink-0 rounded-xl object-contain" />
         )}
-        <div className="min-w-0 flex-1 text-center">
+        <div className="min-w-0 flex-1">
           {school?.name ? (
-            <p className="line-clamp-2 break-words text-center text-[12px] font-bold tracking-tight text-gray-900 leading-snug" title={school.name}>
+            <p className="line-clamp-2 break-words text-[15px] font-bold leading-snug tracking-tight text-[#5B6EE8]" title={school.name}>
               {school.name}
             </p>
           ) : (
-            <div className="mx-auto h-3.5 w-32 animate-pulse rounded bg-gray-200" />
+            <div className="h-4 w-32 animate-pulse rounded bg-slate-200" />
           )}
-          <div className="mt-1 flex items-center justify-center gap-1.5">
+          <div className="mt-1.5 flex items-center gap-2">
             {school?.academic_year && (
-              <span className="inline-flex items-center rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700 ring-1 ring-inset ring-blue-600/20">
+              <span className="inline-flex items-center rounded-full bg-[#EEF0FD] px-2 py-0.5 text-[10px] font-semibold text-[#5B6EE8]">
                 AY {school.academic_year}
               </span>
             )}
-            <span className="text-[11px] font-medium text-gray-400">{roleLabel}</span>
+            <span className="text-[11px] font-medium text-slate-400">{roleLabel}</span>
           </div>
         </div>
       </div>
 
-      {/* ── Nav items ── */}
-      <nav className="flex-1 overflow-y-auto px-3 py-4">
-        <ul className="space-y-0.5">
+      {/* Nav items */}
+      <nav className="sidebar-scroll flex-1 overflow-y-auto px-3 py-4">
+        <ul className="space-y-1">
           {navItems.map((item) => {
             const active = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
             return (
@@ -109,22 +106,19 @@ function SidebarContent({ navItems, location, school, roleLabel, onNavigate, onS
                 <button
                   onClick={() => onNavigate(item.path)}
                   className={cn(
-                    'group flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-200',
+                    'group flex w-full items-center gap-3.5 rounded-[14px] px-4 py-3 text-[15px] font-medium transition-all duration-200',
                     active
-                      ? 'bg-blue-50 text-blue-700 border-l-[3px] border-blue-600 pl-[calc(0.75rem-3px)]'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      ? 'bg-gradient-to-br from-[#5B6EE8] to-[#6F82F5] text-white shadow-[0_6px_16px_rgba(91,110,232,0.35)]'
+                      : 'text-slate-600 hover:bg-[#EEF0FD] hover:text-[#5B6EE8]'
                   )}
                 >
                   <span className={cn(
-                    'flex-shrink-0 text-blue-600 transition-all duration-200',
-                    !active && 'group-hover:scale-110'
+                    'flex-shrink-0 transition-colors duration-200',
+                    active ? 'text-white' : 'text-slate-400 group-hover:text-[#5B6EE8]'
                   )}>
                     {item.icon}
                   </span>
                   <span className="truncate">{item.label}</span>
-                  {!active && (
-                    <ChevronRight className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 ml-auto h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-                  )}
                 </button>
               </li>
             );
@@ -132,18 +126,19 @@ function SidebarContent({ navItems, location, school, roleLabel, onNavigate, onS
         </ul>
       </nav>
 
-      {/* ── Bottom: Veducore + sign out ── */}
-      <div className="border-t border-gray-200 p-3 space-y-2">
-        <div className="flex items-center justify-center px-3 py-2">
-          <img src={veducoreLogo} alt="Veducore" className="h-8 w-auto max-w-full object-contain" />
-        </div>
+      {/* Bottom: Veducore + sign out */}
+      <div className="space-y-2 border-t border-[#E8EAF3] p-3">
         <button
           onClick={onSignOut}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-red-50 hover:text-red-600"
+          className="flex w-full items-center gap-3.5 rounded-[14px] px-4 py-3 text-[15px] font-medium text-slate-600 transition-colors hover:bg-red-50 hover:text-red-600"
         >
-          <LogOut className="h-[18px] w-[18px]" />
+          <LogOut className="h-5 w-5" />
           Sign Out
         </button>
+        <div className="flex flex-col items-start px-4 pb-1 pt-2">
+          <img src={veducoreLogo} alt="Veducore" className="h-7 w-auto max-w-full object-contain" />
+          <span className="mt-1 text-[11px] text-slate-400">Powered by Veducore</span>
+        </div>
       </div>
     </>
   );
@@ -192,9 +187,9 @@ export function DashboardLayout({ children, title }: { children: ReactNode; titl
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#F4F5FB] font-sans text-[#0F172A]">
       {/* Sidebar — Desktop */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col border-r border-gray-200 bg-white lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col border-r border-[#E8EAF3] bg-white lg:flex">
         <SidebarContent {...sidebarProps} />
       </aside>
 
@@ -202,15 +197,15 @@ export function DashboardLayout({ children, title }: { children: ReactNode; titl
       {sidebarOpen && (
         <>
           <div
-            className="fixed inset-0 z-30 bg-gray-900/50 lg:hidden"
+            className="fixed inset-0 z-30 bg-slate-900/40 backdrop-blur-sm lg:hidden"
             onClick={() => setSidebarOpen(false)}
           />
-          <aside className="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-gray-200 bg-white lg:hidden">
+          <aside className="fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-[#E8EAF3] bg-white shadow-2xl lg:hidden">
             <SidebarContent {...sidebarProps} />
           </aside>
           <button
             onClick={() => setSidebarOpen(false)}
-            className="fixed right-4 top-4 z-50 rounded-lg bg-white/80 p-2 text-gray-600 shadow lg:hidden"
+            className="fixed right-4 top-4 z-50 rounded-xl bg-white p-2 text-slate-600 shadow-lg lg:hidden"
           >
             <X className="h-5 w-5" />
           </button>
@@ -218,48 +213,48 @@ export function DashboardLayout({ children, title }: { children: ReactNode; titl
       )}
 
       {/* Main content */}
-      <div className="lg:pl-64">
+      <div className="lg:pl-72">
         {/* Top header */}
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-gray-200 bg-white/80 px-4 backdrop-blur-md sm:px-6">
+        <header className="sticky top-0 z-20 flex h-20 items-center gap-4 bg-[#F4F5FB]/80 px-4 backdrop-blur-md sm:px-8">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 lg:hidden"
+            className="rounded-xl bg-white p-2.5 text-slate-500 shadow-[0_4px_20px_rgba(91,110,232,0.08)] hover:text-[#5B6EE8] lg:hidden"
           >
             <Menu className="h-5 w-5" />
           </button>
 
-          <h1 className="flex-1 truncate text-lg font-semibold text-gray-900">{title}</h1>
+          <h1 className="flex-1 truncate text-2xl font-extrabold tracking-tight text-[#0F172A] sm:text-[28px]">{title}</h1>
 
           {/* User menu */}
           <div className="relative">
             <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="flex items-center gap-2 rounded-lg p-1.5 pr-2 hover:bg-gray-100 transition-colors"
+              className="flex items-center gap-3 rounded-2xl bg-white p-1.5 pr-3 shadow-[0_4px_20px_rgba(91,110,232,0.08)] transition-all hover:-translate-y-0.5"
             >
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#5B6EE8] to-[#7B8CF7] text-sm font-bold text-white">
                 {getInitials(profile?.full_name || '?')}
               </div>
               <div className="hidden text-left sm:block">
-                <p className="text-sm font-medium text-gray-900 leading-tight">{profile?.full_name}</p>
-                <p className="text-xs text-gray-400">{roleLabel}</p>
+                <p className="text-sm font-semibold leading-tight text-[#0F172A]">{profile?.full_name}</p>
+                <p className="text-xs text-slate-400">{roleLabel}</p>
               </div>
-              <ChevronDown className="h-4 w-4 text-gray-400" />
+              <ChevronDown className="h-4 w-4 text-slate-400" />
             </button>
 
             {userMenuOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} />
-                <div className="absolute right-0 top-full z-20 mt-2 w-48 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                <div className="absolute right-0 top-full z-20 mt-2 w-52 rounded-2xl border border-[#E8EAF3] bg-white p-1.5 shadow-[0_10px_30px_rgba(91,110,232,0.15)]">
                   <button
                     onClick={() => { navigate(`/${profile?.role}/profile`); setUserMenuOpen(false); }}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-[#EEF0FD] hover:text-[#5B6EE8]"
                   >
                     <UserCircle className="h-4 w-4" />
                     My Profile
                   </button>
                   <button
                     onClick={handleSignOut}
-                    className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50"
                   >
                     <LogOut className="h-4 w-4" />
                     Sign Out
@@ -271,7 +266,7 @@ export function DashboardLayout({ children, title }: { children: ReactNode; titl
         </header>
 
         {/* Page content */}
-        <main className="px-4 py-6 sm:px-6 lg:px-8">
+        <main className="px-4 pb-10 pt-2 sm:px-8">
           {children}
         </main>
       </div>

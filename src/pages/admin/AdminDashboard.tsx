@@ -79,56 +79,56 @@ export default function AdminDashboard() {
         ) : (
           <>
             {/* Greeting */}
-            <div className="rounded-2xl border border-gray-100 bg-white px-5 py-4 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900">{greeting}, {profile?.full_name || 'Admin'} 👋</h2>
-              <p className="mt-0.5 text-sm text-gray-500">Here's what's happening at your school today.</p>
+            <div className="rounded-[20px] bg-white px-6 py-5 shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
+              <h2 className="text-xl font-bold text-[#0F172A]">{greeting}, {profile?.full_name || 'Admin'} 👋</h2>
+              <p className="mt-1 text-[15px] text-slate-500">Here's what's happening at your school today.</p>
             </div>
 
             {/* Row 1: 4 stat cards */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {[
                 { label: 'Total Students', value: stats?.totalStudents ?? 0, icon: <Users className="h-5 w-5" />, color: 'blue' as const },
                 { label: 'Total Teachers', value: stats?.totalTeachers ?? 0, icon: <GraduationCap className="h-5 w-5" />, color: 'emerald' as const },
                 { label: 'Total Classes', value: stats?.totalClasses ?? 0, icon: <BookOpen className="h-5 w-5" />, color: 'amber' as const },
                 { label: 'Total Parents', value: stats?.totalParents ?? 0, icon: <UserCog className="h-5 w-5" />, color: 'cyan' as const },
               ].map((card, i) => (
-                <div key={card.label} className="hover:shadow-md transition-shadow duration-200" style={{ animation: 'fadeSlideUp 350ms ease both', animationDelay: `${i * 60}ms` }}>
+                <div key={card.label} className="transition-transform duration-200 hover:-translate-y-0.5" style={{ animation: 'fadeSlideUp 350ms ease both', animationDelay: `${i * 60}ms` }}>
                   <StatCard label={card.label} value={card.value} icon={card.icon} color={card.color} />
                 </div>
               ))}
             </div>
 
             {/* Row 2: 4 stat cards */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {[
                 { label: 'Present Today', value: stats?.todayPresent ?? 0, icon: <ClipboardCheck className="h-5 w-5" />, color: 'emerald' as const },
                 { label: 'Absent Today', value: stats?.todayAbsent ?? 0, icon: <ClipboardCheck className="h-5 w-5" />, color: 'red' as const },
                 { label: 'Collected Fees', value: formatCurrency(stats?.collectedFees, currencySymbol), icon: <IndianRupee className="h-5 w-5" />, color: 'emerald' as const },
                 { label: 'Outstanding Fees', value: formatCurrency(stats?.outstandingFees, currencySymbol), icon: <TrendingUp className="h-5 w-5" />, color: 'red' as const },
               ].map((card, i) => (
-                <div key={card.label} className="hover:shadow-md transition-shadow duration-200" style={{ animation: 'fadeSlideUp 350ms ease both', animationDelay: `${(i + 4) * 60}ms` }}>
+                <div key={card.label} className="transition-transform duration-200 hover:-translate-y-0.5" style={{ animation: 'fadeSlideUp 350ms ease both', animationDelay: `${(i + 4) * 60}ms` }}>
                   <StatCard label={card.label} value={card.value} icon={card.icon} color={card.color} />
                 </div>
               ))}
             </div>
 
             {/* Charts row */}
-            <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
               {/* Attendance SVG bar chart */}
-              <Card className="p-5">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-gray-900">Attendance Trend (Last 5 Days)</h3>
-                  <div className="flex items-center gap-3 text-xs text-gray-500">
-                    <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500"></span>Present</span>
-                    <span className="flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-red-400"></span>Absent</span>
+              <Card className="p-6">
+                <div className="mb-5 flex items-center justify-between">
+                  <h3 className="text-lg font-bold text-[#0F172A]">Attendance Trend (Last 5 Days)</h3>
+                  <div className="flex items-center gap-3 text-xs text-slate-500">
+                    <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-[#22C08A]"></span>Present</span>
+                    <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-full bg-[#F87171]"></span>Absent</span>
                   </div>
                 </div>
                 {attendanceTrend.length === 0 ? (
-                  <p className="text-sm text-gray-400 py-8 text-center">No attendance data yet</p>
+                  <p className="py-10 text-center text-sm text-slate-400">No attendance data yet</p>
                 ) : (
                   <svg viewBox="0 0 400 160" className="w-full" preserveAspectRatio="none">
                     {[0, 40, 80, 120].map((y) => (
-                      <line key={y} x1="30" y1={y + 10} x2="395" y2={y + 10} stroke="#f3f4f6" strokeWidth="1" strokeDasharray="4 2" />
+                      <line key={y} x1="30" y1={y + 10} x2="395" y2={y + 10} stroke="#E8EAF3" strokeWidth="1" strokeDasharray="4 2" />
                     ))}
                     {attendanceTrend.map((d, i) => {
                       const maxVal = Math.max(...attendanceTrend.map((x) => x.present + x.absent), 1);
@@ -146,8 +146,8 @@ export default function AdminDashboard() {
                             y={130 - presentH}
                             width={barW}
                             height={presentH}
-                            rx="3"
-                            fill="#10b981"
+                            rx="5"
+                            fill="#22C08A"
                             className={barsAnimated ? 'bar-animate' : ''}
                             style={{ animationDelay: `${i * 80}ms` }}
                           >
@@ -158,14 +158,14 @@ export default function AdminDashboard() {
                             y={130 - absentH}
                             width={barW}
                             height={absentH}
-                            rx="3"
-                            fill="#f87171"
+                            rx="5"
+                            fill="#F87171"
                             className={barsAnimated ? 'bar-animate' : ''}
                             style={{ animationDelay: `${i * 80 + 40}ms` }}
                           >
                             <title>{d.date}: {d.absent} absent</title>
                           </rect>
-                          <text x={x + 4 + barW + 1} y={148} textAnchor="middle" fontSize="9" fill="#9ca3af">{dateLabel}</text>
+                          <text x={x + 4 + barW + 1} y={148} textAnchor="middle" fontSize="9" fill="#94A3B8">{dateLabel}</text>
                         </g>
                       );
                     })}
@@ -174,15 +174,15 @@ export default function AdminDashboard() {
               </Card>
 
               {/* Fee donut chart */}
-              <Card className="p-5">
-                <h3 className="mb-4 text-sm font-semibold text-gray-900">Fee Collection</h3>
-                <div className="flex items-center gap-6">
+              <Card className="p-6">
+                <h3 className="mb-5 text-lg font-bold text-[#0F172A]">Fee Collection</h3>
+                <div className="flex items-center gap-8">
                   <div className="relative flex-shrink-0">
-                    <svg viewBox="0 0 120 120" className="h-28 w-28">
-                      <circle cx="60" cy="60" r="50" fill="none" stroke="#f3f4f6" strokeWidth="14" />
+                    <svg viewBox="0 0 120 120" className="h-32 w-32">
+                      <circle cx="60" cy="60" r="50" fill="none" stroke="#EEF0FD" strokeWidth="14" />
                       <circle
                         cx="60" cy="60" r="50" fill="none"
-                        stroke="#10b981" strokeWidth="14"
+                        stroke="#22C08A" strokeWidth="14"
                         strokeDasharray={`${paidDash} ${C - paidDash}`}
                         strokeDashoffset={C * 0.25}
                         strokeLinecap="round"
@@ -190,26 +190,26 @@ export default function AdminDashboard() {
                       />
                       <circle
                         cx="60" cy="60" r="50" fill="none"
-                        stroke="#f87171" strokeWidth="14"
+                        stroke="#F87171" strokeWidth="14"
                         strokeDasharray={`${outstandingDash} ${C - outstandingDash}`}
                         strokeDashoffset={C * 0.25 - paidDash}
                         strokeLinecap="round"
                         style={{ transition: 'stroke-dasharray 1s ease-out' }}
                       />
-                      <text x="60" y="56" textAnchor="middle" fontSize="9" fill="#6b7280">Total</text>
-                      <text x="60" y="70" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#111827">₹{(feeTotal / 1000).toFixed(0)}K</text>
+                      <text x="60" y="56" textAnchor="middle" fontSize="9" fill="#94A3B8">Total</text>
+                      <text x="60" y="70" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#0F172A">₹{(feeTotal / 1000).toFixed(0)}K</text>
                     </svg>
                   </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="h-3 w-3 rounded-full bg-emerald-500 flex-shrink-0"></span>
-                      <span className="text-gray-600">Collected</span>
-                      <span className="ml-auto font-semibold text-gray-900">{formatCurrency(feePaid, '₹')}</span>
+                  <div className="flex-1 space-y-3">
+                    <div className="flex items-center gap-2.5 text-[15px]">
+                      <span className="h-3 w-3 flex-shrink-0 rounded-full bg-[#22C08A]"></span>
+                      <span className="text-slate-500">Collected</span>
+                      <span className="ml-auto font-bold text-[#0F172A]">{formatCurrency(feePaid, '₹')}</span>
                     </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="h-3 w-3 rounded-full bg-red-400 flex-shrink-0"></span>
-                      <span className="text-gray-600">Outstanding</span>
-                      <span className="ml-auto font-semibold text-gray-900">{formatCurrency(feeOutstanding, '₹')}</span>
+                    <div className="flex items-center gap-2.5 text-[15px]">
+                      <span className="h-3 w-3 flex-shrink-0 rounded-full bg-[#F87171]"></span>
+                      <span className="text-slate-500">Outstanding</span>
+                      <span className="ml-auto font-bold text-[#0F172A]">{formatCurrency(feeOutstanding, '₹')}</span>
                     </div>
                   </div>
                 </div>
