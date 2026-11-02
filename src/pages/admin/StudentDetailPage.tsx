@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, User, ClipboardList, IndianRupee, FileText, Megaphone, BookOpen, Users, Copy, Eye, EyeOff, CheckCircle, KeyRound } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
@@ -18,8 +18,30 @@ type Tab = 'overview' | 'academic' | 'attendance' | 'fees' | 'remarks' | 'class'
 export default function StudentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { profile } = useAuth();
   const toast = useToast();
+
+  // Determine where "back" goes and what the sidebar should highlight.
+  // ?from=tracking  → came from Student Tracking
+  // anything else   → came from Students list (default)
+  const fromTracking = searchParams.get('from') === 'tracking';
+  const backSearch   = searchParams.get('search') ?? '';
+  const backClass    = searchParams.get('class')  ?? '';
+
+  const backPath = (() => {
+    if (fromTracking) {
+      const p = new URLSearchParams();
+      if (backSearch) p.set('search', backSearch);
+      if (backClass)  p.set('class', backClass);
+      const qs = p.toString();
+      return `/admin/tracking${qs ? `?${qs}` : ''}`;
+    }
+    return '/admin/students';
+  })();
+
+  const backLabel     = fromTracking ? 'Back to Student Tracking' : 'Back to Students';
+  const activeNavPath = fromTracking ? '/admin/tracking' : '/admin/students';
   const [student, setStudent] = useState<Student | null>(null);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [records, setRecords] = useState<StudentRecord[]>([]);
@@ -85,9 +107,9 @@ export default function StudentDetailPage() {
     { key: 'parent', label: 'Parent Info', icon: Users },
   ];
 
-  if (loading) return <DashboardLayout title="Student Profile"><LoadingSpinner variant="profile" /></DashboardLayout>;
+  if (loading) return <DashboardLayout title="Student Profile" activeNavPath={activeNavPath}><LoadingSpinner variant="profile" /></DashboardLayout>;
   if (!student) return (
-    <DashboardLayout title="Student Profile">
+    <DashboardLayout title="Student Profile" activeNavPath={activeNavPath}>
       <Card className="p-8 text-center"><p className="text-gray-500">Student not found</p></Card>
     </DashboardLayout>
   );
@@ -98,9 +120,9 @@ export default function StudentDetailPage() {
   const totalPaid = fees.reduce((sum, f) => sum + Number(f.paid_amount), 0);
 
   return (
-    <DashboardLayout title="Student Profile">
+    <DashboardLayout title="Student Profile" activeNavPath={activeNavPath}>
       <div className="space-y-6">
-        <Button variant="ghost" icon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate('/admin/students')}>Back to Students</Button>
+        <Button variant="ghost" icon={<ArrowLeft className="h-4 w-4" />} onClick={() => navigate(backPath)}>{backLabel}</Button>
 
         {/* Header */}
         <Card className="p-6">

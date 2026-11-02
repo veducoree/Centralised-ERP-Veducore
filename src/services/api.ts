@@ -86,4 +86,9 @@ export {
   fetchSchoolTransportData,
   saveSchoolTransportData,
   applyForTransport,
+  // Admission fees
+  fetchFeeStructuresForClass,
+  generateAdmissionReceiptNumber,
+  createAdmissionWithFees,
+  fetchAdmissionReceiptById,
 } from './realApi';

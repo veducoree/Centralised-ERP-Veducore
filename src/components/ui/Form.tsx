@@ -1,16 +1,37 @@
 import { type InputHTMLAttributes, type SelectHTMLAttributes, type ReactNode, forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 
+// Keys that produce non-numeric characters in a number input.
+// We block them unless the field explicitly allows negatives.
+const BLOCKED_NUMBER_KEYS = ['e', 'E', '+'];
+const BLOCKED_NUMBER_KEYS_NO_NEG = ['e', 'E', '+', '-'];
+
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   hint?: string;
   required?: boolean;
+  /** When true, blocks e / E / + and (unless allowNegative) also blocks - */
+  numericOnly?: boolean;
+  /** Only relevant when numericOnly=true. Allows the minus key for negative numbers. */
+  allowNegative?: boolean;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, hint, required, className, id, ...props }, ref) => {
+  ({ label, error, hint, required, className, id, numericOnly, allowNegative, onKeyDown, ...props }, ref) => {
     const inputId = id || props.name;
+
+    function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+      if (numericOnly || props.type === 'number') {
+        const blocked = allowNegative ? BLOCKED_NUMBER_KEYS : BLOCKED_NUMBER_KEYS_NO_NEG;
+        if (blocked.includes(e.key)) {
+          e.preventDefault();
+          return;
+        }
+      }
+      onKeyDown?.(e);
+    }
+
     return (
       <div className="w-full">
         {label && (
@@ -26,6 +47,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             error ? 'border-red-300 focus:border-red-400' : 'border-gray-300 focus:border-blue-500',
             className
           )}
+          onKeyDown={handleKeyDown}
           {...props}
         />
         {error ? (

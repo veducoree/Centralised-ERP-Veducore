@@ -6,6 +6,7 @@ import { Card, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Form';
 import { Modal, ConfirmDialog } from '@/components/ui/Modal';
+import { required, positiveNumber, paymentAmount, range } from '@/lib/validators';
 import { SearchInput, PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
@@ -44,7 +45,9 @@ export default function AdminFees() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [feeForm, setFeeForm] = useState({ student_id: '', fee_type: '', amount: '', due_date: '' });
+  const [feeErrors, setFeeErrors] = useState<Record<string, string>>({});
   const [paymentForm, setPaymentForm] = useState({ amount: '', payment_date: new Date().toISOString().split('T')[0], payment_method: 'Cash', receipt_number: '' });
+  const [paymentErrors, setPaymentErrors] = useState<Record<string, string>>({});
 
   // ── Tab 2: Fee Structure ──
   const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
@@ -56,6 +59,8 @@ export default function AdminFees() {
     name: '', fee_type: 'Tuition', class_id: '', amount: '', frequency: 'annual' as FeeStructure['frequency'],
     due_day: '', academic_year: '2024-25', is_active: true,
   });
+  const [structureErrors, setStructureErrors] = useState<Record<string, string>>({});
+  const [structureSaving, setStructureSaving] = useState(false);
   const [assigningStructure, setAssigningStructure] = useState<FeeStructure | null>(null);
   const [assignLoading, setAssignLoading] = useState(false);
 
@@ -192,7 +197,17 @@ export default function AdminFees() {
 
   // ── Tab 1: Handlers ──
   async function handleCreateFee() {
-    if (!profile?.school_id || !feeForm.student_id || !feeForm.fee_type || !feeForm.amount) return;
+    if (!profile?.school_id) return;
+    // Validate
+    const e: Record<string, string> = {};
+    if (!feeForm.student_id) e.student_id = 'Please select a student';
+    if (!feeForm.fee_type)   e.fee_type   = 'Please select a fee type';
+    const amtErr = required(feeForm.amount, 'Amount') ?? positiveNumber(feeForm.amount, 'Amount');
+    if (amtErr) e.amount = amtErr;
+    if (!feeForm.due_date)   e.due_date   = 'Due date is required';
+    setFeeErrors(e);
+    if (Object.keys(e).length > 0) return;
+
     setSaving(true);
     try {
       await createFee({
@@ -205,13 +220,24 @@ export default function AdminFees() {
       toast('Fee record created', 'success');
       setModalOpen(false);
       setFeeForm({ student_id: '', fee_type: '', amount: '', due_date: '' });
+      setFeeErrors({});
       loadData();
-    } catch { toast('Failed to create fee', 'error'); }
-    finally { setSaving(false); }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to create fee', 'error');
+    } finally { setSaving(false); }
   }
 
   async function handlePayment() {
     if (!selectedFee || !profile?.school_id) return;
+    const remaining = Number(selectedFee.remaining_amount);
+    // Validate
+    const e: Record<string, string> = {};
+    const amtErr = paymentAmount(paymentForm.amount, remaining, 'Payment amount');
+    if (amtErr) e.amount = amtErr;
+    if (!paymentForm.payment_date) e.payment_date = 'Payment date is required';
+    setPaymentErrors(e);
+    if (Object.keys(e).length > 0) return;
+
     setSaving(true);
     try {
       await recordFeePayment(selectedFee.id, {
@@ -226,9 +252,11 @@ export default function AdminFees() {
       toast('Payment recorded successfully', 'success');
       setPaymentModalOpen(false);
       setPaymentForm({ amount: '', payment_date: new Date().toISOString().split('T')[0], payment_method: 'Cash', receipt_number: '' });
+      setPaymentErrors({});
       loadData();
-    } catch { toast('Failed to record payment', 'error'); }
-    finally { setSaving(false); }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to record payment', 'error');
+    } finally { setSaving(false); }
   }
 
   async function handleDelete() {
@@ -241,6 +269,7 @@ export default function AdminFees() {
   function openAddStructure() {
     setEditingStructure(null);
     setStructureForm({ name: '', fee_type: 'Tuition', class_id: '', amount: '', frequency: 'annual', due_day: '', academic_year: '2024-25', is_active: true });
+    setStructureErrors({});
     setStructureModalOpen(true);
   }
 
@@ -251,43 +280,63 @@ export default function AdminFees() {
       amount: fs.amount.toString(), frequency: fs.frequency,
       due_day: fs.due_day?.toString() || '', academic_year: fs.academic_year, is_active: fs.is_active,
     });
+    setStructureErrors({});
     setStructureModalOpen(true);
   }
 
-  function handleSaveStructure() {
-    if (!profile?.school_id || !structureForm.name || !structureForm.amount) {
-      toast('Please fill required fields', 'error');
-      return;
+  async function handleSaveStructure() {
+    if (!profile?.school_id) return;
+    // Validate
+    const e: Record<string, string> = {};
+    const nameErr = required(structureForm.name, 'Name');
+    if (nameErr) e.name = nameErr;
+    const amtErr = required(structureForm.amount, 'Amount') ?? positiveNumber(structureForm.amount, 'Amount');
+    if (amtErr) e.amount = amtErr;
+    if (!structureForm.academic_year.trim()) e.academic_year = 'Academic year is required';
+    if (structureForm.due_day) {
+      const dayErr = range(1, 31)(structureForm.due_day, 'Due day');
+      if (dayErr) e.due_day = dayErr;
     }
-    const now = new Date().toISOString();
-    let updatedList: FeeStructure[] = [];
-    if (editingStructure) {
-      updatedList = feeStructures.map((s) =>
-        s.id === editingStructure.id
-          ? { ...s, ...structureForm, class_id: structureForm.class_id || null, amount: parseFloat(structureForm.amount), due_day: structureForm.due_day ? parseInt(structureForm.due_day) : null, updated_at: now }
-          : s
-      );
-    } else {
-      const newEntry: FeeStructure = {
-        id: Date.now().toString(),
-        school_id: profile.school_id,
-        name: structureForm.name,
-        fee_type: structureForm.fee_type,
-        class_id: structureForm.class_id || null,
-        amount: parseFloat(structureForm.amount),
-        frequency: structureForm.frequency,
-        due_day: structureForm.due_day ? parseInt(structureForm.due_day) : null,
-        academic_year: structureForm.academic_year,
-        is_active: structureForm.is_active,
-        created_at: now,
-        updated_at: now,
-      };
-      updatedList = [...feeStructures, newEntry];
+    setStructureErrors(e);
+    if (Object.keys(e).length > 0) return;
+
+    setStructureSaving(true);
+    try {
+      const now = new Date().toISOString();
+      let updatedList: FeeStructure[] = [];
+      if (editingStructure) {
+        updatedList = feeStructures.map((s) =>
+          s.id === editingStructure.id
+            ? { ...s, ...structureForm, class_id: structureForm.class_id || null, amount: parseFloat(structureForm.amount), due_day: structureForm.due_day ? parseInt(structureForm.due_day) : null, updated_at: now }
+            : s
+        );
+      } else {
+        const newEntry: FeeStructure = {
+          id: Date.now().toString(),
+          school_id: profile.school_id,
+          name: structureForm.name,
+          fee_type: structureForm.fee_type,
+          class_id: structureForm.class_id || null,
+          amount: parseFloat(structureForm.amount),
+          frequency: structureForm.frequency,
+          due_day: structureForm.due_day ? parseInt(structureForm.due_day) : null,
+          academic_year: structureForm.academic_year,
+          is_active: structureForm.is_active,
+          created_at: now,
+          updated_at: now,
+        };
+        updatedList = [...feeStructures, newEntry];
+      }
+      setFeeStructures(updatedList);
+      await persistStructuresToSchool(updatedList);
+      setStructureModalOpen(false);
+      setStructureErrors({});
+      toast(editingStructure ? 'Fee structure updated' : 'Fee structure added', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to save fee structure', 'error');
+    } finally {
+      setStructureSaving(false);
     }
-    setFeeStructures(updatedList);
-    persistStructuresToSchool(updatedList);
-    setStructureModalOpen(false);
-    toast(editingStructure ? 'Fee structure updated' : 'Fee structure added', 'success');
   }
 
   function handleDeleteStructure() {
@@ -546,12 +595,6 @@ export default function AdminFees() {
         {/* ══════════════ TAB 2: FEE STRUCTURE ══════════════ */}
         {activeTab === 'structure' && (
           <>
-            <div className="rounded-xl bg-amber-50 border border-amber-100 p-3 flex items-start gap-2">
-              <span className="text-amber-500 mt-0.5">⚠</span>
-              <p className="text-sm text-amber-800">
-                Fee structures are saved in your browser's local storage. Use "Assign to Students" to create persistent fee records for each student in your school's database.
-              </p>
-            </div>
             <div className="flex justify-end">
               <Button icon={<Plus className="h-4 w-4" />} onClick={openAddStructure}>Add Fee Structure</Button>
             </div>
@@ -752,45 +795,86 @@ export default function AdminFees() {
       </div>
 
       {/* ── Add Fee Modal ── */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Cash Entry" size="md"
-        footer={<><Button variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button><Button onClick={handleCreateFee} loading={saving}>Create</Button></>}>
-        <div className="space-y-4">
-          <Select label="Student" required value={feeForm.student_id} onChange={(e) => setFeeForm({ ...feeForm, student_id: e.target.value })}>
-            <option value="">Select student...</option>
-            {students.map((s) => <option key={s.id} value={s.id}>{s.full_name} ({s.admission_number})</option>)}
-          </Select>
-          <Select label="Fee Type" required value={feeForm.fee_type} onChange={(e) => {
-            const ft = feeTypes.find((t) => t.name === e.target.value);
-            setFeeForm({ ...feeForm, fee_type: e.target.value, amount: ft?.default_amount.toString() || feeForm.amount });
-          }}>
+      <Modal open={modalOpen} onClose={() => { setModalOpen(false); setFeeErrors({}); }} title="Cash Entry" size="lg"
+        footer={<><Button variant="outline" onClick={() => { setModalOpen(false); setFeeErrors({}); }}>Cancel</Button><Button onClick={handleCreateFee} loading={saving}>Create</Button></>}>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <Select label="Student" required value={feeForm.student_id}
+              error={feeErrors.student_id}
+              onChange={(e) => { setFeeForm({ ...feeForm, student_id: e.target.value }); setFeeErrors((prev) => ({ ...prev, student_id: '' })); }}>
+              <option value="">Select student...</option>
+              {students.map((s) => <option key={s.id} value={s.id}>{s.full_name} ({s.admission_number})</option>)}
+            </Select>
+          </div>
+          <Select label="Fee Type" required value={feeForm.fee_type}
+            error={feeErrors.fee_type}
+            onChange={(e) => {
+              const ft = feeTypes.find((t) => t.name === e.target.value);
+              setFeeForm({ ...feeForm, fee_type: e.target.value, amount: ft?.default_amount.toString() || feeForm.amount });
+              setFeeErrors((prev) => ({ ...prev, fee_type: '' }));
+            }}>
             <option value="">Select fee type...</option>
             {feeTypes.map((ft) => <option key={ft.id} value={ft.name}>{ft.name}</option>)}
             <option value="Custom">Custom</option>
           </Select>
-          <Input label="Amount" type="number" required value={feeForm.amount} onChange={(e) => setFeeForm({ ...feeForm, amount: e.target.value })} />
-          <Input label="Due Date" type="date" required value={feeForm.due_date} onChange={(e) => setFeeForm({ ...feeForm, due_date: e.target.value })} />
+          <Input label="Amount (₹)" type="number" required min="0.01" step="0.01"
+            value={feeForm.amount} error={feeErrors.amount}
+            onChange={(e) => { setFeeForm({ ...feeForm, amount: e.target.value }); setFeeErrors((prev) => ({ ...prev, amount: '' })); }} />
+          <div className="sm:col-span-2">
+            <Input label="Due Date" type="date" required value={feeForm.due_date}
+              error={feeErrors.due_date}
+              onChange={(e) => { setFeeForm({ ...feeForm, due_date: e.target.value }); setFeeErrors((prev) => ({ ...prev, due_date: '' })); }} />
+          </div>
         </div>
       </Modal>
 
       {/* ── Record Payment Modal ── */}
-      <Modal open={paymentModalOpen} onClose={() => setPaymentModalOpen(false)} title="Record Payment" description={`For ${selectedFee?.student?.full_name} - ${selectedFee?.fee_type}`} size="md"
-        footer={<><Button variant="outline" onClick={() => setPaymentModalOpen(false)}>Cancel</Button><Button onClick={handlePayment} loading={saving}>Record Payment</Button></>}>
+      <Modal open={paymentModalOpen} onClose={() => { setPaymentModalOpen(false); setPaymentErrors({}); }}
+        title="Record Payment"
+        description={selectedFee ? `${selectedFee.student?.full_name ?? ''} — ${selectedFee.fee_type}` : undefined}
+        size="lg"
+        footer={<><Button variant="outline" onClick={() => { setPaymentModalOpen(false); setPaymentErrors({}); }}>Cancel</Button><Button onClick={handlePayment} loading={saving}>Record Payment</Button></>}>
         <div className="space-y-4">
-          <div className="rounded-lg bg-gray-50 p-3 text-sm">
-            <div className="flex justify-between"><span className="text-gray-500">Total Amount:</span><span className="font-medium">{formatCurrency(selectedFee?.amount || 0, '₹')}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Already Paid:</span><span className="font-medium">{formatCurrency(selectedFee?.paid_amount || 0, '₹')}</span></div>
-            <div className="flex justify-between border-t border-gray-200 mt-1 pt-1"><span className="text-gray-500">Remaining:</span><span className="font-bold text-red-600">{formatCurrency(selectedFee?.remaining_amount || 0, '₹')}</span></div>
+          {/* Balance summary banner */}
+          <div className="grid grid-cols-3 divide-x divide-gray-200 rounded-xl border border-gray-200 bg-gray-50 text-center text-sm">
+            <div className="px-3 py-3">
+              <p className="text-xs text-gray-500 mb-0.5">Total Amount</p>
+              <p className="font-semibold text-gray-900">{formatCurrency(selectedFee?.amount ?? 0, '₹')}</p>
+            </div>
+            <div className="px-3 py-3">
+              <p className="text-xs text-gray-500 mb-0.5">Already Paid</p>
+              <p className="font-semibold text-emerald-700">{formatCurrency(selectedFee?.paid_amount ?? 0, '₹')}</p>
+            </div>
+            <div className="px-3 py-3">
+              <p className="text-xs text-gray-500 mb-0.5">Remaining</p>
+              <p className="font-bold text-red-600">{formatCurrency(selectedFee?.remaining_amount ?? 0, '₹')}</p>
+            </div>
           </div>
-          <Input label="Payment Amount" type="number" required value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
-          <Input label="Payment Date" type="date" required value={paymentForm.payment_date} onChange={(e) => setPaymentForm({ ...paymentForm, payment_date: e.target.value })} />
-          <Select label="Payment Method" value={paymentForm.payment_method} onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}>
-            <option value="Cash">Cash</option>
-            <option value="Bank Transfer">Bank Transfer</option>
-            <option value="Cheque">Cheque</option>
-            <option value="Online">Online Payment</option>
-            <option value="Card">Card Payment</option>
-          </Select>
-          <Input label="Receipt Number" value={paymentForm.receipt_number} onChange={(e) => setPaymentForm({ ...paymentForm, receipt_number: e.target.value })} placeholder="Optional" />
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Input label="Payment Amount (₹)" type="number" required
+              min="0.01" step="0.01"
+              max={selectedFee?.remaining_amount}
+              value={paymentForm.amount}
+              error={paymentErrors.amount}
+              hint={selectedFee ? `Max: ${formatCurrency(selectedFee.remaining_amount, '₹')}` : undefined}
+              onChange={(e) => { setPaymentForm({ ...paymentForm, amount: e.target.value }); setPaymentErrors((prev) => ({ ...prev, amount: '' })); }} />
+            <Input label="Payment Date" type="date" required
+              value={paymentForm.payment_date}
+              error={paymentErrors.payment_date}
+              onChange={(e) => { setPaymentForm({ ...paymentForm, payment_date: e.target.value }); setPaymentErrors((prev) => ({ ...prev, payment_date: '' })); }} />
+            <Select label="Payment Method" value={paymentForm.payment_method}
+              onChange={(e) => setPaymentForm({ ...paymentForm, payment_method: e.target.value })}>
+              <option value="Cash">Cash</option>
+              <option value="Bank Transfer">Bank Transfer</option>
+              <option value="Cheque">Cheque</option>
+              <option value="Online">Online Payment</option>
+              <option value="Card">Card Payment</option>
+            </Select>
+            <Input label="Receipt Number" value={paymentForm.receipt_number}
+              placeholder="Auto-generated if left blank"
+              onChange={(e) => setPaymentForm({ ...paymentForm, receipt_number: e.target.value })} />
+          </div>
         </div>
       </Modal>
 
@@ -798,34 +882,69 @@ export default function AdminFees() {
       <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete} title="Delete Fee" message="Are you sure you want to delete this fee record?" confirmText="Delete" variant="danger" />
 
       {/* ── Fee Structure Modal ── */}
-      <Modal open={structureModalOpen} onClose={() => setStructureModalOpen(false)} title={editingStructure ? 'Edit Fee Structure' : 'Add Fee Structure'} size="md"
-        footer={<><Button variant="outline" onClick={() => setStructureModalOpen(false)}>Cancel</Button><Button onClick={handleSaveStructure}>{editingStructure ? 'Save Changes' : 'Add'}</Button></>}>
-        <div className="space-y-4">
-          <Input label="Name" required value={structureForm.name} onChange={(e) => setStructureForm({ ...structureForm, name: e.target.value })} placeholder="e.g. Annual Tuition Fee" />
-          <Select label="Fee Type" value={structureForm.fee_type} onChange={(e) => setStructureForm({ ...structureForm, fee_type: e.target.value })}>
+      <Modal open={structureModalOpen} onClose={() => { setStructureModalOpen(false); setStructureErrors({}); }}
+        title={editingStructure ? 'Edit Fee Structure' : 'Add Fee Structure'} size="lg"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => { setStructureModalOpen(false); setStructureErrors({}); }}>Cancel</Button>
+            <Button onClick={handleSaveStructure} loading={structureSaving}>{editingStructure ? 'Save Changes' : 'Add'}</Button>
+          </>
+        }>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {/* Name — full width */}
+          <div className="sm:col-span-2">
+            <Input label="Name" required value={structureForm.name}
+              error={structureErrors.name}
+              placeholder="e.g. Annual Tuition Fee"
+              onChange={(e) => { setStructureForm({ ...structureForm, name: e.target.value }); setStructureErrors((p) => ({ ...p, name: '' })); }} />
+          </div>
+
+          <Select label="Fee Type" value={structureForm.fee_type}
+            onChange={(e) => setStructureForm({ ...structureForm, fee_type: e.target.value })}>
             {['Admission', 'Tuition', 'Transport', 'Hostel', 'Activity', 'Other'].map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
           </Select>
-          <Select label="Class" value={structureForm.class_id} onChange={(e) => setStructureForm({ ...structureForm, class_id: e.target.value })}>
+
+          <Select label="Class" value={structureForm.class_id}
+            onChange={(e) => setStructureForm({ ...structureForm, class_id: e.target.value })}>
             <option value="">All Classes</option>
             {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
-          <Input label="Amount (₹)" type="number" required value={structureForm.amount} onChange={(e) => setStructureForm({ ...structureForm, amount: e.target.value })} />
-          <Select label="Frequency" value={structureForm.frequency} onChange={(e) => setStructureForm({ ...structureForm, frequency: e.target.value as FeeStructure['frequency'] })}>
+
+          <Input label="Amount (₹)" type="number" required min="0.01" step="0.01"
+            value={structureForm.amount} error={structureErrors.amount}
+            onChange={(e) => { setStructureForm({ ...structureForm, amount: e.target.value }); setStructureErrors((p) => ({ ...p, amount: '' })); }} />
+
+          <Select label="Frequency" value={structureForm.frequency}
+            onChange={(e) => setStructureForm({ ...structureForm, frequency: e.target.value as FeeStructure['frequency'] })}>
             <option value="one_time">One Time</option>
             <option value="monthly">Monthly</option>
             <option value="quarterly">Quarterly</option>
             <option value="annual">Annual</option>
           </Select>
+
           {structureForm.frequency !== 'one_time' && (
-            <Input label="Due Day (1-31)" type="number" value={structureForm.due_day} onChange={(e) => setStructureForm({ ...structureForm, due_day: e.target.value })} placeholder="Day of month" />
+            <Input label="Due Day (1–31)" type="number" min="1" max="31"
+              value={structureForm.due_day} error={structureErrors.due_day}
+              placeholder="Day of month"
+              onChange={(e) => { setStructureForm({ ...structureForm, due_day: e.target.value }); setStructureErrors((p) => ({ ...p, due_day: '' })); }} />
           )}
-          <Input label="Academic Year" value={structureForm.academic_year} onChange={(e) => setStructureForm({ ...structureForm, academic_year: e.target.value })} />
-          <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-            <input type="checkbox" checked={structureForm.is_active} onChange={(e) => setStructureForm({ ...structureForm, is_active: e.target.checked })} className="rounded" />
-            Active
-          </label>
+
+          <Input label="Academic Year" required value={structureForm.academic_year}
+            error={structureErrors.academic_year}
+            placeholder="e.g. 2026-27"
+            onChange={(e) => { setStructureForm({ ...structureForm, academic_year: e.target.value }); setStructureErrors((p) => ({ ...p, academic_year: '' })); }} />
+
+          {/* Active checkbox — full width */}
+          <div className="sm:col-span-2">
+            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input type="checkbox" checked={structureForm.is_active}
+                onChange={(e) => setStructureForm({ ...structureForm, is_active: e.target.checked })}
+                className="rounded" />
+              Active
+            </label>
+          </div>
         </div>
       </Modal>
 

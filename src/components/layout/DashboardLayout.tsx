@@ -67,9 +67,10 @@ interface SidebarContentProps {
   roleLabel: string;
   onNavigate: (path: string) => void;
   onSignOut: () => void;
+  activeNavPath?: string;
 }
 
-function SidebarContent({ navItems, location, school, roleLabel, onNavigate, onSignOut }: SidebarContentProps) {
+function SidebarContent({ navItems, location, school, roleLabel, onNavigate, onSignOut, activeNavPath }: SidebarContentProps) {
   return (
     <>
       {/* Header: School Name & Academic Year */}
@@ -100,7 +101,9 @@ function SidebarContent({ navItems, location, school, roleLabel, onNavigate, onS
       <nav className="sidebar-scroll flex-1 overflow-y-auto px-3 py-4">
         <ul className="space-y-1">
           {navItems.map((item) => {
-            const active = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+            const active = activeNavPath
+              ? activeNavPath === item.path || activeNavPath.startsWith(item.path + '/')
+              : location.pathname === item.path || location.pathname.startsWith(item.path + '/');
             return (
               <li key={item.path}>
                 <button
@@ -144,7 +147,7 @@ function SidebarContent({ navItems, location, school, roleLabel, onNavigate, onS
   );
 }
 
-export function DashboardLayout({ children, title }: { children: ReactNode; title: string }) {
+export function DashboardLayout({ children, title, activeNavPath }: { children: ReactNode; title: string; activeNavPath?: string }) {
   const { profile, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -184,6 +187,7 @@ export function DashboardLayout({ children, title }: { children: ReactNode; titl
     roleLabel,
     onNavigate: (path) => { navigate(path); setSidebarOpen(false); },
     onSignOut: handleSignOut,
+    activeNavPath,
   };
 
   return (

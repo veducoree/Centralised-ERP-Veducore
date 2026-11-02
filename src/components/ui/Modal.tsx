@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -19,41 +19,115 @@ const sizeClasses = {
   xl: 'max-w-4xl',
 };
 
+// All elements that can receive keyboard focus
+const FOCUSABLE = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ');
+
 export function Modal({ open, onClose, title, description, children, size = 'md', footer }: ModalProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const previouslyFocused = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-      return () => { document.body.style.overflow = ''; };
+    if (!open) return;
+
+    // Lock body scroll
+    document.body.style.overflow = 'hidden';
+
+    // Remember what was focused before the modal opened
+    previouslyFocused.current = document.activeElement as HTMLElement;
+
+    // Auto-focus first focusable element inside the modal
+    const raf = requestAnimationFrame(() => {
+      const first = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
+      first?.focus();
+    });
+
+    // Escape key closes
+    function handleKeyDown(e: KeyboardEvent) {
+      if (!panelRef.current) return;
+
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+        return;
+      }
+
+      // Focus trap: keep Tab/Shift+Tab inside the modal
+      if (e.key === 'Tab') {
+        const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE));
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+
+        if (e.shiftKey) {
+          if (document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+          }
+        } else {
+          if (document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+          }
+        }
+      }
     }
-  }, [open]);
+
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', handleKeyDown);
+      cancelAnimationFrame(raf);
+      // Restore focus to the element that triggered the modal
+      previouslyFocused.current?.focus();
+    };
+  }, [open, onClose]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity"
         onClick={onClose}
+        aria-hidden="true"
       />
+
+      {/* Panel */}
       <div
+        ref={panelRef}
         className={cn(
           'relative z-10 w-full rounded-2xl bg-white shadow-xl transition-all duration-200',
           sizeClasses[size]
         )}
       >
+        {/* Header */}
         <div className="flex items-start justify-between border-b border-gray-100 px-6 py-4">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+            <h2 id="modal-title" className="text-base font-semibold text-gray-900">{title}</h2>
             {description && <p className="mt-1 text-sm text-gray-500">{description}</p>}
           </div>
           <button
             onClick={onClose}
             className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="max-h-[60vh] overflow-y-auto px-6 py-4">{children}</div>
+
+        {/* Scrollable body — max 80vh minus header (~72px) and footer (~72px) */}
+        <div className="max-h-[calc(80vh-144px)] overflow-y-auto px-6 py-4">{children}</div>
+
+        {/* Footer */}
         {footer && (
           <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
             {footer}
@@ -64,15 +138,19 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
   );
 }
 
+// ── ConfirmDialog ─────────────────────────────────────────────────────────────
+
 interface ConfirmDialogProps {
   open: boolean;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   title: string;
   message: string;
   confirmText?: string;
   cancelText?: string;
   variant?: 'danger' | 'default';
+  /** Disables the confirm button and shows a spinner while an async operation runs */
+  loading?: boolean;
 }
 
 export function ConfirmDialog({
@@ -84,6 +162,7 @@ export function ConfirmDialog({
   confirmText = 'Confirm',
   cancelText = 'Cancel',
   variant = 'default',
+  loading = false,
 }: ConfirmDialogProps) {
   return (
     <Modal
@@ -95,17 +174,22 @@ export function ConfirmDialog({
         <>
           <button
             onClick={onClose}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+            disabled={loading}
+            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
             {cancelText}
           </button>
           <button
-            onClick={() => { onConfirm(); onClose(); }}
+            onClick={async () => { await onConfirm(); onClose(); }}
+            disabled={loading}
             className={cn(
-              'rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors',
+              'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed',
               variant === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
             )}
           >
+            {loading && (
+              <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+            )}
             {confirmText}
           </button>
         </>

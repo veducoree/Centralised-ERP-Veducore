@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, Shield } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/Button';
@@ -13,11 +13,23 @@ import { StatusBadge } from '@/components/ui/Badge';
 export default function AdminTracking() {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Initialise filters from URL query params so browser Back restores state
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<(Class & { sections: Section[] })[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [classFilter, setClassFilter] = useState('');
+  const [search, setSearch]           = useState(() => searchParams.get('search') ?? '');
+  const [classFilter, setClassFilter] = useState(() => searchParams.get('class')  ?? '');
+
+  // Keep URL in sync with filter state so the browser history entry is complete
+  useEffect(() => {
+    const p = new URLSearchParams();
+    if (search)      p.set('search', search);
+    if (classFilter) p.set('class',  classFilter);
+    // Replace (not push) so typing in the search box doesn't spam history
+    setSearchParams(p, { replace: true });
+  }, [search, classFilter, setSearchParams]);
 
   const loadData = useCallback(async () => {
     if (!profile?.school_id) return;
@@ -84,7 +96,12 @@ export default function AdminTracking() {
                     <td className="px-4 py-3 text-gray-700">{s.section?.name || '—'}</td>
                     <td className="px-4 py-3"><StatusBadge status={s.status} /></td>
                     <td className="px-4 py-3 text-right whitespace-nowrap">
-                      <Button size="sm" variant="ghost" icon={<Eye className="h-3.5 w-3.5" />} onClick={() => navigate(`/admin/students/${s.id}`)}>View Profile</Button>
+                      <Button size="sm" variant="ghost" icon={<Eye className="h-3.5 w-3.5" />} onClick={() => {
+                        const params = new URLSearchParams({ from: 'tracking' });
+                        if (search) params.set('search', search);
+                        if (classFilter) params.set('class', classFilter);
+                        navigate(`/admin/students/${s.id}?${params.toString()}`);
+                      }}>View Profile</Button>
                     </td>
                   </tr>
                 ))}

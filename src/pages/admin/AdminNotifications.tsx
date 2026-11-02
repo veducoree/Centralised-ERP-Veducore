@@ -11,6 +11,7 @@ import { useAuth } from '@/auth/AuthContext';
 import { fetchNotifications, createNotification, deleteNotification, markNotificationRead } from '@/services/api';
 import type { Notification } from '@/types';
 import { formatDateTime } from '@/lib/utils';
+import { required } from '@/lib/validators';
 
 export default function AdminNotifications() {
   const { profile } = useAuth();
@@ -21,6 +22,7 @@ export default function AdminNotifications() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ title: '', message: '', type: 'info', target: 'all' });
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const loadData = useCallback(async () => {
     if (!profile?.school_id) return;
@@ -34,20 +36,33 @@ export default function AdminNotifications() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  function validateForm(): Record<string, string> {
+    const e: Record<string, string> = {};
+    const titleErr = required(form.title, 'Title');
+    if (titleErr) e.title = titleErr;
+    const msgErr = required(form.message, 'Message');
+    if (msgErr) e.message = msgErr;
+    return e;
+  }
+
   async function handleCreate() {
-    if (!profile?.school_id || !form.title || !form.message) return;
+    if (!profile?.school_id) return;
+    const e = validateForm();
+    setErrors(e);
+    if (Object.keys(e).length > 0) return;
+
     setSaving(true);
     try {
       if (form.target === 'all') {
-        // Send to all users in school - we'll just create one for the admin for now
+        // Broadcast: create one notification for the school (user_id null = school-wide)
         await createNotification({
           school_id: profile.school_id,
-          user_id: profile.id,
           title: form.title,
           message: form.message,
           type: form.type,
         });
       } else {
+        // target === 'admin' — send only to the current admin
         await createNotification({
           school_id: profile.school_id,
           user_id: profile.id,
@@ -59,9 +74,11 @@ export default function AdminNotifications() {
       toast('Notification sent', 'success');
       setModalOpen(false);
       setForm({ title: '', message: '', type: 'info', target: 'all' });
+      setErrors({});
       loadData();
-    } catch { toast('Failed to send notification', 'error'); }
-    finally { setSaving(false); }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to send notification', 'error');
+    } finally { setSaving(false); }
   }
 
   async function handleMarkRead(id: string) {
@@ -79,7 +96,7 @@ export default function AdminNotifications() {
     <DashboardLayout title="Notifications">
       <div className="space-y-6">
         <PageHeader title="Notifications" description="Send and manage notifications"
-          action={<Button icon={<Plus className="h-4 w-4" />} onClick={() => setModalOpen(true)}>Send Notification</Button>} />
+          action={<Button icon={<Plus className="h-4 w-4" />} onClick={() => { setForm({ title: '', message: '', type: 'info', target: 'all' }); setErrors({}); setModalOpen(true); }}>Send Notification</Button>} />
 
         {loading ? (
           <LoadingSpinner variant="cards" />
@@ -121,21 +138,69 @@ export default function AdminNotifications() {
         )}
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Send Notification" size="md"
-        footer={<><Button variant="outline" onClick={() => setModalOpen(false)}>Cancel</Button><Button onClick={handleCreate} loading={saving} icon={<Send className="h-4 w-4" />}>Send</Button></>}>
+      {/* ── Send Notification Modal ── */}
+      <Modal
+        open={modalOpen}
+        onClose={() => { setModalOpen(false); setErrors({}); }}
+        title="Send Notification"
+        size="md"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => { setModalOpen(false); setErrors({}); }}>Cancel</Button>
+            <Button onClick={handleCreate} loading={saving} icon={<Send className="h-4 w-4" />}>Send</Button>
+          </>
+        }
+      >
         <div className="space-y-4">
-          <Input label="Title" required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-          <Textarea label="Message" required rows={3} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
-          <Select label="Type" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-            <option value="info">Info</option>
-            <option value="success">Success</option>
-            <option value="warning">Warning</option>
-            <option value="error">Error</option>
-          </Select>
+          <Input
+            label="Title"
+            required
+            value={form.title}
+            error={errors.title}
+            placeholder="Notification title"
+            onChange={(e) => { setForm({ ...form, title: e.target.value }); setErrors((p) => ({ ...p, title: '' })); }}
+          />
+          <Textarea
+            label="Message"
+            required
+            rows={3}
+            value={form.message}
+            error={errors.message}
+            placeholder="Write your message here…"
+            onChange={(e) => { setForm({ ...form, message: e.target.value }); setErrors((p) => ({ ...p, message: '' })); }}
+          />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Select
+              label="Type"
+              value={form.type}
+              onChange={(e) => setForm({ ...form, type: e.target.value })}
+            >
+              <option value="info">Info</option>
+              <option value="success">Success</option>
+              <option value="warning">Warning</option>
+              <option value="error">Error / Alert</option>
+            </Select>
+            <Select
+              label="Audience"
+              value={form.target}
+              onChange={(e) => setForm({ ...form, target: e.target.value })}
+            >
+              <option value="all">All Users (School-wide)</option>
+              <option value="admin">Admin Only</option>
+            </Select>
+          </div>
         </div>
       </Modal>
 
-      <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete} title="Delete Notification" message="Are you sure?" confirmText="Delete" variant="danger" />
+      <ConfirmDialog
+        open={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        title="Delete Notification"
+        message="Are you sure you want to delete this notification?"
+        confirmText="Delete"
+        variant="danger"
+      />
     </DashboardLayout>
   );
 }

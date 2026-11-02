@@ -411,3 +411,70 @@ export interface StudentTransportAssignment {
   applied_by_parent?: boolean;
   assigned_at: string;
 }
+
+// ─── Admission Fees Step Types ────────────────────────────────────────────────
+
+/** One fee line item shown in the wizard Fees step table */
+export interface AdmissionFeeLineItem {
+  fee_type: string;   // label, e.g. "Registration Fee"
+  amount: number;     // editable by admin
+  include: boolean;   // checkbox — admin can untick
+  editable: boolean;  // whether amount field is editable
+}
+
+/** Discount applied at admission time */
+export interface AdmissionDiscount {
+  type: 'flat' | 'percent';
+  value: number;
+  reason: 'Sibling' | 'Staff Child' | 'Merit' | 'Other';
+  reason_note: string;
+}
+
+/** Payment option chosen in the Fees step */
+export type AdmissionPaymentOption = 'full' | 'partial' | 'later';
+
+/** Payment mode options */
+export type AdmissionPaymentMode = 'Cash' | 'UPI' | 'Card' | 'Cheque' | 'Online/Bank Transfer';
+
+/** Full fees step data stored inside FormData */
+export interface AdmissionFeesData {
+  line_items: AdmissionFeeLineItem[];
+  discount: AdmissionDiscount;
+  payment_option: AdmissionPaymentOption;
+  amount_paying: string;       // string so input is controlled
+  payment_mode: AdmissionPaymentMode;
+  transaction_ref: string;
+  payment_date: string;        // YYYY-MM-DD
+  remarks: string;
+  fee_structures_loaded: boolean; // tracks whether auto-load has run
+  no_structure_warning: boolean;  // true when no structure found for class
+}
+
+/** Receipt record returned after successful admission + fee submission */
+export interface AdmissionReceipt {
+  id: string;
+  school_id: string;
+  student_id: string;
+  admission_number: string;
+  receipt_number: string;
+  academic_year: string;
+  fee_lines: AdmissionFeeLineItem[];
+  discount_amount: number;
+  discount_type: 'flat' | 'percent' | null;
+  discount_reason: string | null;
+  discount_note: string | null;
+  total_fees: number;
+  net_payable: number;
+  paid_now: number;
+  balance_due: number;
+  payment_option: AdmissionPaymentOption;
+  payment_mode: string | null;
+  transaction_ref: string | null;
+  payment_date: string | null;
+  remarks: string | null;
+  collected_by: string | null;
+  collected_by_name: string | null;
+  idempotency_key: string | null;
+  created_at: string;
+  updated_at: string;
+}
