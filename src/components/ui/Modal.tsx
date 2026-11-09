@@ -19,7 +19,6 @@ const sizeClasses = {
   xl: 'max-w-4xl',
 };
 
-// All elements that can receive keyboard focus
 const FOCUSABLE = [
   'a[href]',
   'button:not([disabled])',
@@ -30,78 +29,90 @@ const FOCUSABLE = [
 ].join(', ');
 
 export function Modal({ open, onClose, title, description, children, size = 'md', footer }: ModalProps) {
-  const panelRef = useRef<HTMLDivElement>(null);
-  const previouslyFocused = useRef<HTMLElement | null>(null);
+  const panelRef     = useRef<HTMLDivElement>(null);
+  const onCloseRef   = useRef(onClose);
+  const triggerRef   = useRef<HTMLElement | null>(null); // element focused before modal opened
+  const didFocusRef  = useRef(false);                    // auto-focus only once per open
 
+  // Keep onCloseRef current without adding onClose to effect deps
+  onCloseRef.current = onClose;
+
+  // ── Open / close lifecycle ──────────────────────────────────────────────
+  // Only depends on `open` — changing onClose never restarts this effect,
+  // so typing in a form field (which recreates inline callbacks in parent)
+  // will NOT cause cleanup+re-run → no focus steal.
+  useEffect(() => {
+    if (!open) {
+      // Restore focus to whatever triggered the modal
+      triggerRef.current?.focus();
+      triggerRef.current = null;
+      didFocusRef.current = false;
+      document.body.style.overflow = '';
+      return;
+    }
+
+    document.body.style.overflow = 'hidden';
+    triggerRef.current = document.activeElement as HTMLElement;
+
+    // Auto-focus first field — only once per open session
+    if (!didFocusRef.current) {
+      didFocusRef.current = true;
+      const raf = requestAnimationFrame(() => {
+        const first = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
+        first?.focus();
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [open]); // ← only `open`, NOT onClose
+
+  // ── Keyboard handling (Escape + focus trap) ─────────────────────────────
+  // Separate effect so it can use the always-current onCloseRef.
   useEffect(() => {
     if (!open) return;
 
-    // Lock body scroll
-    document.body.style.overflow = 'hidden';
-
-    // Remember what was focused before the modal opened
-    previouslyFocused.current = document.activeElement as HTMLElement;
-
-    // Auto-focus first focusable element inside the modal
-    const raf = requestAnimationFrame(() => {
-      const first = panelRef.current?.querySelector<HTMLElement>(FOCUSABLE);
-      first?.focus();
-    });
-
-    // Escape key closes
     function handleKeyDown(e: KeyboardEvent) {
       if (!panelRef.current) return;
 
       if (e.key === 'Escape') {
         e.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
-      // Focus trap: keep Tab/Shift+Tab inside the modal
       if (e.key === 'Tab') {
-        const focusable = Array.from(panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE));
+        const focusable = Array.from(
+          panelRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)
+        );
         if (focusable.length === 0) return;
         const first = focusable[0];
-        const last = focusable[focusable.length - 1];
+        const last  = focusable[focusable.length - 1];
 
         if (e.shiftKey) {
-          if (document.activeElement === first) {
-            e.preventDefault();
-            last.focus();
-          }
+          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
         } else {
-          if (document.activeElement === last) {
-            e.preventDefault();
-            first.focus();
-          }
+          if (document.activeElement === last)  { e.preventDefault(); first.focus(); }
         }
       }
     }
 
     document.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.body.style.overflow = '';
-      document.removeEventListener('keydown', handleKeyDown);
-      cancelAnimationFrame(raf);
-      // Restore focus to the element that triggered the modal
-      previouslyFocused.current?.focus();
-    };
-  }, [open, onClose]);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [open]);
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      {/* Backdrop */}
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+    >
       <div
         className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
-
-      {/* Panel */}
       <div
         ref={panelRef}
         className={cn(
@@ -109,7 +120,6 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
           sizeClasses[size]
         )}
       >
-        {/* Header */}
         <div className="flex items-start justify-between border-b border-gray-100 px-6 py-4">
           <div>
             <h2 id="modal-title" className="text-base font-semibold text-gray-900">{title}</h2>
@@ -124,10 +134,8 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
           </button>
         </div>
 
-        {/* Scrollable body — max 80vh minus header (~72px) and footer (~72px) */}
         <div className="max-h-[calc(80vh-144px)] overflow-y-auto px-6 py-4">{children}</div>
 
-        {/* Footer */}
         {footer && (
           <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
             {footer}
@@ -149,20 +157,13 @@ interface ConfirmDialogProps {
   confirmText?: string;
   cancelText?: string;
   variant?: 'danger' | 'default';
-  /** Disables the confirm button and shows a spinner while an async operation runs */
   loading?: boolean;
 }
 
 export function ConfirmDialog({
-  open,
-  onClose,
-  onConfirm,
-  title,
-  message,
-  confirmText = 'Confirm',
-  cancelText = 'Cancel',
-  variant = 'default',
-  loading = false,
+  open, onClose, onConfirm, title, message,
+  confirmText = 'Confirm', cancelText = 'Cancel',
+  variant = 'default', loading = false,
 }: ConfirmDialogProps) {
   return (
     <Modal

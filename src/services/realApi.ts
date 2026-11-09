@@ -11,6 +11,7 @@ import type {
   TransportStop, TransportBus, StudentTransportAssignment,
   AdmissionFeeLineItem, AdmissionDiscount, AdmissionPaymentOption,
   AdmissionPaymentMode, AdmissionReceipt,
+  SidebarPreference,
 } from '@/types';
 
 // Lightweight in-memory cache with TTL and in-flight request deduplication
@@ -2078,4 +2079,96 @@ export async function fetchAdmissionReceiptById(id: string): Promise<AdmissionRe
     .maybeSingle();
   if (error) throw error;
   return data as AdmissionReceipt | null;
+}
+
+// ============================================================
+// SIDEBAR PREFERENCES
+// ============================================================
+
+/**
+ * Fetch this user's saved sidebar preference.
+ * Returns null if the user has never customised their sidebar.
+ */
+export async function fetchSidebarPreference(
+  profileId: string,
+  schoolId: string | null
+): Promise<SidebarPreference | null> {
+  if (!supabase) return null;
+  try {
+    let query = supabase
+      .from('sidebar_preferences')
+      .select('*')
+      .eq('profile_id', profileId);
+    if (schoolId) {
+      query = query.eq('school_id', schoolId);
+    } else {
+      query = query.is('school_id', null);
+    }
+    const { data, error } = await query.maybeSingle();
+    // 404 = table doesn't exist yet (migration pending) — treat as no preference
+    if (error) {
+      if ((error as any).code === 'PGRST116' || error.message?.includes('404') || error.message?.includes('relation') || (error as any).status === 404) {
+        return null;
+      }
+      throw error;
+    }
+    return data as SidebarPreference | null;
+  } catch {
+    // Any network or DB error — fail silently, use role default
+    return null;
+  }
+}
+
+/**
+ * Upsert the user's sidebar preference.
+ * ordered_paths: ordered array of route path strings to pin.
+ * Pass null to reset to role default.
+ */
+export async function saveSidebarPreference(
+  profileId: string,
+  schoolId: string | null,
+  role: string,
+  orderedPaths: string[] | null
+): Promise<SidebarPreference | null> {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('sidebar_preferences')
+      .upsert(
+        {
+          profile_id: profileId,
+          school_id: schoolId,
+          role,
+          ordered_paths: orderedPaths,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'profile_id,school_id' }
+      )
+      .select()
+      .maybeSingle();
+    if (error) {
+      // Table doesn't exist yet — silently ignore
+      if ((error as any).status === 404 || error.message?.includes('relation')) return null;
+      throw error;
+    }
+    return data as SidebarPreference | null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Reset the user's sidebar to role default by setting ordered_paths to null.
+ */
+export async function resetSidebarPreference(
+  profileId: string,
+  schoolId: string | null
+): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('sidebar_preferences')
+    .update({ ordered_paths: null, updated_at: new Date().toISOString() })
+    .eq('profile_id', profileId)
+    .eq('school_id', schoolId ?? (null as unknown as string));
+  if (error) throw error;
 }

@@ -5,6 +5,7 @@ import { ToastProvider } from '@/components/ui/Toast';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import LoginPage from '@/pages/LoginPage';
 import { CenteredLoader } from '@/components/ui/Skeleton';
+import { SidebarPrefProvider } from '@/context/SidebarPrefContext';
 
 // Dead-centered Veducore logo-fill loading fallback for route transitions
 const PageLoader = () => (
@@ -33,6 +34,7 @@ const AdminHolidays = lazy(() => import('@/pages/admin/AdminHolidays'));
 const ProfilePage = lazy(() => import('@/pages/shared/ProfilePage'));
 const StudentDetailPage = lazy(() => import('@/pages/admin/StudentDetailPage'));
 const NewAdmissionPage = lazy(() => import('@/pages/admin/NewAdmissionPage'));
+const AllModulesPage = lazy(() => import('@/pages/admin/AllModulesPage'));
 
 // Teacher pages
 const TeacherDashboard = lazy(() => import('@/pages/teacher/TeacherDashboard'));
@@ -117,9 +119,10 @@ function RoutePrefetcher() {
 function App() {
   return (
     <AuthProvider>
-      <RoutePrefetcher />
       <ToastProvider>
-        <BrowserRouter>
+        <SidebarPrefProvider>
+          <RoutePrefetcher />
+          <BrowserRouter>
           <Suspense fallback={<PageLoader />}>
           <Routes>
             <Route path="/" element={<Navigate to="/login" replace />} />
@@ -152,6 +155,7 @@ function App() {
             <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={['admin']}><AdminNotifications /></ProtectedRoute>} />
             <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['admin']}><AdminSettings /></ProtectedRoute>} />
             <Route path="/admin/profile" element={<ProtectedRoute allowedRoles={['admin']}><ProfilePage /></ProtectedRoute>} />
+            <Route path="/admin/all-modules" element={<ProtectedRoute allowedRoles={['admin']}><AllModulesPage /></ProtectedRoute>} />
 
             {/* Teacher routes */}
             <Route path="/teacher/dashboard" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherDashboard /></ProtectedRoute>} />
@@ -184,6 +188,7 @@ function App() {
           </Routes>
           </Suspense>
         </BrowserRouter>
+        </SidebarPrefProvider>
       </ToastProvider>
     </AuthProvider>
   );

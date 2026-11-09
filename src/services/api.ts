@@ -91,4 +91,8 @@ export {
   generateAdmissionReceiptNumber,
   createAdmissionWithFees,
   fetchAdmissionReceiptById,
+  // Sidebar preferences
+  fetchSidebarPreference,
+  saveSidebarPreference,
+  resetSidebarPreference,
 } from './realApi';

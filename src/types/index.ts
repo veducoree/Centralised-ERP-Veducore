@@ -478,3 +478,16 @@ export interface AdmissionReceipt {
   created_at: string;
   updated_at: string;
 }
+
+// ─── Sidebar Preferences ──────────────────────────────────────────────────────
+
+export interface SidebarPreference {
+  id: string;
+  profile_id: string;
+  school_id: string | null;
+  role: string;
+  /** Ordered array of pinned route paths. null = user has never customised (use role default). */
+  ordered_paths: string[] | null;
+  created_at: string;
+  updated_at: string;
+}
