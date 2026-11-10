@@ -243,8 +243,7 @@ export default function AdminStudents() {
           <select
             value={classFilter}
             onChange={(e) => setClassFilter(e.target.value)}
-            className="h-[42px] rounded-xl border border-gray-200 bg-white px-3 pr-8 text-sm text-gray-700 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 sm:w-52 appearance-none bg-no-repeat"
-            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundPosition: 'right 12px center' }}
+            className="h-10 w-full sm:w-52 rounded-[10px] border border-gray-200 bg-white px-3 pr-9 text-sm text-gray-700 transition-colors focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25 appearance-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2712%27%20height%3D%2712%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%239ca3af%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpolyline%20points%3D%276%209%2012%2015%2018%209%27%3E%3C/polyline%3E%3C/svg%3E')] bg-no-repeat bg-[right_12px_center]"
           >
             <option value="">All Classes</option>
             {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -364,8 +363,8 @@ export default function AdminStudents() {
             <label className="mb-1.5 block text-sm font-medium text-gray-700">
               Mobile Number
             </label>
-            <div className="flex rounded-lg shadow-2xs">
-              <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-600 text-sm font-medium select-none">
+            <div className="flex rounded-[10px] overflow-hidden">
+              <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-gray-200 bg-gray-50 text-gray-600 text-sm font-medium select-none">
                 +91
               </span>
               <input
@@ -376,7 +375,7 @@ export default function AdminStudents() {
                   const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
                   setForm({ ...form, emergency_contact: digits });
                 }}
-                className="flex-1 rounded-r-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="flex-1 rounded-r-[10px] border border-gray-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
                 placeholder="10-digit mobile number"
               />
             </div>

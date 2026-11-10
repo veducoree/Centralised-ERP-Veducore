@@ -8,7 +8,7 @@ import {
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Form';
+import { Input, Select } from '@/components/ui/Form';
 import { PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
@@ -290,21 +290,14 @@ export default function AdminSettings() {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="sm:col-span-1">
-                  <label className="mb-1.5 block text-xs font-semibold text-gray-700">
-                    Affiliation Board
-                  </label>
-                  <select
-                    value={affiliationBoard}
-                    onChange={(e) => setAffiliationBoard(e.target.value)}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                  >
+                  <Select label="Affiliation Board" value={affiliationBoard} onChange={(e) => setAffiliationBoard(e.target.value)}>
                     <option value="CBSE">CBSE (Central Board)</option>
                     <option value="ICSE">ICSE / ISC</option>
                     <option value="State Board">State Board</option>
                     <option value="Cambridge">Cambridge Assessment (IGCSE)</option>
                     <option value="IB">International Baccalaureate (IB)</option>
                     <option value="Other">Other Institutional Board</option>
-                  </select>
+                  </Select>
                 </div>
 
                 <div className="sm:col-span-1">
@@ -336,59 +329,32 @@ export default function AdminSettings() {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-gray-700">
-                    Weekly Working Days
-                  </label>
-                  <select
-                    value={settings.workingDays}
-                    onChange={(e) => setSettings({ ...settings, workingDays: e.target.value })}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                  >
+                  <Select label="Weekly Working Days" value={settings.workingDays} onChange={(e) => setSettings({ ...settings, workingDays: e.target.value })}>
                     <option value="6">6 Working Days (Monday – Saturday)</option>
                     <option value="5">5 Working Days (Monday – Friday)</option>
-                  </select>
-                  <span className="text-[11px] text-gray-400 mt-1 block">
-                    Sets active attendance days across teacher portals.
-                  </span>
+                  </Select>
+                  <span className="text-[11px] text-gray-400 mt-1 block">Sets active attendance days across teacher portals.</span>
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-gray-700">
-                    Daily Attendance Cutoff Time
-                  </label>
-                  <select
-                    value={settings.attendanceCutoff}
-                    onChange={(e) => setSettings({ ...settings, attendanceCutoff: e.target.value })}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                  >
+                  <Select label="Daily Attendance Cutoff Time" value={settings.attendanceCutoff} onChange={(e) => setSettings({ ...settings, attendanceCutoff: e.target.value })}>
                     <option value="09:00 AM">09:00 AM</option>
                     <option value="09:30 AM">09:30 AM (Standard)</option>
                     <option value="10:00 AM">10:00 AM</option>
                     <option value="10:30 AM">10:30 AM</option>
                     <option value="11:00 AM">11:00 AM</option>
-                  </select>
-                  <span className="text-[11px] text-gray-400 mt-1 block">
-                    Alerts staff if class attendance is unsubmitted.
-                  </span>
+                  </Select>
+                  <span className="text-[11px] text-gray-400 mt-1 block">Alerts staff if class attendance is unsubmitted.</span>
                 </div>
 
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-gray-700">
-                    Minimum Passing Marks Threshold
-                  </label>
-                  <select
-                    value={settings.passingPercentage}
-                    onChange={(e) => setSettings({ ...settings, passingPercentage: Number(e.target.value) })}
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                  >
-                    <option value={33}>33% (National Standard)</option>
-                    <option value={35}>35%</option>
-                    <option value={40}>40%</option>
-                    <option value={50}>50%</option>
-                  </select>
-                  <span className="text-[11px] text-gray-400 mt-1 block">
-                    Used for automatic student report card status calculations.
-                  </span>
+                  <Select label="Minimum Passing Marks Threshold" value={String(settings.passingPercentage)} onChange={(e) => setSettings({ ...settings, passingPercentage: Number(e.target.value) })}>
+                    <option value="33">33% (National Standard)</option>
+                    <option value="35">35%</option>
+                    <option value="40">40%</option>
+                    <option value="50">50%</option>
+                  </Select>
+                  <span className="text-[11px] text-gray-400 mt-1 block">Used for automatic student report card status calculations.</span>
                 </div>
               </div>
             </Card>
@@ -404,36 +370,22 @@ export default function AdminSettings() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div>
-                    <label className="mb-1.5 block text-xs font-semibold text-gray-700">
-                      Default Monthly Due Date
-                    </label>
-                    <select
-                      value={settings.feeDueDay}
-                      onChange={(e) => setSettings({ ...settings, feeDueDay: Number(e.target.value) })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                    >
-                      <option value={5}>5th of every month</option>
-                      <option value={10}>10th of every month (Recommended)</option>
-                      <option value={15}>15th of every month</option>
-                      <option value={20}>20th of every month</option>
-                    </select>
+                    <Select label="Default Monthly Due Date" value={String(settings.feeDueDay)} onChange={(e) => setSettings({ ...settings, feeDueDay: Number(e.target.value) })}>
+                      <option value="5">5th of every month</option>
+                      <option value="10">10th of every month (Recommended)</option>
+                      <option value="15">15th of every month</option>
+                      <option value="20">20th of every month</option>
+                    </Select>
                   </div>
 
                   <div>
-                    <label className="mb-1.5 block text-xs font-semibold text-gray-700">
-                      Late Fee Grace Period (Days)
-                    </label>
-                    <select
-                      value={settings.lateGraceDays}
-                      onChange={(e) => setSettings({ ...settings, lateGraceDays: Number(e.target.value) })}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-xs text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                    >
-                      <option value={0}>0 Days (Immediate Overdue)</option>
-                      <option value={3}>3 Days</option>
-                      <option value={5}>5 Days (Standard)</option>
-                      <option value={7}>7 Days (1 Week)</option>
-                      <option value={10}>10 Days</option>
-                    </select>
+                    <Select label="Late Fee Grace Period (Days)" value={String(settings.lateGraceDays)} onChange={(e) => setSettings({ ...settings, lateGraceDays: Number(e.target.value) })}>
+                      <option value="0">0 Days (Immediate Overdue)</option>
+                      <option value="3">3 Days</option>
+                      <option value="5">5 Days (Standard)</option>
+                      <option value="7">7 Days (1 Week)</option>
+                      <option value="10">10 Days</option>
+                    </Select>
                   </div>
                 </div>
 

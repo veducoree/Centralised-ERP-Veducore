@@ -2172,3 +2172,506 @@ export async function resetSidebarPreference(
     .eq('school_id', schoolId ?? (null as unknown as string));
   if (error) throw error;
 }
+
+// ============================================================
+// TRANSPORT — DB-backed functions (migration 019)
+// These read from / write to the new transport_buses,
+// transport_stops, student_transport_assignments tables.
+// The older JSONB/localStorage functions above still work for
+// backward-compat; the UI will prefer DB when available.
+// ============================================================
+
+import type {
+  TransportFareSnapshot,
+  TransportAssignmentStatus,
+} from '@/types';
+
+// ── Buses ─────────────────────────────────────────────────────
+
+export async function fetchTransportBuses(schoolId: string) {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('transport_buses')
+      .select('*, stops:transport_stops(*)')
+      .eq('school_id', schoolId)
+      .order('created_at');
+    if (error) {
+      // Table may not exist yet (migration pending)
+      if ((error as any).code === '42P01' || (error as any).status === 404) return [];
+      throw error;
+    }
+    return (data || []) as import('@/types').TransportBus[];
+  } catch {
+    return [];
+  }
+}
+
+export async function upsertTransportBus(bus: {
+  id?: string;
+  school_id: string;
+  bus_number: string;
+  route_name: string;
+  capacity?: number;
+  driver_name?: string;
+  driver_phone?: string;
+  conductor_name?: string;
+  conductor_phone?: string;
+  status?: string;
+}) {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('transport_buses')
+    .upsert(bus, { onConflict: 'id' })
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data as import('@/types').TransportBus | null;
+}
+
+export async function deleteTransportBus(id: string) {
+  if (!supabase) return;
+  const { error } = await supabase.from('transport_buses').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ── Stops ─────────────────────────────────────────────────────
+
+export async function upsertTransportStop(stop: {
+  id?: string;
+  school_id: string;
+  bus_id: string;
+  stop_name: string;
+  area_landmark?: string;
+  pickup_time?: string;
+  drop_time?: string;
+  distance_km?: number;
+  amount: number;
+  fare_period?: string;
+  stop_order?: number;
+}) {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('transport_stops')
+    .upsert(stop, { onConflict: 'id' })
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data as import('@/types').TransportStop | null;
+}
+
+export async function deleteTransportStop(id: string) {
+  if (!supabase) return;
+  const { error } = await supabase.from('transport_stops').delete().eq('id', id);
+  if (error) throw error;
+}
+
+// ── Assignments ───────────────────────────────────────────────
+
+export async function fetchTransportAssignments(schoolId: string) {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('student_transport_assignments')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('assigned_at', { ascending: false });
+    if (error) {
+      if ((error as any).code === '42P01' || (error as any).status === 404) return [];
+      throw error;
+    }
+    return (data || []) as import('@/types').StudentTransportAssignment[];
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchStudentTransportAssignment(schoolId: string, studentId: string) {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase
+      .from('student_transport_assignments')
+      .select('*')
+      .eq('school_id', schoolId)
+      .eq('student_id', studentId)
+      .in('status', ['pending', 'approved'])
+      .order('assigned_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) {
+      if ((error as any).code === '42P01' || (error as any).status === 404) return null;
+      throw error;
+    }
+    return data as import('@/types').StudentTransportAssignment | null;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchStudentTransportHistory(schoolId: string, studentId: string) {
+  if (!supabase) return [];
+  try {
+    const { data, error } = await supabase
+      .from('student_transport_assignments')
+      .select('*')
+      .eq('school_id', schoolId)
+      .eq('student_id', studentId)
+      .order('assigned_at', { ascending: false });
+    if (error) {
+      if ((error as any).code === '42P01' || (error as any).status === 404) return [];
+      throw error;
+    }
+    return (data || []) as import('@/types').StudentTransportAssignment[];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Create a new transport assignment (admin or parent).
+ * - Admin creates with status='pending' (or 'approved' for direct assign).
+ * - Parent creates with status='pending', applied_by_parent=true.
+ * Returns the created row.
+ */
+export async function createTransportAssignment(assignment: {
+  school_id: string;
+  student_id: string;
+  bus_id: string;
+  stop_id: string;
+  start_date?: string;
+  status?: TransportAssignmentStatus;
+  applied_by_parent?: boolean;
+}) {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('student_transport_assignments')
+    .insert(assignment)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data as import('@/types').StudentTransportAssignment | null;
+}
+
+/**
+ * Approve a pending transport assignment.
+ * - Copies fare_snapshot from the stop at this moment.
+ * - Sets status='approved', approved_by, approved_at.
+ * - Caller should check seat capacity BEFORE calling this.
+ * - If a fee record ID is provided, links it.
+ * Returns the updated row.
+ */
+export async function approveTransportAssignment(
+  assignmentId: string,
+  approvedBy: string,
+  fareSnapshot: TransportFareSnapshot,
+  feeId?: string
+) {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('student_transport_assignments')
+    .update({
+      status: 'approved',
+      approved_by: approvedBy,
+      approved_at: new Date().toISOString(),
+      fare_snapshot: fareSnapshot,
+      ...(feeId ? { fee_id: feeId } : {}),
+    })
+    .eq('id', assignmentId)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data as import('@/types').StudentTransportAssignment | null;
+}
+
+/**
+ * Reject a pending transport assignment.
+ * Sets status='rejected' and stores the reason.
+ */
+export async function rejectTransportAssignment(
+  assignmentId: string,
+  rejectReason: string
+) {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('student_transport_assignments')
+    .update({ status: 'rejected', reject_reason: rejectReason })
+    .eq('id', assignmentId)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data as import('@/types').StudentTransportAssignment | null;
+}
+
+/**
+ * Stop an approved assignment (soft-stop).
+ * Sets status='stopped', end_date=today.
+ * Does NOT delete any fee records.
+ */
+export async function stopTransportAssignment(
+  assignmentId: string,
+  endDate?: string
+) {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('student_transport_assignments')
+    .update({
+      status: 'stopped',
+      end_date: endDate || new Date().toISOString().split('T')[0],
+    })
+    .eq('id', assignmentId)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data as import('@/types').StudentTransportAssignment | null;
+}
+
+/**
+ * Count approved students on a specific bus (for capacity check).
+ */
+export async function countApprovedStudentsOnBus(
+  schoolId: string,
+  busId: string
+): Promise<number> {
+  if (!supabase) return 0;
+  try {
+    const { count, error } = await supabase
+      .from('student_transport_assignments')
+      .select('id', { count: 'exact', head: true })
+      .eq('school_id', schoolId)
+      .eq('bus_id', busId)
+      .eq('status', 'approved');
+    if (error) return 0;
+    return count ?? 0;
+  } catch {
+    return 0;
+  }
+}
+
+// ============================================================
+// fetchTransportAll — single call for AdminTransport.tsx
+// Returns buses (with nested stops), stops flat list, and
+// assignments array from DB tables (migration 019).
+// Falls back to empty arrays gracefully if tables don't exist.
+// ============================================================
+export async function fetchTransportAll(schoolId: string): Promise<{
+  buses: import('@/types').TransportBus[];
+  stops: import('@/types').TransportStop[];
+  assignments: import('@/types').StudentTransportAssignment[];
+}> {
+  if (!supabase) return { buses: [], stops: [], assignments: [] };
+  try {
+    const [busRes, assignRes] = await Promise.all([
+      supabase
+        .from('transport_buses')
+        .select('*, stops:transport_stops(*)')
+        .eq('school_id', schoolId)
+        .order('created_at'),
+      supabase
+        .from('student_transport_assignments')
+        .select('*, bus:transport_buses(bus_number,route_name,driver_name,driver_phone), stop:transport_stops(stop_name,area_landmark,pickup_time,drop_time,amount,fare_period,distance_km)')
+        .eq('school_id', schoolId)
+        .order('assigned_at', { ascending: false }),
+    ]);
+
+    if (busRes.error) {
+      // Table doesn't exist yet — return empty
+      if ((busRes.error as any).code === '42P01') return { buses: [], stops: [], assignments: [] };
+      throw busRes.error;
+    }
+
+    const buses = (busRes.data || []) as import('@/types').TransportBus[];
+    const stops = buses.flatMap((b) => (b.stops || []).map((s) => ({
+      ...s,
+      bus_number: b.bus_number,
+      route_name: b.route_name,
+      driver_name: b.driver_name,
+      driver_phone: b.driver_phone,
+    }))) as import('@/types').TransportStop[];
+
+    // Flatten joined assignment data into the flat shape the UI expects
+    const rawAssignments = (assignRes.data || []) as Array<
+      import('@/types').StudentTransportAssignment & {
+        bus?: { bus_number: string; route_name: string; driver_name?: string; driver_phone?: string };
+        stop?: { stop_name: string; area_landmark?: string; pickup_time?: string; drop_time?: string; amount: number; fare_period?: string; distance_km?: number };
+      }
+    >;
+
+    const assignments = rawAssignments.map((a) => ({
+      ...a,
+      bus_number: a.bus?.bus_number ?? a.bus_number,
+      route_name: a.bus?.route_name ?? a.route_name,
+      driver_name: a.bus?.driver_name ?? a.driver_name,
+      driver_phone: a.bus?.driver_phone ?? a.driver_phone,
+      stop_name: a.stop?.stop_name ?? a.stop_name,
+      area_landmark: a.stop?.area_landmark ?? a.area_landmark,
+      pickup_time: a.stop?.pickup_time ?? a.pickup_time,
+      drop_time: a.stop?.drop_time ?? a.drop_time,
+      amount: Number(a.stop?.amount ?? a.amount ?? 0),
+      fare_period: (a.stop?.fare_period ?? a.fare_period) as import('@/types').StudentTransportAssignment['fare_period'],
+    } as import('@/types').StudentTransportAssignment));
+
+    return { buses, stops, assignments };
+  } catch {
+    return { buses: [], stops: [], assignments: [] };
+  }
+}
+
+// ============================================================
+// saveTransportBus — upsert bus + replace all its stops atomically
+// ============================================================
+export async function saveTransportBus(
+  schoolId: string,
+  bus: {
+    id?: string;
+    bus_number: string;
+    route_name: string;
+    capacity?: number;
+    driver_name?: string;
+    driver_phone?: string;
+    conductor_name?: string;
+    conductor_phone?: string;
+    status?: string;
+  },
+  stops: Array<{
+    id?: string;
+    stop_name: string;
+    area_landmark?: string;
+    pickup_time?: string;
+    drop_time?: string;
+    distance_km?: number;
+    amount: number;
+    fare_period?: string;
+    stop_order: number;
+  }>
+): Promise<import('@/types').TransportBus> {
+  if (!supabase) throw new Error('Supabase not initialised');
+
+  // 1. Upsert the bus
+  const { data: busRow, error: busErr } = await supabase
+    .from('transport_buses')
+    .upsert({ ...bus, school_id: schoolId }, { onConflict: 'id' })
+    .select()
+    .maybeSingle();
+  if (busErr) throw busErr;
+  if (!busRow) throw new Error('Bus save returned no data');
+
+  const busId = (busRow as { id: string }).id;
+
+  // 2. Delete stops that were removed (stops not in new list)
+  const keepIds = stops.filter((s) => s.id).map((s) => s.id as string);
+  if (keepIds.length > 0) {
+    await supabase
+      .from('transport_stops')
+      .delete()
+      .eq('bus_id', busId)
+      .not('id', 'in', `(${keepIds.join(',')})`);
+  } else {
+    // All stops are new — delete all existing ones
+    await supabase.from('transport_stops').delete().eq('bus_id', busId);
+  }
+
+  // 3. Upsert all stops
+  const stopRows = stops.map((s, idx) => ({
+    ...(s.id ? { id: s.id } : {}),
+    school_id: schoolId,
+    bus_id: busId,
+    stop_name: s.stop_name,
+    area_landmark: s.area_landmark || null,
+    pickup_time: s.pickup_time || null,
+    drop_time: s.drop_time || null,
+    distance_km: s.distance_km ?? null,
+    amount: s.amount,
+    fare_period: s.fare_period || 'Monthly',
+    stop_order: s.stop_order ?? idx + 1,
+  }));
+
+  const { data: savedStops, error: stopsErr } = await supabase
+    .from('transport_stops')
+    .upsert(stopRows, { onConflict: 'id' })
+    .select();
+  if (stopsErr) throw stopsErr;
+
+  return {
+    ...(busRow as import('@/types').TransportBus),
+    stops: (savedStops || []) as import('@/types').TransportStop[],
+    total_stops: (savedStops || []).length,
+  };
+}
+
+// ============================================================
+// deleteTransportBusWithStops — cascade-deletes bus and all stops
+// (assignments are protected by RESTRICT on stop_id FK — must
+//  be stopped/removed first by the caller)
+// ============================================================
+export async function deleteTransportBusWithStops(busId: string): Promise<void> {
+  if (!supabase) return;
+  // Stops are ON DELETE CASCADE from bus, so just delete the bus
+  const { error } = await supabase.from('transport_buses').delete().eq('id', busId);
+  if (error) throw error;
+}
+
+// ============================================================
+// createOrUpdateAssignment — admin-side direct assignment
+// ============================================================
+export async function createOrUpdateAssignment(assignment: {
+  id?: string;
+  school_id: string;
+  student_id: string;
+  bus_id: string;
+  stop_id: string;
+  start_date?: string;
+  status?: string;
+  applied_by_parent?: boolean;
+  fare_snapshot?: import('@/types').TransportFareSnapshot;
+  approved_by?: string;
+  approved_at?: string;
+}): Promise<import('@/types').StudentTransportAssignment> {
+  if (!supabase) throw new Error('Supabase not initialised');
+  const { data, error } = await supabase
+    .from('student_transport_assignments')
+    .upsert({ ...assignment, assigned_at: new Date().toISOString() }, { onConflict: 'id' })
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('Assignment save returned no data');
+  return data as import('@/types').StudentTransportAssignment;
+}
+
+// ============================================================
+// updateAssignmentStatus — approve / reject / stop
+// ============================================================
+export async function updateAssignmentStatus(
+  assignmentId: string,
+  updates: {
+    status: string;
+    approved_by?: string;
+    approved_at?: string;
+    fare_snapshot?: import('@/types').TransportFareSnapshot;
+    reject_reason?: string;
+    end_date?: string;
+    fee_id?: string;
+  }
+): Promise<import('@/types').StudentTransportAssignment> {
+  if (!supabase) throw new Error('Supabase not initialised');
+  const { data, error } = await supabase
+    .from('student_transport_assignments')
+    .update(updates)
+    .eq('id', assignmentId)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('Assignment update returned no data');
+  return data as import('@/types').StudentTransportAssignment;
+}
+
+// ============================================================
+// deleteAssignment — hard delete (only if no payments)
+// ============================================================
+export async function deleteAssignment(assignmentId: string): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('student_transport_assignments')
+    .delete()
+    .eq('id', assignmentId);
+  if (error) throw error;
+}

@@ -33,7 +33,7 @@ export function SearchInput({ value, onChange, placeholder = 'Search...', classN
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="block w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm text-gray-900 placeholder-gray-400 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+        className="block w-full rounded-[10px] border border-gray-200 bg-white h-10 pl-10 pr-4 text-sm text-gray-900 placeholder-gray-400 shadow-sm transition-all focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
       />
     </div>
   );
@@ -49,7 +49,7 @@ export function PageHeader({ title, description, action }: PageHeaderProps) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">{title}</h1>
+        <h1 className="text-[22px] font-bold tracking-tight text-gray-900">{title}</h1>
         {description && <p className="mt-1 text-sm text-gray-500">{description}</p>}
       </div>
       {action && <div className="flex items-center gap-2">{action}</div>}

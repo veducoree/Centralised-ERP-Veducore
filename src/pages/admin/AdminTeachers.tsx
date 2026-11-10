@@ -340,7 +340,7 @@ export default function AdminTeachers() {
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">Phone</label>
             <div className="flex">
-              <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">+91</span>
+              <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-sm">+91</span>
               <input
                 type="tel"
                 maxLength={10}
@@ -349,7 +349,7 @@ export default function AdminTeachers() {
                   const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
                   setForm({ ...form, phone: digits });
                 }}
-                className="flex-1 rounded-r-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="flex-1 rounded-r-[10px] border border-gray-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
                 placeholder="10-digit mobile number"
               />
             </div>
@@ -378,7 +378,7 @@ export default function AdminTeachers() {
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">Phone</label>
             <div className="flex">
-              <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">+91</span>
+              <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-sm">+91</span>
               <input
                 type="tel"
                 maxLength={10}
@@ -387,7 +387,7 @@ export default function AdminTeachers() {
                   const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
                   setEditForm({ ...editForm, phone: digits });
                 }}
-                className="flex-1 rounded-r-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="flex-1 rounded-r-[10px] border border-gray-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
                 placeholder="10-digit mobile number"
               />
             </div>

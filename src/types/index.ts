@@ -365,6 +365,8 @@ export interface TransportStop {
   id: string;
   stop_name: string;
   amount: number;
+  /** Monthly | Quarterly | Yearly */
+  fare_period?: 'Monthly' | 'Quarterly' | 'Yearly';
   bus_id?: string;
   bus_number?: string;
   route_name?: string;
@@ -384,14 +386,31 @@ export interface TransportBus {
   id: string;
   bus_number: string;
   route_name: string;
+  /** Seat capacity — approved students must not exceed this */
+  capacity?: number;
   driver_name?: string;
   driver_phone?: string;
+  conductor_name?: string;
+  conductor_phone?: string;
+  /** active | maintenance | inactive */
+  status?: 'active' | 'maintenance' | 'inactive';
   total_stops: number;
   stops: TransportStop[];
   created_at: string;
 }
 
+export type TransportAssignmentStatus = 'pending' | 'approved' | 'rejected' | 'stopped' | 'active';
+
+export interface TransportFareSnapshot {
+  amount: number;
+  fare_period: 'Monthly' | 'Quarterly' | 'Yearly';
+  stop_name: string;
+  bus_number?: string;
+  route_name?: string;
+}
+
 export interface StudentTransportAssignment {
+  id?: string;
   student_id: string;
   student_name?: string;
   class_name?: string;
@@ -400,6 +419,9 @@ export interface StudentTransportAssignment {
   stop_id: string;
   stop_name: string;
   amount: number;
+  fare_period?: 'Monthly' | 'Quarterly' | 'Yearly';
+  /** Fare snapshot at approval time — does not change when stop fare changes */
+  fare_snapshot?: TransportFareSnapshot;
   route_name?: string;
   bus_number?: string;
   area_landmark?: string;
@@ -407,8 +429,14 @@ export interface StudentTransportAssignment {
   drop_time?: string;
   driver_name?: string;
   driver_phone?: string;
-  status?: 'pending' | 'active';
+  status?: TransportAssignmentStatus;
+  start_date?: string;
+  end_date?: string;
   applied_by_parent?: boolean;
+  approved_by?: string;
+  approved_at?: string;
+  reject_reason?: string;
+  fee_id?: string;
   assigned_at: string;
 }
 

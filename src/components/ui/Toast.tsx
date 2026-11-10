@@ -67,7 +67,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
   return (
     <div
       className={cn(
-        'flex items-start gap-3 rounded-lg border border-l-4 bg-white px-4 py-3 shadow-lg transition-all duration-300',
+        'flex items-start gap-3 rounded-[12px] border border-l-4 bg-white px-4 py-3 shadow-lg transition-all duration-300',
         borders[toast.type],
         visible ? 'translate-x-0 opacity-100' : 'translate-x-8 opacity-0'
       )}

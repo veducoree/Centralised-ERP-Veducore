@@ -1,11 +1,11 @@
-import { type ReactNode, useState, useEffect } from 'react';
+import { type ReactNode, useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, GraduationCap, BookOpen, ClipboardList,
   IndianRupee, FileText, Bell, Settings, LogOut,
-  Menu, X, UserCircle, ChevronDown, Shield, User,
+  X, UserCircle, ChevronDown, Shield, User,
   Megaphone, UserPlus, ClipboardCheck, CreditCard, CalendarDays, Bus,
-  LayoutGrid, Pin, PinOff, GripVertical, RotateCcw, Pencil, Check,
+  LayoutGrid, GripVertical, RotateCcw, Pencil, Check, MoreVertical,
 } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '@/auth/AuthContext';
-import { fetchSchool, getCachedSchoolSync } from '@/services/api';
+import { fetchSchool, getCachedSchoolSync, fetchNotifications } from '@/services/api';
 import { cn, getInitials } from '@/lib/utils';
 import veducoreLogo from '@/assets/veducore-logo.png';
 import type { School } from '@/types';
@@ -77,11 +77,20 @@ export const parentNav: NavItem[] = [
   { label: 'Profile',          path: '/parent/profile',      icon: <UserCircle className="h-5 w-5" /> },
 ];
 
-// ── Sortable sidebar item (used in edit mode) ─────────────────────────────────
+// ── Focusable elements selector (for focus trap) ──────────────────────────────
+const FOCUSABLE_SELECTOR = [
+  'a[href]',
+  'button:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(', ');
+
+// ── Sortable sidebar item ─────────────────────────────────────────────────────
 
 function SortableSidebarItem({
-  item, active, editMode, isFixed,
-  onNavigate, onUnpin,
+  item, active, editMode, isFixed, onNavigate, onUnpin,
 }: {
   item: NavItem;
   active: boolean;
@@ -111,7 +120,6 @@ function SortableSidebarItem({
             : 'text-slate-600 hover:bg-[#EEF0FD] hover:text-[#5B6EE8]',
         )}
       >
-        {/* Drag handle — only in edit mode, only non-fixed */}
         {editMode && !isFixed && (
           <button
             {...attributes}
@@ -123,11 +131,8 @@ function SortableSidebarItem({
             <GripVertical className="h-4 w-4" />
           </button>
         )}
-        {editMode && isFixed && (
-          <span className="h-4 w-4 flex-shrink-0" /> /* spacer to keep alignment */
-        )}
+        {editMode && isFixed && <span className="h-4 w-4 flex-shrink-0" />}
 
-        {/* Icon */}
         {!editMode && (
           <span className={cn(
             'flex-shrink-0 transition-colors duration-200',
@@ -136,23 +141,16 @@ function SortableSidebarItem({
             {item.icon}
           </span>
         )}
-        {editMode && (
-          <span className="flex-shrink-0 text-slate-400">{item.icon}</span>
-        )}
+        {editMode && <span className="flex-shrink-0 text-slate-400">{item.icon}</span>}
 
-        {/* Label — click navigates only in normal mode */}
         {!editMode ? (
-          <button
-            onClick={() => onNavigate(item.path)}
-            className="flex-1 truncate text-left"
-          >
+          <button onClick={() => onNavigate(item.path)} className="flex-1 truncate text-left">
             {item.label}
           </button>
         ) : (
           <span className="flex-1 truncate">{item.label}</span>
         )}
 
-        {/* Unpin button — only in edit mode, only non-fixed */}
         {editMode && !isFixed && (
           <button
             onClick={() => onUnpin(item.path)}
@@ -175,11 +173,13 @@ interface SidebarContentProps {
   roleLabel: string;
   onNavigate: (path: string) => void;
   onSignOut: () => void;
+  onClose: () => void;
   activeNavPath?: string;
+  firstFocusRef: React.RefObject<HTMLButtonElement>;
 }
 
 function SidebarContent({
-  location, school, roleLabel, onNavigate, onSignOut, activeNavPath,
+  location, school, roleLabel, onNavigate, onSignOut, onClose, activeNavPath, firstFocusRef,
 }: SidebarContentProps) {
   const { pinnedItems, isFixed, togglePin, reorder, reset, isCustomised } = useSidebarPref();
   const [editMode, setEditMode] = useState(false);
@@ -196,13 +196,12 @@ function SidebarContent({
     const oldIndex = pinnedItems.findIndex((i) => i.path === active.id);
     const newIndex = pinnedItems.findIndex((i) => i.path === over.id);
     if (oldIndex === -1 || newIndex === -1) return;
-    const newOrder = arrayMove(pinnedItems, oldIndex, newIndex);
-    reorder(newOrder.map((i) => i.path));
+    reorder(arrayMove(pinnedItems, oldIndex, newIndex).map((i) => i.path));
   }
 
   return (
     <>
-      {/* Header: School Name & Academic Year */}
+      {/* Header row: school info + edit toggle + X close */}
       <div className="flex min-h-[5rem] items-center gap-3 border-b border-[#E8EAF3] px-5 py-4">
         {school?.logo_url && (
           <img src={school.logo_url} alt={school.name} className="h-11 w-11 flex-shrink-0 rounded-xl object-contain" />
@@ -225,18 +224,28 @@ function SidebarContent({
           </div>
         </div>
 
-        {/* Edit toggle */}
+        {/* Customise toggle */}
         <button
           onClick={() => setEditMode((v) => !v)}
           title={editMode ? 'Done editing' : 'Customise sidebar'}
           className={cn(
-            'flex-shrink-0 rounded-lg p-1.5 transition-colors',
+            'flex-shrink-0 rounded-[10px] p-1.5 transition-colors',
             editMode
               ? 'bg-[#5B6EE8] text-white'
               : 'text-slate-400 hover:bg-[#EEF0FD] hover:text-[#5B6EE8]',
           )}
         >
           {editMode ? <Check className="h-4 w-4" /> : <Pencil className="h-3.5 w-3.5" />}
+        </button>
+
+        {/* X close button — inside sidebar top-right */}
+        <button
+          ref={firstFocusRef}
+          onClick={onClose}
+          aria-label="Close menu"
+          className="flex-shrink-0 rounded-[10px] p-1.5 text-slate-400 hover:bg-[#EEF0FD] hover:text-[#5B6EE8] transition-colors"
+        >
+          <X className="h-5 w-5" />
         </button>
       </div>
 
@@ -256,16 +265,9 @@ function SidebarContent({
       )}
 
       {/* Nav items */}
-      <nav className="sidebar-scroll flex-1 overflow-y-auto px-3 py-4">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={pinnedItems.map((i) => i.path)}
-            strategy={verticalListSortingStrategy}
-          >
+      <nav className="sidebar-scroll flex-1 overflow-y-auto px-3 py-4" aria-label="Main navigation">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={pinnedItems.map((i) => i.path)} strategy={verticalListSortingStrategy}>
             <ul className="space-y-1">
               {pinnedItems.map((item) => {
                 const active = activeNavPath
@@ -278,7 +280,7 @@ function SidebarContent({
                     active={active}
                     editMode={editMode}
                     isFixed={isFixed(item.path)}
-                    onNavigate={(path) => { onNavigate(path); }}
+                    onNavigate={onNavigate}
                     onUnpin={togglePin}
                   />
                 );
@@ -288,7 +290,7 @@ function SidebarContent({
         </DndContext>
       </nav>
 
-      {/* Bottom: Veducore + sign out */}
+      {/* Bottom: sign out + branding */}
       <div className="space-y-2 border-t border-[#E8EAF3] p-3">
         <button
           onClick={onSignOut}
@@ -325,30 +327,103 @@ export function DashboardLayout({
   activeNavPath,
 }: {
   children: ReactNode;
-  title: string;
+  /** Still accepted for backward-compat but NOT rendered in the header. */
+  title?: string;
   activeNavPath?: string;
 }) {
   const { profile, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [school, setSchool] = useState<School | null>(() => getCachedSchoolSync(profile?.school_id));
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Refs for focus management
+  const triggerRef    = useRef<HTMLButtonElement>(null); // 3-dot button
+  const firstFocusRef = useRef<HTMLButtonElement>(null); // X button inside sidebar
+  const drawerRef     = useRef<HTMLElement>(null);
 
   const roleLabel = profile?.role
     ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1)
     : '';
 
+  // ── Close helpers ─────────────────────────────────────────
+  const closeSidebar = useCallback(() => {
+    setSidebarOpen(false);
+    requestAnimationFrame(() => triggerRef.current?.focus());
+  }, []);
+
+  const openSidebar = useCallback(() => {
+    setSidebarOpen(true);
+    requestAnimationFrame(() => {
+      setTimeout(() => firstFocusRef.current?.focus(), 160);
+    });
+  }, []);
+
+  // ── Close on route change ─────────────────────────────────
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [location.pathname]);
+
+  // ── Escape key + focus trap ───────────────────────────────
+  useEffect(() => {
+    if (!sidebarOpen) return;
+
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        closeSidebar();
+        return;
+      }
+
+      // Focus trap inside drawer
+      if (e.key === 'Tab' && drawerRef.current) {
+        const focusable = Array.from(
+          drawerRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last  = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+          if (document.activeElement === last)  { e.preventDefault(); first.focus(); }
+        }
+      }
+    }
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [sidebarOpen, closeSidebar]);
+
+  // ── Close user menu on Esc ────────────────────────────────
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setUserMenuOpen(false); }
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [userMenuOpen]);
+
+  // ── School fetch ──────────────────────────────────────────
   useEffect(() => {
     if (!profile?.school_id) return;
     const cached = getCachedSchoolSync(profile.school_id);
     if (cached) setSchool(cached);
-    let isCancelled = false;
-    fetchSchool(profile.school_id)
-      .then((s) => { if (!isCancelled && s) setSchool(s); })
-      .catch(() => {});
-    return () => { isCancelled = true; };
+    let cancelled = false;
+    fetchSchool(profile.school_id).then((s) => { if (!cancelled && s) setSchool(s); }).catch(() => {});
+    return () => { cancelled = true; };
   }, [profile?.school_id]);
+
+  // ── Unread notifications count ────────────────────────────
+  useEffect(() => {
+    if (!profile?.school_id) return;
+    let cancelled = false;
+    fetchNotifications(undefined, profile.school_id)
+      .then((data) => { if (!cancelled) setUnreadCount(data.filter((n) => !n.is_read).length); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [profile?.school_id, location.pathname]);
 
   const handleSignOut = async () => {
     setUserMenuOpen(false);
@@ -357,101 +432,184 @@ export function DashboardLayout({
     navigate('/login', { replace: true });
   };
 
-  const sidebarProps: SidebarContentProps = {
+  const sidebarContentProps: SidebarContentProps = {
     location,
     school,
     roleLabel,
-    onNavigate: (path) => { navigate(path); setSidebarOpen(false); },
+    onNavigate: (path) => { navigate(path); closeSidebar(); },
     onSignOut: handleSignOut,
+    onClose: closeSidebar,
     activeNavPath,
+    firstFocusRef,
   };
 
+  // School initial for fallback avatar
+  const schoolInitial = school?.name ? school.name.charAt(0).toUpperCase() : '?';
+
   return (
-      <div className="min-h-screen bg-[#F4F5FB] font-sans text-[#0F172A]">
-        {/* Sidebar — Desktop */}
-        <aside className="fixed inset-y-0 left-0 z-40 hidden w-72 flex-col border-r border-[#E8EAF3] bg-white lg:flex">
-          <SidebarContent {...sidebarProps} />
-        </aside>
+    <div className="min-h-screen bg-[#F4F5FB] font-sans text-[#0F172A]">
 
-        {/* Sidebar — Mobile drawer */}
-        {sidebarOpen && (
-          <>
-            <div
-              className="fixed inset-0 z-30 bg-slate-900/40 backdrop-blur-sm lg:hidden"
-              onClick={() => setSidebarOpen(false)}
-            />
-            <aside className="fixed inset-y-0 left-0 z-40 flex w-72 flex-col border-r border-[#E8EAF3] bg-white shadow-2xl lg:hidden">
-              <SidebarContent {...sidebarProps} />
-            </aside>
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="fixed right-4 top-4 z-50 rounded-xl bg-white p-2 text-slate-600 shadow-lg lg:hidden"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </>
+      {/* ── Overlay backdrop ── */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/30"
+          onClick={closeSidebar}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* ── Sidebar drawer ── */}
+      <aside
+        ref={drawerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation menu"
+        className={cn(
+          'fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85vw] flex-col',
+          'border-r border-[#E8EAF3] bg-white shadow-2xl',
+          'transition-transform duration-[180ms] ease-out',
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
+      >
+        <SidebarContent {...sidebarContentProps} />
+      </aside>
 
-        {/* Main content */}
-        <div className="lg:pl-72">
-          {/* Top header */}
-          <header className="sticky top-0 z-20 flex h-20 items-center gap-4 bg-[#F4F5FB]/80 px-4 backdrop-blur-md sm:px-8">
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="rounded-xl bg-white p-2.5 text-slate-500 shadow-[0_4px_20px_rgba(91,110,232,0.08)] hover:text-[#5B6EE8] lg:hidden"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
+      {/* ── Main content — full width ── */}
+      <div className="min-h-screen">
 
-            <h1 className="flex-1 truncate text-xl font-bold tracking-tight text-[#0F172A] sm:text-2xl">
-              {title}
-            </h1>
+        {/* ════════════ HEADER ════════════ */}
+        <header className="sticky top-0 z-30 flex h-[72px] items-center gap-3 border-b border-[#E8EAF3] bg-white/90 px-4 backdrop-blur-md sm:gap-4 sm:px-6">
 
-            {/* User menu */}
-            <div className="relative">
-              <button
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-3 rounded-2xl bg-white p-1.5 pr-3 shadow-[0_4px_20px_rgba(91,110,232,0.08)] transition-all hover:-translate-y-0.5"
+          {/* 1. 3-dot menu trigger */}
+          <button
+            ref={triggerRef}
+            onClick={openSidebar}
+            aria-label="Open menu"
+            aria-expanded={sidebarOpen}
+            aria-controls="sidebar-drawer"
+            className="flex-shrink-0 rounded-xl bg-white p-2.5 text-slate-500 shadow-[0_4px_20px_rgba(91,110,232,0.08)] hover:text-[#5B6EE8] transition-colors"
+          >
+            <MoreVertical className="h-5 w-5" />
+          </button>
+
+          {/* 2 + 3. School logo + name + AY chip */}
+          <div className="flex min-w-0 items-center gap-2.5 sm:gap-3">
+            {/* Logo / avatar — 36px mobile, 44px desktop */}
+            {school?.logo_url ? (
+              <img
+                src={school.logo_url}
+                alt={school.name}
+                title={school.name}
+                className="h-9 w-9 flex-shrink-0 rounded-full border border-[#E8EAF3] object-contain sm:h-11 sm:w-11"
+              />
+            ) : (
+              <div
+                title={school?.name}
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-[#E8EAF3] bg-[#EEF0FD] text-sm font-bold text-[#5B6EE8] sm:h-11 sm:w-11"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#5B6EE8] to-[#7B8CF7] text-sm font-bold text-white">
-                  {getInitials(profile?.full_name || '?')}
-                </div>
-                <div className="hidden text-left sm:block">
-                  <p className="text-sm font-semibold leading-tight text-[#0F172A]">{profile?.full_name}</p>
-                  <p className="text-xs text-slate-400">{roleLabel}</p>
-                </div>
-                <ChevronDown className="h-4 w-4 text-slate-400" />
-              </button>
+                {schoolInitial}
+              </div>
+            )}
 
-              {userMenuOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} />
-                  <div className="absolute right-0 top-full z-20 mt-2 w-52 rounded-2xl border border-[#E8EAF3] bg-white p-1.5 shadow-[0_10px_30px_rgba(91,110,232,0.15)]">
-                    <button
-                      onClick={() => { navigate(`/${profile?.role}/profile`); setUserMenuOpen(false); }}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-[#EEF0FD] hover:text-[#5B6EE8]"
-                    >
-                      <UserCircle className="h-4 w-4" />
-                      My Profile
-                    </button>
-                    <button
-                      onClick={handleSignOut}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Sign Out
-                    </button>
-                  </div>
-                </>
+            {/* Text block */}
+            <div className="min-w-0">
+              {school?.name ? (
+                <p
+                  title={school.name}
+                  className="truncate text-[14px] font-semibold leading-tight text-[#5B6EE8] sm:text-[16px]"
+                >
+                  {school.name}
+                </p>
+              ) : (
+                <div className="h-4 w-28 animate-pulse rounded bg-slate-200" />
+              )}
+              {school?.academic_year && (
+                <span className="mt-0.5 inline-flex items-center rounded-full bg-[#EEF0FD] px-2 py-0.5 text-[10px] font-semibold text-[#5B6EE8]">
+                  AY {school.academic_year}
+                </span>
               )}
             </div>
-          </header>
+          </div>
 
-          {/* Page content */}
-          <main className="px-4 pb-10 pt-2 sm:px-8">
-            {children}
-          </main>
-        </div>
+          {/* 4. Spacer */}
+          <div className="flex-1" />
+
+          {/* 5. Notifications bell */}
+          <button
+            onClick={() => navigate(`/${profile?.role}/notifications`)}
+            aria-label="Notifications"
+            className="relative flex-shrink-0 rounded-xl bg-white p-2.5 text-slate-500 shadow-[0_4px_20px_rgba(91,110,232,0.08)] transition-colors hover:text-[#5B6EE8]"
+          >
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span
+                className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500"
+                aria-hidden="true"
+              />
+            )}
+          </button>
+
+          {/* 6. Profile card + dropdown */}
+          <div className="relative flex-shrink-0">
+            <button
+              onClick={() => setUserMenuOpen((v) => !v)}
+              aria-label="Account menu"
+              aria-expanded={userMenuOpen}
+              aria-haspopup="true"
+              className="flex items-center gap-2 rounded-2xl bg-white p-1.5 pr-2 shadow-[0_4px_20px_rgba(91,110,232,0.08)] transition-all hover:-translate-y-0.5 sm:pr-3"
+            >
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#5B6EE8] to-[#7B8CF7] text-sm font-bold text-white sm:h-10 sm:w-10">
+                {getInitials(profile?.full_name || '?')}
+              </div>
+              {/* Name + role hidden on mobile */}
+              <div className="hidden text-left sm:block">
+                <p className="text-sm font-semibold leading-tight text-[#0F172A]">{profile?.full_name}</p>
+                <p className="text-xs text-slate-400">{roleLabel}</p>
+              </div>
+              <ChevronDown className="h-4 w-4 text-slate-400" />
+            </button>
+
+            {userMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} aria-hidden="true" />
+                <div
+                  role="menu"
+                  className="absolute right-0 top-full z-20 mt-2 w-52 rounded-2xl border border-[#E8EAF3] bg-white p-1.5 shadow-[0_10px_30px_rgba(91,110,232,0.15)]"
+                >
+                  <button
+                    role="menuitem"
+                    onClick={() => { navigate(`/${profile?.role}/profile`); setUserMenuOpen(false); }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-[#EEF0FD] hover:text-[#5B6EE8]"
+                  >
+                    <UserCircle className="h-4 w-4" /> My Profile
+                  </button>
+                  <button
+                    role="menuitem"
+                    onClick={() => { navigate(`/${profile?.role}/settings`); setUserMenuOpen(false); }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-[#EEF0FD] hover:text-[#5B6EE8]"
+                  >
+                    <Settings className="h-4 w-4" /> Settings
+                  </button>
+                  <div className="my-1 h-px bg-[#E8EAF3]" />
+                  <button
+                    role="menuitem"
+                    onClick={handleSignOut}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50"
+                  >
+                    <LogOut className="h-4 w-4" /> Sign Out
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </header>
+        {/* ═══════════════════════════════ */}
+
+        {/* Page content */}
+        <main className="px-4 pb-10 pt-4 sm:px-8">
+          {children}
+        </main>
       </div>
+    </div>
   );
 }

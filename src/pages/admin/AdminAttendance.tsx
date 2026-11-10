@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
+import { Input, Select } from '@/components/ui/Form';
 import { PageHeader, LoadingSpinner, SearchInput } from '@/components/ui/Primitives';
 import { useAuth } from '@/auth/AuthContext';
 import { fetchClasses, fetchAttendance } from '@/services/api';
@@ -53,23 +54,15 @@ export default function AdminAttendance() {
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1 min-w-0">
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Class / Section</label>
-            <select
-              value={selectedSection}
-              onChange={(e) => setSelectedSection(e.target.value)}
-              className="h-[42px] w-full rounded-xl border border-gray-200 bg-white px-3 pr-8 text-sm text-gray-700 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none bg-no-repeat"
-              style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundPosition: 'right 12px center' }}
-            >
+            <Select label="Class / Section" value={selectedSection} onChange={(e) => setSelectedSection(e.target.value)}>
               <option value="">Select section...</option>
               {classes.map((c) => c.sections.map((s) => (
                 <option key={s.id} value={s.id}>{c.name} - Section {s.name}</option>
               )))}
-            </select>
+            </Select>
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Date</label>
-            <input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)}
-              className="h-[42px] rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-700 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+            <Input label="Date" type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
           </div>
           <div className="flex-1 min-w-0">
             <SearchInput value={search} onChange={setSearch} placeholder="Search by student name..." />

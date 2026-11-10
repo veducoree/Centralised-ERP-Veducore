@@ -116,18 +116,18 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
       <div
         ref={panelRef}
         className={cn(
-          'relative z-10 w-full rounded-2xl bg-white shadow-xl transition-all duration-200',
+          'relative z-10 w-full rounded-[20px] bg-white shadow-xl transition-all duration-200',
           sizeClasses[size]
         )}
       >
         <div className="flex items-start justify-between border-b border-gray-100 px-6 py-4">
           <div>
-            <h2 id="modal-title" className="text-base font-semibold text-gray-900">{title}</h2>
+            <h2 id="modal-title" className="text-[15px] font-semibold tracking-tight text-gray-900">{title}</h2>
             {description && <p className="mt-1 text-sm text-gray-500">{description}</p>}
           </div>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            className="rounded-[10px] p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
@@ -176,7 +176,7 @@ export function ConfirmDialog({
           <button
             onClick={onClose}
             disabled={loading}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            className="rounded-[10px] border border-gray-200 bg-white px-4 h-9 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
           >
             {cancelText}
           </button>
@@ -184,8 +184,8 @@ export function ConfirmDialog({
             onClick={async () => { await onConfirm(); onClose(); }}
             disabled={loading}
             className={cn(
-              'inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed',
-              variant === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'
+              'inline-flex items-center gap-2 rounded-[10px] h-9 px-4 text-sm font-medium text-white transition-colors disabled:opacity-60 disabled:cursor-not-allowed',
+              variant === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-[#5B6EE8] hover:bg-[#4B5DD8]'
             )}
           >
             {loading && (

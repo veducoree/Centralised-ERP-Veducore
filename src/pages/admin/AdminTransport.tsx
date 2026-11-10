@@ -1,18 +1,8 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import {
-  Bus,
-  Plus,
-  MapPin,
-  IndianRupee,
-  Users,
-  Trash2,
-  Pencil,
-  UserPlus,
-  CheckCircle2,
-  ArrowRight,
-  Navigation,
-  Phone,
-  Clock,
+  Bus, Plus, MapPin, IndianRupee, Users, Trash2, Pencil,
+  UserPlus, CheckCircle2, ArrowRight, Navigation, Phone,
+  Clock, AlertTriangle,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, StatCard } from '@/components/ui/Card';
@@ -24,100 +14,119 @@ import { Badge } from '@/components/ui/Badge';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
 import {
-  fetchSchoolTransportData,
-  saveSchoolTransportData,
+  fetchTransportAll,
+  saveTransportBus,
+  deleteTransportBusWithStops,
+  createOrUpdateAssignment,
+  updateAssignmentStatus,
+  deleteAssignment,
   fetchStudents,
   fetchClasses,
   createFee,
+  createNotification,
 } from '@/services/api';
 import type {
   TransportBus,
   TransportStop,
   StudentTransportAssignment,
+  TransportFareSnapshot,
   Student,
   Class,
   Section,
 } from '@/types';
 import { formatCurrency, formatDate, getInitials } from '@/lib/utils';
 
-interface DraftStopInput {
-  id?: string;
+// ─────────────────────────────────────────────────────────────
+const FARE_PERIODS = ['Monthly', 'Quarterly', 'Yearly'] as const;
+type FarePeriod = typeof FARE_PERIODS[number];
+
+const BUS_STATUSES = ['active', 'maintenance', 'inactive'] as const;
+const busStatusLabel: Record<string, string> = {
+  active: 'Active', maintenance: 'Maintenance', inactive: 'Inactive',
+};
+
+interface DraftStop {
+  id?: string;          // present when editing an existing stop
   stop_name: string;
   area_landmark: string;
   amount: string;
+  fare_period: FarePeriod;
   pickup_time: string;
   drop_time: string;
   distance_km: string;
 }
 
-function createEmptyStopRow(): DraftStopInput {
-  return {
-    stop_name: '',
-    area_landmark: '',
-    amount: '',
-    pickup_time: '',
-    drop_time: '',
-    distance_km: '',
-  };
-}
+const emptyStop = (): DraftStop => ({
+  stop_name: '', area_landmark: '', amount: '',
+  fare_period: 'Monthly', pickup_time: '', drop_time: '', distance_km: '',
+});
 
+// ─────────────────────────────────────────────────────────────
 export default function AdminTransport() {
   const { profile } = useAuth();
   const toast = useToast();
 
-  const [buses, setBuses] = useState<TransportBus[]>([]);
-  const [stops, setStops] = useState<TransportStop[]>([]);
-  const [assignments, setAssignments] = useState<Record<string, StudentTransportAssignment>>({});
-  const [students, setStudents] = useState<Student[]>([]);
-  const [classes, setClasses] = useState<(Class & { sections?: Section[] })[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  // ── Core data ────────────────────────────────────────────
+  const [buses, setBuses]           = useState<TransportBus[]>([]);
+  const [stops, setStops]           = useState<TransportStop[]>([]);
+  const [assignments, setAssignments] = useState<StudentTransportAssignment[]>([]);
+  const [students, setStudents]     = useState<Student[]>([]);
+  const [classes, setClasses]       = useState<(Class & { sections?: Section[] })[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [saving, setSaving]         = useState(false);
 
-  // Bus + Route + Stops form state (used both for initial onboarding and Add/Edit Bus modal)
-  const [busModalOpen, setBusModalOpen] = useState(false);
-  const [editingBus, setEditingBus] = useState<TransportBus | null>(null);
-  const [busNumber, setBusNumber] = useState('');
-  const [routeName, setRouteName] = useState('');
-  const [driverName, setDriverName] = useState('');
-  const [driverPhone, setDriverPhone] = useState('');
-  const [stopCountInput, setStopCountInput] = useState('3');
-  const [busStopsDraft, setBusStopsDraft] = useState<DraftStopInput[]>([
-    createEmptyStopRow(),
-    createEmptyStopRow(),
-    createEmptyStopRow(),
-  ]);
-  const [deleteBusId, setDeleteBusId] = useState<string | null>(null);
+  // ── Bus form ─────────────────────────────────────────────
+  const [busModalOpen, setBusModalOpen]   = useState(false);
+  const [editingBus, setEditingBus]       = useState<TransportBus | null>(null);
+  const [busNumber, setBusNumber]         = useState('');
+  const [routeName, setRouteName]         = useState('');
+  const [busCapacity, setBusCapacity]     = useState('40');
+  const [driverName, setDriverName]       = useState('');
+  const [driverPhone, setDriverPhone]     = useState('');
+  const [conductorName, setConductorName] = useState('');
+  const [conductorPhone, setConductorPhone] = useState('');
+  const [busStatus, setBusStatus]         = useState('active');
+  const [stopsDraft, setStopsDraft]       = useState<DraftStop[]>([emptyStop(), emptyStop(), emptyStop()]);
+  const [deleteBusId, setDeleteBusId]     = useState<string | null>(null);
 
-  // Assign student modal state
+  // ── Assign modal ─────────────────────────────────────────
   const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [editingAssignment, setEditingAssignment] = useState<StudentTransportAssignment | null>(null);
   const [assignClassFilter, setAssignClassFilter] = useState('');
-  const [assignStudentId, setAssignStudentId] = useState('');
-  const [assignBusId, setAssignBusId] = useState('');
-  const [assignStopId, setAssignStopId] = useState('');
-  const [autoCreateFee, setAutoCreateFee] = useState(true);
-  const [assignDueDate, setAssignDueDate] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 10);
-    return d.toISOString().split('T')[0];
+  const [assignStudentId, setAssignStudentId]     = useState('');
+  const [assignBusId, setAssignBusId]             = useState('');
+  const [assignStopId, setAssignStopId]           = useState('');
+  const [assignStartDate, setAssignStartDate]     = useState(() => new Date().toISOString().split('T')[0]);
+  const [autoCreateFee, setAutoCreateFee]         = useState(true);
+  const [assignDueDate, setAssignDueDate]         = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() + 10); return d.toISOString().split('T')[0];
   });
-  const [removeStudentId, setRemoveStudentId] = useState<string | null>(null);
 
-  // Filters for enrolled students table
-  const [search, setSearch] = useState('');
-  const [busFilter, setBusFilter] = useState('');
+  // ── Reject modal ─────────────────────────────────────────
+  const [rejectAssignmentId, setRejectAssignmentId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason]             = useState('');
 
+  // ── Stop transport modal ──────────────────────────────────
+  const [stopAssignmentId, setStopAssignmentId] = useState<string | null>(null);
+
+  // ── Table filters ─────────────────────────────────────────
+  const [search, setSearch]           = useState('');
+  const [busFilter, setBusFilter]     = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
+  // ── Load all data from DB ─────────────────────────────────
   const loadData = useCallback(async () => {
     if (!profile?.school_id) return;
     setLoading(true);
     try {
-      const [transportData, studentList, classList] = await Promise.all([
-        fetchSchoolTransportData(profile.school_id),
+      const [transport, studentList, classList] = await Promise.all([
+        fetchTransportAll(profile.school_id),
         fetchStudents(profile.school_id),
         fetchClasses(profile.school_id),
       ]);
-      setBuses(transportData.buses);
-      setStops(transportData.stops);
-      setAssignments(transportData.assignments);
+      setBuses(transport.buses);
+      setStops(transport.stops);
+      setAssignments(transport.assignments);
       setStudents(studentList);
       setClasses(classList);
     } catch {
@@ -127,589 +136,509 @@ export default function AdminTransport() {
     }
   }, [profile?.school_id, toast]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useEffect(() => { loadData(); }, [loadData]);
 
-  // Adjust number of stop rows when "Number of Stops (Kitne Stop Hai)" changes
-  function handleStopCountChange(val: string) {
-    setStopCountInput(val);
-    const num = Math.max(1, Math.min(25, parseInt(val, 10) || 1));
-    setBusStopsDraft((prev) => {
-      if (num === prev.length) return prev;
-      if (num > prev.length) {
-        const extra = Array.from({ length: num - prev.length }, () => createEmptyStopRow());
-        return [...prev, ...extra];
-      }
-      return prev.slice(0, num);
-    });
-  }
-
+  // ── Bus form helpers ──────────────────────────────────────
   function resetBusForm() {
     setEditingBus(null);
-    setBusNumber('');
-    setRouteName('');
-    setDriverName('');
-    setDriverPhone('');
-    setStopCountInput('3');
-    setBusStopsDraft([
-      createEmptyStopRow(),
-      createEmptyStopRow(),
-      createEmptyStopRow(),
-    ]);
+    setBusNumber(''); setRouteName(''); setBusCapacity('40');
+    setDriverName(''); setDriverPhone('');
+    setConductorName(''); setConductorPhone('');
+    setBusStatus('active');
+    setStopsDraft([emptyStop(), emptyStop(), emptyStop()]);
   }
 
-  function openAddBusModal() {
-    resetBusForm();
-    setBusModalOpen(true);
-  }
+  function openAddBus() { resetBusForm(); setBusModalOpen(true); }
 
-  function openEditBusModal(bus: TransportBus) {
+  function openEditBus(bus: TransportBus) {
     setEditingBus(bus);
     setBusNumber(bus.bus_number);
     setRouteName(bus.route_name);
+    setBusCapacity(String(bus.capacity ?? 40));
     setDriverName(bus.driver_name || '');
     setDriverPhone(bus.driver_phone || '');
-    const existingStops = bus.stops && bus.stops.length > 0
-      ? bus.stops.map((s) => ({
-          id: s.id,
-          stop_name: s.stop_name,
-          area_landmark: s.area_landmark || '',
-          amount: String(s.amount),
-          pickup_time: s.pickup_time || '',
-          drop_time: s.drop_time || '',
-          distance_km: s.distance_km !== undefined ? String(s.distance_km) : '',
-        }))
-      : [createEmptyStopRow()];
-    setStopCountInput(String(existingStops.length));
-    setBusStopsDraft(existingStops);
+    setConductorName(bus.conductor_name || '');
+    setConductorPhone(bus.conductor_phone || '');
+    setBusStatus(bus.status || 'active');
+    setStopsDraft(
+      bus.stops?.length > 0
+        ? bus.stops.map((s) => ({
+            id: s.id,
+            stop_name: s.stop_name,
+            area_landmark: s.area_landmark || '',
+            amount: String(s.amount),
+            fare_period: (s.fare_period as FarePeriod) || 'Monthly',
+            pickup_time: s.pickup_time || '',
+            drop_time: s.drop_time || '',
+            distance_km: s.distance_km !== undefined ? String(s.distance_km) : '',
+          }))
+        : [emptyStop()]
+    );
     setBusModalOpen(true);
   }
 
-  async function handleSaveBusAndStops(e: React.FormEvent) {
+  async function handleSaveBus(e: React.FormEvent) {
     e.preventDefault();
     if (!profile?.school_id) return;
-
     const cleanBusNo = busNumber.trim();
     const cleanRoute = routeName.trim();
-    if (!cleanBusNo) {
-      toast('Please enter the Bus Number', 'error');
-      return;
-    }
-    if (!cleanRoute) {
-      toast('Please enter the Route Name', 'error');
-      return;
-    }
+    if (!cleanBusNo) { toast('Bus Number is required', 'error'); return; }
+    if (!cleanRoute) { toast('Route Name is required', 'error'); return; }
 
-    const validStops = busStopsDraft
+    const validStops = stopsDraft
       .map((r, idx) => ({
-        id: r.id || `stop-${Date.now()}-${idx}`,
+        ...(r.id ? { id: r.id } : {}),
         stop_name: r.stop_name.trim(),
-        area_landmark: r.area_landmark.trim(),
+        area_landmark: r.area_landmark.trim() || undefined,
         amount: Number(r.amount),
-        pickup_time: r.pickup_time.trim(),
-        drop_time: r.drop_time.trim(),
+        fare_period: r.fare_period || 'Monthly',
+        pickup_time: r.pickup_time.trim() || undefined,
+        drop_time: r.drop_time.trim() || undefined,
         distance_km: r.distance_km.trim() ? Number(r.distance_km) : undefined,
+        stop_order: idx + 1,
       }))
-      .filter((r) => r.stop_name && !Number.isNaN(r.amount) && r.amount > 0);
+      .filter((r) => r.stop_name && !isNaN(r.amount) && r.amount > 0);
 
     if (validStops.length === 0) {
-      toast('Please enter at least one Stop Name and valid Fare Amount (₹)', 'error');
+      toast('At least one valid stop with a fare amount is required', 'error');
       return;
     }
 
     setSaving(true);
     try {
-      const busId = editingBus?.id || `bus-${Date.now()}`;
-      const now = new Date().toISOString();
-      const builtStops: TransportStop[] = validStops.map((st, idx) => ({
-        id: st.id,
-        bus_id: busId,
-        bus_number: cleanBusNo,
-        route_name: cleanRoute,
-        stop_order: idx + 1,
-        stop_name: st.stop_name,
-        area_landmark: st.area_landmark || undefined,
-        amount: st.amount,
-        pickup_time: st.pickup_time || undefined,
-        drop_time: st.drop_time || undefined,
-        distance_km: st.distance_km,
-        driver_name: driverName.trim() || undefined,
-        driver_phone: driverPhone.trim() || undefined,
-        created_at: now,
-      }));
-
-      const newBus: TransportBus = {
-        id: busId,
-        bus_number: cleanBusNo,
-        route_name: cleanRoute,
-        driver_name: driverName.trim() || undefined,
-        driver_phone: driverPhone.trim() || undefined,
-        total_stops: builtStops.length,
-        stops: builtStops,
-        created_at: editingBus?.created_at || now,
-      };
-
-      const updatedBuses = editingBus
-        ? buses.map((b) => (b.id === editingBus.id ? newBus : b))
-        : [...buses, newBus];
-
-      const allStops = updatedBuses.flatMap((b) => b.stops);
-      const stopById = new Map(allStops.map((s) => [s.id, s]));
-
-      // Sync any assigned students whose stop was updated
-      const updatedAssignments = { ...assignments };
-      Object.keys(updatedAssignments).forEach((stuId) => {
-        const matched = stopById.get(updatedAssignments[stuId].stop_id);
-        if (matched) {
-          updatedAssignments[stuId] = {
-            ...updatedAssignments[stuId],
-            bus_id: matched.bus_id,
-            bus_number: matched.bus_number,
-            route_name: matched.route_name,
-            stop_name: matched.stop_name,
-            area_landmark: matched.area_landmark,
-            amount: matched.amount,
-            pickup_time: matched.pickup_time,
-            drop_time: matched.drop_time,
-            driver_name: matched.driver_name,
-            driver_phone: matched.driver_phone,
-          };
-        }
-      });
-
-      const saved = await saveSchoolTransportData(profile.school_id, {
-        buses: updatedBuses,
-        stops: allStops,
-        assignments: updatedAssignments,
-      });
-
-      setBuses(saved.buses);
-      setStops(saved.stops);
-      setAssignments(saved.assignments);
+      await saveTransportBus(
+        profile.school_id,
+        {
+          ...(editingBus ? { id: editingBus.id } : {}),
+          bus_number: cleanBusNo,
+          route_name: cleanRoute,
+          capacity: parseInt(busCapacity, 10) || 40,
+          driver_name: driverName.trim() || undefined,
+          driver_phone: driverPhone.trim() || undefined,
+          conductor_name: conductorName.trim() || undefined,
+          conductor_phone: conductorPhone.trim() || undefined,
+          status: busStatus,
+        },
+        validStops
+      );
+      await loadData();
       setBusModalOpen(false);
       resetBusForm();
-      toast(
-        editingBus
-          ? `Updated ${cleanBusNo} (${builtStops.length} stops)`
-          : `Added ${cleanBusNo} with ${builtStops.length} stops`,
-        'success'
-      );
-    } catch {
-      toast('Failed to save bus and stops', 'error');
+      toast(editingBus ? `Updated ${cleanBusNo}` : `Added ${cleanBusNo} with ${validStops.length} stops`, 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to save bus', 'error');
     } finally {
       setSaving(false);
     }
   }
 
   async function handleConfirmDeleteBus() {
-    if (!profile?.school_id || !deleteBusId) return;
+    if (!deleteBusId) return;
+    // Check if any active assignments exist on this bus's stops
+    const busStopIds = new Set(
+      stops.filter((s) => s.bus_id === deleteBusId).map((s) => s.id)
+    );
+    const hasActive = assignments.some(
+      (a) => busStopIds.has(a.stop_id) &&
+             (a.status === 'active' || a.status === 'approved' || a.status === 'pending')
+    );
+    if (hasActive) {
+      toast('This bus has active student assignments. Stop or remove them first.', 'error');
+      setDeleteBusId(null);
+      return;
+    }
     setSaving(true);
     try {
-      const busToDelete = buses.find((b) => b.id === deleteBusId);
-      const deletedStopIds = new Set((busToDelete?.stops || []).map((s) => s.id));
-      const updatedBuses = buses.filter((b) => b.id !== deleteBusId);
-      const updatedStops = updatedBuses.flatMap((b) => b.stops);
-      const updatedAssignments = { ...assignments };
-
-      Object.keys(updatedAssignments).forEach((stuId) => {
-        if (
-          updatedAssignments[stuId].bus_id === deleteBusId ||
-          deletedStopIds.has(updatedAssignments[stuId].stop_id)
-        ) {
-          delete updatedAssignments[stuId];
-        }
-      });
-
-      const saved = await saveSchoolTransportData(profile.school_id, {
-        buses: updatedBuses,
-        stops: updatedStops,
-        assignments: updatedAssignments,
-      });
-
-      setBuses(saved.buses);
-      setStops(saved.stops);
-      setAssignments(saved.assignments);
+      await deleteTransportBusWithStops(deleteBusId);
+      await loadData();
       setDeleteBusId(null);
-      toast('Bus route and its stops removed', 'success');
-    } catch {
-      toast('Failed to delete bus route', 'error');
+      toast('Bus and all its stops deleted', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to delete bus', 'error');
     } finally {
       setSaving(false);
     }
   }
 
-  function openAssignModal(preselectStudentId?: string) {
+  // ── Assign student ────────────────────────────────────────
+  function openAssignModal(assignment?: StudentTransportAssignment) {
+    setEditingAssignment(assignment || null);
     setAssignClassFilter('');
-    setAssignStudentId(preselectStudentId || '');
-    const existing = preselectStudentId ? assignments[preselectStudentId] : undefined;
-    const defaultBusId = existing?.bus_id || buses[0]?.id || '';
+    setAssignStudentId(assignment?.student_id || '');
+    const defaultBusId = assignment?.bus_id || buses[0]?.id || '';
     setAssignBusId(defaultBusId);
     const busObj = buses.find((b) => b.id === defaultBusId) || buses[0];
-    setAssignStopId(existing?.stop_id || busObj?.stops[0]?.id || '');
-    setAutoCreateFee(!existing);
+    setAssignStopId(assignment?.stop_id || busObj?.stops[0]?.id || '');
+    setAssignStartDate(new Date().toISOString().split('T')[0]);
+    setAutoCreateFee(!assignment);
     setAssignModalOpen(true);
   }
 
   async function handleAssignStudent(e: React.FormEvent) {
     e.preventDefault();
     if (!profile?.school_id) return;
-    if (!assignStudentId) {
-      toast('Please select a student', 'error');
-      return;
-    }
+    if (!assignStudentId) { toast('Please select a student', 'error'); return; }
     const stop = stops.find((s) => s.id === assignStopId);
-    if (!stop) {
-      toast('Please select a transport stop', 'error');
-      return;
-    }
+    if (!stop) { toast('Please select a stop', 'error'); return; }
+    const bus  = buses.find((b) => b.id === assignBusId) || buses.find((b) => b.id === stop.bus_id);
 
     setSaving(true);
     try {
-      const assignment: StudentTransportAssignment = {
-        student_id: assignStudentId,
-        bus_id: stop.bus_id,
-        stop_id: stop.id,
-        stop_name: stop.stop_name,
-        area_landmark: stop.area_landmark,
+      const fareSnapshot: TransportFareSnapshot = {
         amount: stop.amount,
-        route_name: stop.route_name,
-        bus_number: stop.bus_number,
-        pickup_time: stop.pickup_time,
-        drop_time: stop.drop_time,
-        driver_name: stop.driver_name,
-        driver_phone: stop.driver_phone,
-        status: 'active',
-        assigned_at: new Date().toISOString(),
+        fare_period: (stop.fare_period as FarePeriod) || 'Monthly',
+        stop_name: stop.stop_name,
+        bus_number: bus?.bus_number,
+        route_name: bus?.route_name,
       };
 
-      const updatedAssignments = {
-        ...assignments,
-        [assignStudentId]: assignment,
-      };
-
-      await saveSchoolTransportData(profile.school_id, {
-        buses,
-        stops,
-        assignments: updatedAssignments,
+      const saved = await createOrUpdateAssignment({
+        ...(editingAssignment?.id ? { id: editingAssignment.id } : {}),
+        school_id: profile.school_id,
+        student_id: assignStudentId,
+        bus_id: stop.bus_id || assignBusId,
+        stop_id: stop.id,
+        start_date: assignStartDate,
+        status: 'approved',
+        applied_by_parent: false,
+        fare_snapshot: fareSnapshot,
+        approved_by: profile.id,
+        approved_at: new Date().toISOString(),
       });
 
+      // Create fee record if requested
       if (autoCreateFee) {
         try {
-          await createFee({
+          const fee = await createFee({
             school_id: profile.school_id,
             student_id: assignStudentId,
-            fee_type: `Transport Fee (${stop.bus_number || 'Bus'} - ${stop.stop_name})`,
+            fee_type: `Transport Fee (${bus?.bus_number || 'Bus'} - ${stop.stop_name})`,
             amount: stop.amount,
             due_date: assignDueDate || new Date().toISOString().split('T')[0],
           });
-        } catch {
-          // non-fatal
-        }
+          // Link fee to assignment
+          if (fee?.id && saved?.id) {
+            await updateAssignmentStatus(saved.id, { status: 'approved', fee_id: fee.id });
+          }
+        } catch { /* non-fatal */ }
       }
 
-      setAssignments(updatedAssignments);
+      await loadData();
       setAssignModalOpen(false);
-      toast(
-        `Assigned to ${stop.bus_number || 'Bus'} · ${stop.stop_name} (${formatCurrency(stop.amount)})`,
-        'success'
-      );
-    } catch {
-      toast('Failed to assign student transport', 'error');
+      toast(`Assigned ${stop.stop_name} (${formatCurrency(stop.amount)}/${(stop.fare_period || 'month').toLowerCase()})`, 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to assign transport', 'error');
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleApproveApplication(studentId: string) {
-    if (!profile?.school_id) return;
-    const existing = assignments[studentId];
-    if (!existing) return;
+  // ── Approve ────────────────────────────────────────────────
+  async function handleApprove(assignment: StudentTransportAssignment) {
+    if (!profile?.school_id || !assignment.id) return;
+
+    // Capacity check
+    const bus = buses.find((b) => b.id === assignment.bus_id);
+    if (bus?.capacity) {
+      const approvedCount = assignments.filter(
+        (a) => a.bus_id === bus.id && (a.status === 'active' || a.status === 'approved')
+      ).length;
+      if (approvedCount >= bus.capacity) {
+        toast(`Bus ${bus.bus_number} is full (${bus.capacity} seats). Cannot approve more students.`, 'error');
+        return;
+      }
+    }
 
     setSaving(true);
     try {
-      const approved: StudentTransportAssignment = {
-        ...existing,
-        status: 'active',
-        assigned_at: new Date().toISOString(),
-      };
-      const updatedAssignments = {
-        ...assignments,
-        [studentId]: approved,
+      const stop = stops.find((s) => s.id === assignment.stop_id);
+      const fareSnapshot: TransportFareSnapshot = {
+        amount: stop?.amount ?? assignment.amount,
+        fare_period: (stop?.fare_period as FarePeriod) || assignment.fare_period || 'Monthly',
+        stop_name: stop?.stop_name ?? assignment.stop_name,
+        bus_number: bus?.bus_number ?? assignment.bus_number,
+        route_name: bus?.route_name ?? assignment.route_name,
       };
 
-      await saveSchoolTransportData(profile.school_id, {
-        buses,
-        stops,
-        assignments: updatedAssignments,
+      // Create fee record
+      let feeId: string | undefined;
+      try {
+        const fee = await createFee({
+          school_id: profile.school_id,
+          student_id: assignment.student_id,
+          fee_type: `Transport Fee (${fareSnapshot.bus_number || 'Bus'} - ${fareSnapshot.stop_name})`,
+          amount: fareSnapshot.amount,
+          due_date: new Date().toISOString().split('T')[0],
+        });
+        feeId = fee?.id;
+      } catch { /* non-fatal */ }
+
+      await updateAssignmentStatus(assignment.id, {
+        status: 'approved',
+        approved_by: profile.id,
+        approved_at: new Date().toISOString(),
+        fare_snapshot: fareSnapshot,
+        ...(feeId ? { fee_id: feeId } : {}),
+      });
+
+      // Notify parent
+      try {
+        await createNotification({
+          school_id: profile.school_id,
+          title: 'Transport Application Approved',
+          message: `Your transport application for ${fareSnapshot.stop_name} (${formatCurrency(fareSnapshot.amount)}/${fareSnapshot.fare_period.toLowerCase()}) has been approved.`,
+          type: 'success',
+        });
+      } catch { /* non-fatal */ }
+
+      await loadData();
+      toast(`Approved transport for ${fareSnapshot.stop_name}`, 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to approve', 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // ── Reject ─────────────────────────────────────────────────
+  async function handleConfirmReject() {
+    if (!profile?.school_id || !rejectAssignmentId) return;
+    if (!rejectReason.trim()) { toast('Please enter a rejection reason', 'error'); return; }
+    const assignment = assignments.find((a) => a.id === rejectAssignmentId);
+    setSaving(true);
+    try {
+      await updateAssignmentStatus(rejectAssignmentId, {
+        status: 'rejected',
+        reject_reason: rejectReason.trim(),
       });
 
       try {
-        await createFee({
+        await createNotification({
           school_id: profile.school_id,
-          student_id: studentId,
-          fee_type: `Transport Fee (${approved.bus_number || 'Bus'} - ${approved.stop_name})`,
-          amount: approved.amount,
-          due_date: assignDueDate || new Date().toISOString().split('T')[0],
+          title: 'Transport Application Not Approved',
+          message: `Your transport application for ${assignment?.stop_name || 'stop'} could not be approved. Reason: ${rejectReason.trim()}`,
+          type: 'warning',
         });
-      } catch {
-        // non-fatal
-      }
+      } catch { /* non-fatal */ }
 
-      setAssignments(updatedAssignments);
-      toast(`Approved transport for ${approved.stop_name} (${formatCurrency(approved.amount)})`, 'success');
-    } catch {
-      toast('Failed to approve transport application', 'error');
+      await loadData();
+      setRejectAssignmentId(null);
+      setRejectReason('');
+      toast('Application rejected and parent notified', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to reject', 'error');
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleConfirmRemoveStudent() {
-    if (!profile?.school_id || !removeStudentId) return;
+  // ── Stop transport ─────────────────────────────────────────
+  async function handleConfirmStopTransport() {
+    if (!stopAssignmentId) return;
     setSaving(true);
     try {
-      const updatedAssignments = { ...assignments };
-      delete updatedAssignments[removeStudentId];
-      await saveSchoolTransportData(profile.school_id, {
-        buses,
-        stops,
-        assignments: updatedAssignments,
+      await updateAssignmentStatus(stopAssignmentId, {
+        status: 'stopped',
+        end_date: new Date().toISOString().split('T')[0],
       });
-      setAssignments(updatedAssignments);
-      setRemoveStudentId(null);
-      toast('Student removed from transport', 'success');
-    } catch {
-      toast('Failed to remove student from transport', 'error');
+      await loadData();
+      setStopAssignmentId(null);
+      toast('Transport stopped for student', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to stop transport', 'error');
     } finally {
       setSaving(false);
     }
   }
 
-  const enrolledEntries = useMemo(() => {
-    const map = new Map(students.map((s) => [s.id, s]));
-    return Object.values(assignments)
-      .map((a) => ({
-        assignment: a,
-        student: map.get(a.student_id),
-      }))
-      .filter((item): item is { assignment: StudentTransportAssignment; student: Student } =>
-        Boolean(item.student)
-      );
-  }, [assignments, students]);
+  // ── Delete assignment ──────────────────────────────────────
+  async function handleDeleteAssignment(assignmentId: string) {
+    setSaving(true);
+    try {
+      await deleteAssignment(assignmentId);
+      await loadData();
+      toast('Assignment removed', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to remove assignment', 'error');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // ── Derived / memoised state ──────────────────────────────
+  const studentMap = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
+
+  const enrolledEntries = useMemo(() =>
+    assignments
+      .map((a) => ({ assignment: a, student: studentMap.get(a.student_id) }))
+      .filter((e): e is { assignment: StudentTransportAssignment; student: Student } => Boolean(e.student)),
+    [assignments, studentMap]
+  );
 
   const filteredEnrolled = useMemo(() => {
     return enrolledEntries.filter(({ assignment, student }) => {
-      if (busFilter && assignment.bus_id !== busFilter && assignment.bus_number !== busFilter) {
-        return false;
-      }
+      if (busFilter && assignment.bus_id !== busFilter) return false;
+      if (statusFilter && assignment.status !== statusFilter) return false;
       if (search.trim()) {
         const q = search.toLowerCase();
-        const matchName = student.full_name.toLowerCase().includes(q);
-        const matchAdm = student.admission_number.toLowerCase().includes(q);
-        const matchStop = assignment.stop_name.toLowerCase().includes(q);
-        const matchBus = (assignment.bus_number || '').toLowerCase().includes(q);
-        if (!matchName && !matchAdm && !matchStop && !matchBus) return false;
+        return (
+          student.full_name.toLowerCase().includes(q) ||
+          student.admission_number.toLowerCase().includes(q) ||
+          (assignment.stop_name || '').toLowerCase().includes(q) ||
+          (assignment.bus_number || '').toLowerCase().includes(q)
+        );
       }
       return true;
     });
-  }, [enrolledEntries, busFilter, search]);
+  }, [enrolledEntries, busFilter, statusFilter, search]);
 
   const stopStudentCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    Object.values(assignments).forEach((a) => {
-      counts[a.stop_id] = (counts[a.stop_id] || 0) + 1;
-    });
+    assignments
+      .filter((a) => a.status === 'active' || a.status === 'approved')
+      .forEach((a) => { counts[a.stop_id] = (counts[a.stop_id] || 0) + 1; });
     return counts;
   }, [assignments]);
 
-  const totalTransportValue = useMemo(
-    () => enrolledEntries.reduce((sum, item) => sum + Number(item.assignment.amount || 0), 0),
-    [enrolledEntries]
+  const activeCount  = useMemo(() => assignments.filter((a) => a.status === 'active' || a.status === 'approved').length, [assignments]);
+  const pendingCount = useMemo(() => assignments.filter((a) => a.status === 'pending').length, [assignments]);
+  const totalBilling = useMemo(() =>
+    assignments
+      .filter((a) => a.status === 'active' || a.status === 'approved')
+      .reduce((sum, a) => sum + Number(a.fare_snapshot?.amount ?? a.amount ?? 0), 0),
+    [assignments]
   );
 
-  const assignableStudents = useMemo(() => {
-    if (!assignClassFilter) return students;
-    return students.filter((s) => s.class_id === assignClassFilter);
-  }, [students, assignClassFilter]);
+  const assignableStudents = useMemo(() =>
+    assignClassFilter ? students.filter((s) => s.class_id === assignClassFilter) : students,
+    [students, assignClassFilter]
+  );
 
-  const selectedAssignBus = buses.find((b) => b.id === assignBusId) || buses[0];
-  const stopsForSelectedBus = selectedAssignBus ? selectedAssignBus.stops : stops;
-  const selectedAssignStop = stops.find((s) => s.id === assignStopId);
+  const selectedBusForAssign = buses.find((b) => b.id === assignBusId) || buses[0];
+  const stopsForAssignBus    = selectedBusForAssign?.stops ?? [];
+  const selectedAssignStop   = stops.find((s) => s.id === assignStopId);
 
-  // Reusable Bus + Route + Stops Form Body
-  const renderBusAndStopsFormFields = () => (
+  // ─────────────────────────────────────────────────────────
+  // Render helpers
+  // ─────────────────────────────────────────────────────────
+  function StatusPill({ status }: { status?: string }) {
+    const map: Record<string, { label: string; cls: string }> = {
+      pending:  { label: 'Pending',  cls: 'bg-amber-100 text-amber-800' },
+      active:   { label: 'Active',   cls: 'bg-emerald-100 text-emerald-800' },
+      approved: { label: 'Approved', cls: 'bg-emerald-100 text-emerald-800' },
+      rejected: { label: 'Rejected', cls: 'bg-red-100 text-red-700' },
+      stopped:  { label: 'Stopped',  cls: 'bg-gray-100 text-gray-600' },
+    };
+    const s = map[status || 'active'] ?? map['active'];
+    return (
+      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${s.cls}`}>
+        {s.label}
+      </span>
+    );
+  }
+
+  const renderStopFormFields = () => (
     <div className="space-y-5">
-      {/* Bus & Route Primary Info */}
+      {/* Bus info */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-12 rounded-xl border border-blue-100 bg-blue-50/40 p-4">
         <div className="sm:col-span-4">
-          <Input
-            label="Bus Number / Vehicle No. *"
-            placeholder="e.g. Bus 01 (DL-1PC-4521)"
-            value={busNumber}
-            onChange={(e) => setBusNumber(e.target.value)}
-            required
-          />
+          <Input label="Bus Number *" placeholder="e.g. UP50BS353"
+            value={busNumber} onChange={(e) => setBusNumber(e.target.value)} required />
         </div>
         <div className="sm:col-span-5">
-          <Input
-            label="Route Name (From – To) *"
-            placeholder="e.g. Sector 14 – City Center – School"
-            value={routeName}
-            onChange={(e) => setRouteName(e.target.value)}
-            required
-          />
+          <Input label="Route Name *" placeholder="e.g. Sector 14 → School"
+            value={routeName} onChange={(e) => setRouteName(e.target.value)} required />
         </div>
         <div className="sm:col-span-3">
-          <Input
-            label="Total Stops *"
-            type="number"
-            min="1"
-            max="25"
-            placeholder="e.g. 3"
-            value={stopCountInput}
-            onChange={(e) => handleStopCountChange(e.target.value)}
-            required
-          />
-        </div>
-
-        <div className="sm:col-span-6">
-          <Input
-            label="Driver Name (Optional)"
-            placeholder="e.g. Rajesh Kumar"
-            value={driverName}
-            onChange={(e) => setDriverName(e.target.value)}
-          />
+          <Input label="Seat Capacity *" type="number" min="1" max="80"
+            value={busCapacity} onChange={(e) => setBusCapacity(e.target.value)} required />
         </div>
         <div className="sm:col-span-6">
-          <Input
-            label="Driver Mobile Number (Optional)"
-            placeholder="e.g. 9876543210"
-            value={driverPhone}
-            onChange={(e) => setDriverPhone(e.target.value)}
-          />
+          <Input label="Driver Name" placeholder="e.g. Rajesh Kumar"
+            value={driverName} onChange={(e) => setDriverName(e.target.value)} />
+        </div>
+        <div className="sm:col-span-6">
+          <Input label="Driver Mobile" placeholder="e.g. 9876543210"
+            value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} />
+        </div>
+        <div className="sm:col-span-6">
+          <Input label="Conductor Name (optional)" placeholder="e.g. Meena Devi"
+            value={conductorName} onChange={(e) => setConductorName(e.target.value)} />
+        </div>
+        <div className="sm:col-span-3">
+          <Input label="Conductor Mobile" placeholder="optional"
+            value={conductorPhone} onChange={(e) => setConductorPhone(e.target.value)} />
+        </div>
+        <div className="sm:col-span-3">
+          <Select label="Bus Status" value={busStatus} onChange={(e) => setBusStatus(e.target.value)}>
+            {BUS_STATUSES.map((s) => <option key={s} value={s}>{busStatusLabel[s]}</option>)}
+          </Select>
         </div>
       </div>
 
-      {/* Stops list along this route */}
+      {/* Stops */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
             <h4 className="text-sm font-bold text-gray-900">
-              Route Stops & Fare Amounts ({busStopsDraft.length}{' '}
-              {busStopsDraft.length === 1 ? 'Stop' : 'Stops'})
+              Stops &amp; Fares ({stopsDraft.length})
             </h4>
-            <p className="text-xs text-gray-500">
-              Enter each stop name, nearby landmark/area (so parents can find nearby stops), pickup timing, and fare amount.
-            </p>
+            <p className="text-xs text-gray-500">Each stop has its own fare and billing period.</p>
           </div>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            icon={<Plus className="h-3.5 w-3.5" />}
-            onClick={() => {
-              const next = [...busStopsDraft, createEmptyStopRow()];
-              setBusStopsDraft(next);
-              setStopCountInput(String(next.length));
-            }}
-          >
-            + Add Stop Row
+          <Button type="button" size="sm" variant="outline" icon={<Plus className="h-3.5 w-3.5" />}
+            onClick={() => setStopsDraft((p) => [...p, emptyStop()])}>
+            Add Stop
           </Button>
         </div>
 
-        {busStopsDraft.map((row, idx) => (
-          <div
-            key={idx}
-            className="rounded-xl border border-gray-200 bg-gray-50/70 p-3.5 space-y-3"
-          >
+        {stopsDraft.map((row, idx) => (
+          <div key={idx} className="rounded-xl border border-gray-200 bg-gray-50/70 p-3.5 space-y-3">
             <div className="flex items-center justify-between">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-800">
-                <MapPin className="h-3 w-3" />
-                Stop #{idx + 1}
+                <MapPin className="h-3 w-3" /> Stop #{idx + 1}
               </span>
-              {busStopsDraft.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = busStopsDraft.filter((_, rIdx) => rIdx !== idx);
-                    setBusStopsDraft(next);
-                    setStopCountInput(String(next.length));
-                  }}
-                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  Remove
+              {stopsDraft.length > 1 && (
+                <button type="button"
+                  onClick={() => setStopsDraft((p) => p.filter((_, i) => i !== idx))}
+                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-red-600 hover:bg-red-50">
+                  <Trash2 className="h-3.5 w-3.5" /> Remove
                 </button>
               )}
             </div>
-
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
               <div className="sm:col-span-3">
-                <Input
-                  label="Stop Name *"
-                  placeholder="e.g. Sector 14 Main Gate"
+                <Input label="Stop Name *" placeholder="e.g. Sector 14 Gate"
                   value={row.stop_name}
-                  onChange={(e) => {
-                    const next = [...busStopsDraft];
-                    next[idx] = { ...next[idx], stop_name: e.target.value };
-                    setBusStopsDraft(next);
-                  }}
-                  required={idx === 0}
-                />
+                  onChange={(e) => setStopsDraft((p) => p.map((r, i) => i === idx ? { ...r, stop_name: e.target.value } : r))}
+                  required={idx === 0} />
               </div>
-              <div className="sm:col-span-4">
-                <Input
-                  label="Area / Nearby Landmark *"
-                  placeholder="e.g. Near Huda Market, Sector 14"
+              <div className="sm:col-span-3">
+                <Input label="Area / Landmark" placeholder="e.g. Near Huda Market"
                   value={row.area_landmark}
-                  onChange={(e) => {
-                    const next = [...busStopsDraft];
-                    next[idx] = { ...next[idx], area_landmark: e.target.value };
-                    setBusStopsDraft(next);
-                  }}
-                />
+                  onChange={(e) => setStopsDraft((p) => p.map((r, i) => i === idx ? { ...r, area_landmark: e.target.value } : r))} />
               </div>
               <div className="sm:col-span-2">
-                <Input
-                  label="Fare Amount (₹) *"
-                  type="number"
-                  min="1"
-                  placeholder="e.g. 1500"
+                <Input label="Fare (₹) *" type="number" min="1" placeholder="1500"
                   value={row.amount}
-                  onChange={(e) => {
-                    const next = [...busStopsDraft];
-                    next[idx] = { ...next[idx], amount: e.target.value };
-                    setBusStopsDraft(next);
-                  }}
-                  required={idx === 0}
-                />
+                  onChange={(e) => setStopsDraft((p) => p.map((r, i) => i === idx ? { ...r, amount: e.target.value } : r))}
+                  required={idx === 0} />
               </div>
               <div className="sm:col-span-2">
-                <Input
-                  label="Pickup Time"
-                  placeholder="e.g. 07:30 AM"
-                  value={row.pickup_time}
-                  onChange={(e) => {
-                    const next = [...busStopsDraft];
-                    next[idx] = { ...next[idx], pickup_time: e.target.value };
-                    setBusStopsDraft(next);
-                  }}
-                />
+                <Select label="Period"
+                  value={row.fare_period}
+                  onChange={(e) => setStopsDraft((p) => p.map((r, i) => i === idx ? { ...r, fare_period: e.target.value as FarePeriod } : r))}>
+                  {FARE_PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
+                </Select>
               </div>
               <div className="sm:col-span-1">
-                <Input
-                  label="Km"
-                  type="number"
-                  step="0.1"
-                  placeholder="4.5"
-                  value={row.distance_km}
-                  onChange={(e) => {
-                    const next = [...busStopsDraft];
-                    next[idx] = { ...next[idx], distance_km: e.target.value };
-                    setBusStopsDraft(next);
-                  }}
-                />
+                <Input label="Pickup" placeholder="07:30"
+                  value={row.pickup_time}
+                  onChange={(e) => setStopsDraft((p) => p.map((r, i) => i === idx ? { ...r, pickup_time: e.target.value } : r))} />
+              </div>
+              <div className="sm:col-span-1">
+                <Input label="Drop" placeholder="14:30"
+                  value={row.drop_time}
+                  onChange={(e) => setStopsDraft((p) => p.map((r, i) => i === idx ? { ...r, drop_time: e.target.value } : r))} />
               </div>
             </div>
           </div>
@@ -718,246 +647,177 @@ export default function AdminTransport() {
     </div>
   );
 
-  if (loading) {
-    return (
-      <DashboardLayout title="Transport">
-        <LoadingSpinner />
-      </DashboardLayout>
-    );
-  }
+  if (loading) return <DashboardLayout title="Transport"><LoadingSpinner /></DashboardLayout>;
 
+  // ─────────────────────────────────────────────────────────
+  // JSX
+  // ─────────────────────────────────────────────────────────
   return (
     <DashboardLayout title="Transport">
       <div className="space-y-6">
         <PageHeader
           title="School Transport Management"
-          description="Configure buses, routes, number of stops, and stop-wise fare amounts. Parents can view all buses and find nearby stops from their app and portal."
-          action={
-            buses.length > 0 ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  variant="outline"
-                  icon={<Plus className="h-4 w-4" />}
-                  onClick={openAddBusModal}
-                >
-                  Add Bus & Route
-                </Button>
-                <Button
-                  icon={<UserPlus className="h-4 w-4" />}
-                  onClick={() => openAssignModal()}
-                >
-                  Assign Student Transport
-                </Button>
-              </div>
-            ) : undefined
-          }
+          description="Manage buses, routes, stop-wise fares and student assignments. All data is stored in the database."
+          action={buses.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" icon={<Plus className="h-4 w-4" />} onClick={openAddBus}>
+                Add Bus & Route
+              </Button>
+              <Button icon={<UserPlus className="h-4 w-4" />} onClick={() => openAssignModal()}>
+                Assign Student
+              </Button>
+            </div>
+          ) : undefined}
         />
 
-        {/* ── STEP 1 ONBOARDING: WHEN 0 BUSES EXIST, ENTER BUS NUMBER, ROUTE & HOW MANY STOPS FIRST ── */}
+        {/* ── Onboarding ── */}
         {buses.length === 0 ? (
-          <Card className="overflow-hidden border-2 border-blue-100 p-0">
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-5 text-white">
+          <Card className="overflow-hidden border border-gray-200 p-0">
+            <div className="border-b border-gray-100 px-6 py-5">
               <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15 backdrop-blur-xs">
-                  <Bus className="h-6 w-6 text-white" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#EEF0FD]">
+                  <Bus className="h-5 w-5 text-[#5B6EE8]" />
                 </div>
                 <div>
-                  <span className="inline-block rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider">
-                    Step 1 · Bus & Route Setup
-                  </span>
-                  <h2 className="mt-0.5 text-base font-semibold">
-                    Add School Bus Number, Route & Stops
-                  </h2>
-                  <p className="text-xs text-blue-100">
-                    Enter the Bus Number, Route Name, how many stops are on this route, and each stop&apos;s name, location landmark, and fare amount (₹).
-                  </p>
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[#5B6EE8]">Step 1 · Setup</span>
+                  <h2 className="text-[15px] font-semibold text-gray-900">Add your first Bus, Route & Stops</h2>
                 </div>
               </div>
             </div>
-
-            <form onSubmit={handleSaveBusAndStops} className="p-6 space-y-5">
-              {renderBusAndStopsFormFields()}
-
+            <form onSubmit={handleSaveBus} className="p-6 space-y-5">
+              {renderStopFormFields()}
               <div className="flex justify-end pt-2 border-t border-gray-100">
-                <Button
-                  type="submit"
-                  loading={saving}
-                  icon={<ArrowRight className="h-4 w-4" />}
-                >
-                  Save Bus Route & Activate Transport
+                <Button type="submit" loading={saving} icon={<ArrowRight className="h-4 w-4" />}>
+                  Save & Activate Transport
                 </Button>
               </div>
             </form>
           </Card>
         ) : (
           <>
-            {/* ── KPI STAT CARDS ── */}
+            {/* ── Stat Cards ── */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard
-                label="Active Buses & Routes"
-                value={buses.length}
-                icon={<Bus className="h-5 w-5" />}
-                color="blue"
-              />
-              <StatCard
-                label="Total Route Stops"
-                value={stops.length}
-                icon={<MapPin className="h-5 w-5" />}
-                color="amber"
-              />
-              <StatCard
-                label="Students on Transport"
-                value={enrolledEntries.length}
-                icon={<Users className="h-5 w-5" />}
-                color="green"
-              />
-              <StatCard
-                label="Total Transport Billing"
-                value={formatCurrency(totalTransportValue)}
-                icon={<IndianRupee className="h-5 w-5" />}
-                color="purple"
-              />
+              <StatCard label="Active Buses & Routes" value={buses.length}
+                icon={<Bus className="h-5 w-5" />} color="blue" />
+              <StatCard label="Total Route Stops" value={stops.length}
+                icon={<MapPin className="h-5 w-5" />} color="amber" />
+              <StatCard label="Students on Transport" value={activeCount}
+                icon={<Users className="h-5 w-5" />} color="emerald"
+                trend={pendingCount > 0 ? `${pendingCount} pending approval` : undefined} />
+              <StatCard label="Total Transport Billing" value={formatCurrency(totalBilling)}
+                icon={<IndianRupee className="h-5 w-5" />} color="violet" />
             </div>
 
-            {/* ── SECTION 1: BUSES, ROUTES & THEIR STOPS ── */}
+            {/* ── Buses & Stops ── */}
             <div className="space-y-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                    <Bus className="h-5 w-5 text-blue-600" />
-                    School Buses, Routes & Stop-wise Fare List
-                  </h3>
-                  <p className="text-xs text-gray-500">
-                    All buses and stops below are visible to parents on the Parent App & Website with nearby stop search.
-                  </p>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  icon={<Plus className="h-3.5 w-3.5" />}
-                  onClick={openAddBusModal}
-                >
-                  Add Another Bus
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <Bus className="h-5 w-5 text-blue-600" /> Buses, Routes & Stops
+                </h3>
+                <Button size="sm" variant="outline" icon={<Plus className="h-3.5 w-3.5" />} onClick={openAddBus}>
+                  Add Bus
                 </Button>
               </div>
 
               <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                 {buses.map((bus) => {
-                  const busStudentsCount = (bus.stops || []).reduce(
-                    (acc, st) => acc + (stopStudentCounts[st.id] || 0),
-                    0
-                  );
+                  const busStudents = stops
+                    .filter((s) => s.bus_id === bus.id)
+                    .reduce((acc, s) => acc + (stopStudentCounts[s.id] || 0), 0);
+                  const capacity = bus.capacity ?? 40;
+
                   return (
                     <Card key={bus.id} className="overflow-hidden border border-gray-200 p-0">
-                      {/* Bus Header */}
-                      <div className="flex items-start justify-between gap-3 border-b border-gray-100 bg-gradient-to-r from-slate-900 to-blue-950 px-5 py-4 text-white">
+                      {/* Header */}
+                      <div className="flex items-start justify-between gap-3 border-b border-gray-100 bg-[#F8F9FF] px-5 py-4">
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-blue-500/20 border border-blue-400/30">
-                            <Bus className="h-5 w-5 text-blue-300" />
+                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[10px] bg-[#EEF0FD]">
+                            <Bus className="h-4 w-4 text-[#5B6EE8]" />
                           </div>
                           <div className="min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-semibold text-base text-white">
-                                {bus.bus_number}
-                              </h4>
-                              <span className="rounded-full bg-blue-500/30 px-2.5 py-0.5 text-[11px] font-semibold text-blue-100">
-                                {bus.stops.length} {bus.stops.length === 1 ? 'Stop' : 'Stops'}
+                              <h4 className="font-semibold text-sm text-gray-900">{bus.bus_number}</h4>
+                              <span className="rounded-full bg-[#EEF0FD] px-2.5 py-0.5 text-[11px] font-semibold text-[#5B6EE8]">
+                                {bus.stops.length} stops
                               </span>
+                              {bus.status && bus.status !== 'active' && (
+                                <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 capitalize">
+                                  {bus.status}
+                                </span>
+                              )}
                             </div>
-                            <p className="text-xs text-blue-200 truncate mt-0.5">
-                              Route: {bus.route_name}
-                            </p>
+                            <p className="text-xs text-gray-500 truncate mt-0.5">{bus.route_name}</p>
                           </div>
                         </div>
-
                         <div className="flex items-center gap-1 flex-shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => openEditBusModal(bus)}
-                            className="rounded-lg p-1.5 text-blue-200 hover:bg-white/10 hover:text-white"
-                            title="Edit Bus & Stops"
-                          >
+                          <button onClick={() => openEditBus(bus)}
+                            className="rounded-[10px] p-1.5 text-gray-400 hover:bg-[#EEF0FD] hover:text-[#5B6EE8] transition-colors" title="Edit">
                             <Pencil className="h-4 w-4" />
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteBusId(bus.id)}
-                            className="rounded-lg p-1.5 text-red-300 hover:bg-red-500/20 hover:text-red-200"
-                            title="Delete Bus"
-                          >
+                          <button onClick={() => setDeleteBusId(bus.id)}
+                            className="rounded-[10px] p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors" title="Delete">
                             <Trash2 className="h-4 w-4" />
                           </button>
                         </div>
                       </div>
 
-                      {/* Driver & Meta Bar */}
+                      {/* Driver bar */}
                       <div className="flex flex-wrap items-center justify-between gap-2 bg-gray-50 px-5 py-2.5 text-xs text-gray-600 border-b border-gray-100">
                         <div className="flex items-center gap-3">
-                          <span>
-                            Driver: <strong>{bus.driver_name || 'Assigned Staff'}</strong>
-                          </span>
+                          <span>Driver: <strong>{bus.driver_name || 'Not assigned'}</strong></span>
                           {bus.driver_phone && (
                             <span className="inline-flex items-center gap-1 text-blue-600 font-medium">
-                              <Phone className="h-3 w-3" />
-                              {bus.driver_phone}
+                              <Phone className="h-3 w-3" />{bus.driver_phone}
                             </span>
                           )}
                         </div>
-                        <Badge color={busStudentsCount > 0 ? 'blue' : 'gray'}>
-                          {busStudentsCount} {busStudentsCount === 1 ? 'Student' : 'Students'} Enrolled
+                        <Badge color={busStudents >= capacity ? 'red' : busStudents > 0 ? 'blue' : 'gray'}>
+                          {busStudents} / {capacity} seats
                         </Badge>
                       </div>
 
-                      {/* Ordered Stops Timeline */}
+                      {/* Stops */}
                       <div className="p-5 space-y-2.5">
-                        {bus.stops.map((stop, sIdx) => {
-                          const stCount = stopStudentCounts[stop.id] || 0;
-                          return (
-                            <div
-                              key={stop.id}
-                              className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white px-3.5 py-2.5 hover:border-blue-200 transition-colors"
-                            >
-                              <div className="flex items-start gap-3 min-w-0">
-                                <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700 border border-blue-200 mt-0.5">
-                                  {sIdx + 1}
-                                </div>
-                                <div className="min-w-0">
-                                  <p className="text-sm font-bold text-gray-900 truncate">
-                                    {stop.stop_name}
-                                  </p>
-                                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-500 mt-0.5">
-                                    {stop.area_landmark && (
-                                      <span className="inline-flex items-center gap-1 text-gray-600">
-                                        <Navigation className="h-3 w-3 text-blue-500" />
-                                        {stop.area_landmark}
-                                      </span>
-                                    )}
-                                    {stop.pickup_time && (
-                                      <span className="inline-flex items-center gap-1">
-                                        <Clock className="h-3 w-3 text-gray-400" />
-                                        {stop.pickup_time}
-                                      </span>
-                                    )}
-                                    {stop.distance_km !== undefined && (
-                                      <span>· {stop.distance_km} km</span>
-                                    )}
-                                  </div>
-                                </div>
+                        {bus.stops.map((stop, sIdx) => (
+                          <div key={stop.id}
+                            className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 bg-white px-3.5 py-2.5 hover:border-blue-200 transition-colors">
+                            <div className="flex items-start gap-3 min-w-0">
+                              <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 text-xs font-bold text-blue-700 border border-blue-200 mt-0.5">
+                                {sIdx + 1}
                               </div>
-
-                              <div className="flex items-center gap-2.5 flex-shrink-0">
-                                {stCount > 0 && (
-                                  <span className="text-[11px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
-                                    {stCount} stu
-                                  </span>
-                                )}
-                                <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
-                                  {formatCurrency(stop.amount)}
-                                </span>
+                              <div className="min-w-0">
+                                <p className="text-sm font-bold text-gray-900 truncate">{stop.stop_name}</p>
+                                <div className="flex flex-wrap items-center gap-2 text-[11px] text-gray-500 mt-0.5">
+                                  {stop.area_landmark && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <Navigation className="h-3 w-3 text-blue-500" />{stop.area_landmark}
+                                    </span>
+                                  )}
+                                  {stop.pickup_time && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <Clock className="h-3 w-3 text-gray-400" />↑ {stop.pickup_time}
+                                    </span>
+                                  )}
+                                  {stop.drop_time && (
+                                    <span className="inline-flex items-center gap-1">
+                                      <Clock className="h-3 w-3 text-gray-400" />↓ {stop.drop_time}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          );
-                        })}
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              {stopStudentCounts[stop.id] > 0 && (
+                                <span className="text-[11px] font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+                                  {stopStudentCounts[stop.id]} stu
+                                </span>
+                              )}
+                              <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
+                                {formatCurrency(stop.amount)} / {(stop.fare_period || 'month').toLowerCase()}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </Card>
                   );
@@ -965,45 +825,40 @@ export default function AdminTransport() {
               </div>
             </div>
 
-            {/* ── SECTION 2: PARENT APPLICATIONS & ASSIGNED STUDENTS TABLE ── */}
+            {/* ── Assignments Table ── */}
             <Card className="p-5">
               <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                    <Users className="h-4 w-4 text-blue-600" />
-                    Parent Transport Applications &amp; Assigned Students
+                    <Users className="h-4 w-4 text-blue-600" /> Parent Applications &amp; Assigned Students
                   </h3>
                   <p className="text-xs text-gray-500">
-                    When parents select a bus stop and apply for transport from the Parent App or Website, their application appears here.
+                    All assignments are stored in the database. Approve or reject pending ones.
                   </p>
                 </div>
-                <Button
-                  size="sm"
-                  icon={<UserPlus className="h-4 w-4" />}
-                  onClick={() => openAssignModal()}
-                >
-                  Assign Student to Bus Stop
+                <Button size="sm" icon={<UserPlus className="h-4 w-4" />} onClick={() => openAssignModal()}>
+                  Assign Student
                 </Button>
               </div>
 
-              <div className="mb-4 flex flex-col gap-3 sm:flex-row">
-                <SearchInput
-                  value={search}
-                  onChange={setSearch}
-                  placeholder="Search by student, admission no, bus number, or stop..."
-                  className="flex-1"
-                />
-                <div className="w-full sm:w-64">
-                  <Select
-                    value={busFilter}
-                    onChange={(e) => setBusFilter(e.target.value)}
-                  >
-                    <option value="">All Buses & Routes</option>
-                    {buses.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.bus_number} — {b.route_name}
-                      </option>
-                    ))}
+              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <div className="flex-1 min-w-0">
+                  <SearchInput value={search} onChange={setSearch} placeholder="Search student, bus, stop..." />
+                </div>
+                <div className="w-full sm:w-52">
+                  <Select value={busFilter} onChange={(e) => setBusFilter(e.target.value)}>
+                    <option value="">All Buses</option>
+                    {buses.map((b) => <option key={b.id} value={b.id}>{b.bus_number} — {b.route_name}</option>)}
+                  </Select>
+                </div>
+                <div className="w-full sm:w-36">
+                  <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                    <option value="">All Status</option>
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="active">Active</option>
+                    <option value="rejected">Rejected</option>
+                    <option value="stopped">Stopped</option>
                   </Select>
                 </div>
               </div>
@@ -1011,12 +866,7 @@ export default function AdminTransport() {
               {filteredEnrolled.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-gray-200 py-12 text-center">
                   <Bus className="mx-auto h-8 w-8 text-gray-300" />
-                  <p className="mt-2 text-sm font-medium text-gray-600">
-                    No transport applications or assigned students yet
-                  </p>
-                  <p className="mt-1 text-xs text-gray-400">
-                    Applications submitted by parents from the app or students assigned by admin will appear here.
-                  </p>
+                  <p className="mt-2 text-sm font-medium text-gray-600">No transport records found</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
@@ -1026,93 +876,79 @@ export default function AdminTransport() {
                         <th className="px-4 py-3">Student</th>
                         <th className="px-4 py-3">Class</th>
                         <th className="px-4 py-3">Bus & Route</th>
-                        <th className="px-4 py-3">Selected Bus Stop</th>
-                        <th className="px-4 py-3">Fare Amount</th>
+                        <th className="px-4 py-3">Stop</th>
+                        <th className="px-4 py-3">Fare</th>
                         <th className="px-4 py-3">Status</th>
-                        <th className="px-4 py-3">Applied / Assigned</th>
+                        <th className="px-4 py-3">Date</th>
                         <th className="px-4 py-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {filteredEnrolled.map(({ student, assignment }) => (
-                        <tr key={student.id} className="hover:bg-gray-50/60">
+                        <tr key={assignment.id || assignment.student_id} className="hover:bg-gray-50/60">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
                               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
                                 {getInitials(student.full_name)}
                               </div>
                               <div>
-                                <p className="font-semibold text-gray-900">
-                                  {student.full_name}
-                                </p>
-                                <p className="text-xs text-gray-400">
-                                  Adm: {student.admission_number}
-                                </p>
+                                <p className="font-semibold text-gray-900">{student.full_name}</p>
+                                <p className="text-xs text-gray-400">{student.admission_number}</p>
                               </div>
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-gray-600">
-                            {student.class?.name || '—'}{' '}
-                            {student.section?.name ? `(${student.section.name})` : ''}
+                          <td className="px-4 py-3 text-gray-600 text-sm">
+                            {student.class?.name || '—'}{student.section?.name ? ` (${student.section.name})` : ''}
                           </td>
                           <td className="px-4 py-3">
-                            <p className="font-semibold text-gray-900 text-xs">
-                              {assignment.bus_number || 'School Bus'}
-                            </p>
-                            <p className="text-[11px] text-gray-400">
-                              {assignment.route_name || 'Standard Route'}
-                            </p>
+                            <p className="font-semibold text-gray-900 text-xs">{assignment.bus_number || 'Bus'}</p>
+                            <p className="text-[11px] text-gray-400">{assignment.route_name || '—'}</p>
                           </td>
                           <td className="px-4 py-3">
                             <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                              <MapPin className="h-3 w-3" />
-                              {assignment.stop_name}
+                              <MapPin className="h-3 w-3" />{assignment.stop_name}
                             </span>
                           </td>
-                          <td className="px-4 py-3 font-bold text-emerald-700">
-                            {formatCurrency(assignment.amount)}
+                          <td className="px-4 py-3 font-bold text-emerald-700 text-sm">
+                            {formatCurrency(assignment.fare_snapshot?.amount ?? assignment.amount)}
+                            <span className="block text-[10px] font-normal text-gray-400">
+                              / {(assignment.fare_snapshot?.fare_period || assignment.fare_period || 'month').toLowerCase()}
+                            </span>
                           </td>
-                          <td className="px-4 py-3">
-                            {assignment.status === 'pending' ? (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-bold text-amber-800">
-                                Pending Approval
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-bold text-emerald-800">
-                                Active
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-gray-400">
-                            {formatDate(assignment.assigned_at)}
-                          </td>
+                          <td className="px-4 py-3"><StatusPill status={assignment.status} /></td>
+                          <td className="px-4 py-3 text-xs text-gray-400">{formatDate(assignment.assigned_at)}</td>
                           <td className="px-4 py-3 text-right">
-                            <div className="flex items-center justify-end gap-1.5">
+                            <div className="flex items-center justify-end gap-1.5 flex-wrap">
                               {assignment.status === 'pending' && (
-                                <Button
-                                  size="sm"
-                                  onClick={() => handleApproveApplication(student.id)}
-                                  loading={saving}
-                                >
-                                  Approve
-                                </Button>
+                                <>
+                                  <Button size="sm" onClick={() => handleApprove(assignment)} loading={saving}>
+                                    Approve
+                                  </Button>
+                                  <Button size="sm" variant="outline"
+                                    className="border-red-200 text-red-600 hover:bg-red-50"
+                                    onClick={() => { setRejectAssignmentId(assignment.id!); setRejectReason(''); }}>
+                                    Reject
+                                  </Button>
+                                </>
                               )}
-                              <button
-                                type="button"
-                                onClick={() => openAssignModal(student.id)}
-                                className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600"
-                                title="Change stop"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setRemoveStudentId(student.id)}
-                                className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
-                                title="Remove from transport"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+                              {(assignment.status === 'active' || assignment.status === 'approved') && (
+                                <>
+                                  <button onClick={() => openAssignModal(assignment)}
+                                    className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600" title="Edit stop">
+                                    <Pencil className="h-4 w-4" />
+                                  </button>
+                                  <button onClick={() => setStopAssignmentId(assignment.id!)}
+                                    className="rounded-lg p-1.5 text-gray-400 hover:bg-amber-50 hover:text-amber-600" title="Stop transport">
+                                    <Clock className="h-4 w-4" />
+                                  </button>
+                                </>
+                              )}
+                              {(assignment.status === 'rejected' || assignment.status === 'stopped') && (
+                                <button onClick={() => handleDeleteAssignment(assignment.id!)}
+                                  className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600" title="Delete record">
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1126,182 +962,144 @@ export default function AdminTransport() {
         )}
       </div>
 
-      {/* ── MODAL: ADD / EDIT BUS & STOPS ── */}
-      <Modal
-        open={busModalOpen}
-        onClose={() => setBusModalOpen(false)}
-        title={editingBus ? `Edit ${editingBus.bus_number} & Route Stops` : 'Add Bus, Route & Stops'}
-        size="lg"
-      >
-        <form onSubmit={handleSaveBusAndStops} className="space-y-4">
-          {renderBusAndStopsFormFields()}
-
+      {/* ── Add / Edit Bus Modal ── */}
+      <Modal open={busModalOpen} onClose={() => setBusModalOpen(false)}
+        title={editingBus ? `Edit ${editingBus.bus_number}` : 'Add Bus, Route & Stops'} size="xl">
+        <form onSubmit={handleSaveBus} className="space-y-4">
+          {renderStopFormFields()}
           <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setBusModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" loading={saving}>
-              {editingBus ? 'Update Bus & Stops' : 'Save Bus & Stops'}
-            </Button>
+            <Button type="button" variant="outline" onClick={() => setBusModalOpen(false)}>Cancel</Button>
+            <Button type="submit" loading={saving}>{editingBus ? 'Update' : 'Save'}</Button>
           </div>
         </form>
       </Modal>
 
-      {/* ── MODAL: ASSIGN STUDENT TO BUS & STOP ── */}
-      <Modal
-        open={assignModalOpen}
-        onClose={() => setAssignModalOpen(false)}
-        title="Assign Student to Bus & Stop"
-      >
+      {/* ── Assign Student Modal ── */}
+      <Modal open={assignModalOpen} onClose={() => setAssignModalOpen(false)}
+        title={editingAssignment ? 'Change Stop' : 'Assign Student to Transport'} size="md">
         <form onSubmit={handleAssignStudent} className="space-y-4">
-          <Select
-            label="Filter by Class (Optional)"
-            value={assignClassFilter}
-            onChange={(e) => {
-              setAssignClassFilter(e.target.value);
-              setAssignStudentId('');
-            }}
-          >
+          <Select label="Filter by Class" value={assignClassFilter}
+            onChange={(e) => { setAssignClassFilter(e.target.value); setAssignStudentId(''); }}>
             <option value="">All Classes</option>
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
+            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
-
-          <Select
-            label="Select Student *"
-            value={assignStudentId}
-            onChange={(e) => setAssignStudentId(e.target.value)}
-            required
-          >
-            <option value="">Choose a student...</option>
+          <Select label="Student *" value={assignStudentId}
+            onChange={(e) => setAssignStudentId(e.target.value)} required>
+            <option value="">Choose student...</option>
             {assignableStudents.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.full_name} ({s.admission_number}) — {s.class?.name || 'Class'}{' '}
-                {s.section?.name ? `Sec ${s.section.name}` : ''}
+                {s.full_name} ({s.admission_number}) — {s.class?.name || ''} {s.section?.name || ''}
               </option>
             ))}
           </Select>
-
-          <Select
-            label="Select Bus & Route *"
-            value={assignBusId}
-            onChange={(e) => {
-              const newBusId = e.target.value;
-              setAssignBusId(newBusId);
-              const foundBus = buses.find((b) => b.id === newBusId);
-              setAssignStopId(foundBus?.stops[0]?.id || '');
-            }}
-            required
-          >
-            {buses.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.bus_number} — {b.route_name} ({b.stops.length} stops)
-              </option>
-            ))}
+          <Select label="Bus & Route *" value={assignBusId}
+            onChange={(e) => { setAssignBusId(e.target.value); setAssignStopId(buses.find((b) => b.id === e.target.value)?.stops[0]?.id || ''); }} required>
+            {buses.map((b) => <option key={b.id} value={b.id}>{b.bus_number} — {b.route_name}</option>)}
           </Select>
-
-          <Select
-            label="Select Bus Stop *"
-            value={assignStopId}
-            onChange={(e) => setAssignStopId(e.target.value)}
-            required
-          >
-            <option value="">Choose a stop...</option>
-            {stopsForSelectedBus.map((st, idx) => (
+          <Select label="Stop *" value={assignStopId}
+            onChange={(e) => setAssignStopId(e.target.value)} required>
+            <option value="">Choose stop...</option>
+            {stopsForAssignBus.map((st, idx) => (
               <option key={st.id} value={st.id}>
-                Stop #{idx + 1}: {st.stop_name} — {formatCurrency(st.amount)}
-                {st.area_landmark ? ` (${st.area_landmark})` : ''}
+                #{idx + 1} {st.stop_name} — {formatCurrency(st.amount)}/{(st.fare_period || 'month').toLowerCase()}
               </option>
             ))}
           </Select>
 
           {selectedAssignStop && (
             <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-3.5 flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <CheckCircle2 className="h-5 w-5 text-blue-600 flex-shrink-0" />
-                <div>
-                  <p className="text-xs font-semibold text-blue-900">
-                    {selectedAssignStop.bus_number} · {selectedAssignStop.stop_name}
-                  </p>
-                  <p className="text-[11px] text-blue-700">
-                    {selectedAssignStop.area_landmark || selectedAssignStop.route_name || 'School Route'}
-                    {selectedAssignStop.pickup_time ? ` · Pickup: ${selectedAssignStop.pickup_time}` : ''}
-                  </p>
-                </div>
+              <div>
+                <p className="text-xs font-semibold text-blue-900">{selectedAssignStop.stop_name}</p>
+                <p className="text-[11px] text-blue-600">
+                  {selectedAssignStop.area_landmark}
+                  {selectedAssignStop.pickup_time ? ` · ↑ ${selectedAssignStop.pickup_time}` : ''}
+                  {selectedAssignStop.drop_time   ? ` · ↓ ${selectedAssignStop.drop_time}`   : ''}
+                </p>
               </div>
-              <span className="text-base font-semibold text-blue-900">
-                {formatCurrency(selectedAssignStop.amount)}
-              </span>
+              <div className="text-right">
+                <p className="font-semibold text-blue-900">{formatCurrency(selectedAssignStop.amount)}</p>
+                <p className="text-[10px] text-blue-500">/ {(selectedAssignStop.fare_period || 'month').toLowerCase()}</p>
+              </div>
             </div>
           )}
 
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3.5 space-y-3">
-            <label className="flex items-start gap-2.5 cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={autoCreateFee}
-                onChange={(e) => setAutoCreateFee(e.target.checked)}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              <div>
-                <p className="text-xs font-semibold text-gray-800">
-                  Also add Transport Fee ({selectedAssignStop ? formatCurrency(selectedAssignStop.amount) : '₹0'}) to Student&apos;s Fee Records
-                </p>
-                <p className="text-[11px] text-gray-500">
-                  Automatically creates a transport fee invoice so parents can pay it Monthly, Quarterly, or Annually.
-                </p>
-              </div>
-            </label>
+          <Input label="Start Date" type="date" value={assignStartDate}
+            onChange={(e) => setAssignStartDate(e.target.value)} />
 
-            {autoCreateFee && (
-              <Input
-                label="Transport Fee Due Date"
-                type="date"
-                value={assignDueDate}
-                onChange={(e) => setAssignDueDate(e.target.value)}
-              />
-            )}
-          </div>
+          {!editingAssignment && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3.5 space-y-3">
+              <label className="flex items-start gap-2.5 cursor-pointer">
+                <input type="checkbox" checked={autoCreateFee}
+                  onChange={(e) => setAutoCreateFee(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600" />
+                <div>
+                  <p className="text-xs font-semibold text-gray-800">
+                    Create Transport Fee record ({selectedAssignStop ? `${formatCurrency(selectedAssignStop.amount)}/${(selectedAssignStop.fare_period || 'month').toLowerCase()}` : '—'})
+                  </p>
+                  <p className="text-[11px] text-gray-500">Creates an invoice in the Fees module.</p>
+                </div>
+              </label>
+              {autoCreateFee && (
+                <Input label="Fee Due Date" type="date" value={assignDueDate}
+                  onChange={(e) => setAssignDueDate(e.target.value)} />
+              )}
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setAssignModalOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" loading={saving}>
-              Save Assignment
-            </Button>
+            <Button type="button" variant="outline" onClick={() => setAssignModalOpen(false)}>Cancel</Button>
+            <Button type="submit" loading={saving}>{editingAssignment ? 'Update' : 'Assign'}</Button>
           </div>
         </form>
       </Modal>
 
-      {/* ── CONFIRM DELETE BUS ── */}
+      {/* ── Reject Modal ── */}
+      <Modal open={Boolean(rejectAssignmentId)} onClose={() => setRejectAssignmentId(null)}
+        title="Reject Transport Application" size="sm">
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 p-3">
+            <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-amber-800">
+              The parent will be notified with the reason via Notifications.
+            </p>
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">Rejection Reason *</label>
+            <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} rows={3}
+              placeholder="e.g. Bus is full for this route. Please select another stop."
+              className="w-full rounded-[10px] border border-gray-200 px-3.5 py-2.5 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25" />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setRejectAssignmentId(null)}>Cancel</Button>
+            <Button loading={saving} onClick={handleConfirmReject}
+              className="bg-red-600 hover:bg-red-700 text-white border-0">
+              Confirm Reject
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ── Stop Transport Confirm ── */}
+      <ConfirmDialog
+        open={Boolean(stopAssignmentId)}
+        onClose={() => setStopAssignmentId(null)}
+        onConfirm={handleConfirmStopTransport}
+        title="Stop Student Transport"
+        message="Mark this transport assignment as stopped? Existing fee records will not be deleted."
+        confirmText="Stop Transport"
+        variant="danger"
+        loading={saving}
+      />
+
+      {/* ── Delete Bus Confirm ── */}
       <ConfirmDialog
         open={Boolean(deleteBusId)}
         onClose={() => setDeleteBusId(null)}
         onConfirm={handleConfirmDeleteBus}
         title="Delete Bus & Route"
-        message="Are you sure you want to delete this bus and all stops on its route? Students assigned to this bus will be unassigned."
-        loading={saving}
-      />
-
-      {/* ── CONFIRM REMOVE STUDENT ── */}
-      <ConfirmDialog
-        open={Boolean(removeStudentId)}
-        onClose={() => setRemoveStudentId(null)}
-        onConfirm={handleConfirmRemoveStudent}
-        title="Remove Student from Transport"
-        message="Are you sure you want to remove this student from school transport?"
+        message="Delete this bus and all its stops? Students must have no active assignments on this bus."
+        confirmText="Delete"
+        variant="danger"
         loading={saving}
       />
     </DashboardLayout>

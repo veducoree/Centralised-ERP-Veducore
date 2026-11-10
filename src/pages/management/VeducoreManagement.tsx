@@ -1,14 +1,13 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Building2, Users, GraduationCap, BarChart3, Eye, EyeOff,
-  Upload, CheckCircle, Plus, ChevronDown, ChevronRight, ChevronLeft, Globe,
-  LogOut, TrendingUp, Loader2, AlertCircle, ShieldCheck,
+  Upload, CheckCircle, Plus, ChevronDown, ChevronRight, ChevronLeft, LogOut, TrendingUp, Loader2, AlertCircle, ShieldCheck,
   Key, Copy, Check, Trash2, RefreshCw, Search,
   School, Activity, KeyRound, AlertTriangle, X,
   Lock, Phone, Mail, MapPin, Calendar, Sparkles,
   ArrowUpRight, ShieldAlert, Layers, Contact2, Printer,
-  Download, Filter, Palette, Sliders, Image as ImageIcon,
-  FileText, CheckCircle2, UserCheck, UserX
+  Palette, Image as ImageIcon,
+  FileText, CheckCircle2, UserX
 } from 'lucide-react';
 import veducoreLogo from '@/assets/veducore-logo.png';
 
@@ -41,9 +40,11 @@ async function callManageSchools(body: Record<string, unknown>) {
 
 function generateRandomPassword(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789!@#$%&*';
+  const bytes = new Uint32Array(12);
+  crypto.getRandomValues(bytes);
   let pw = '';
   for (let i = 0; i < 12; i++) {
-    pw += chars.charAt(Math.floor(Math.random() * chars.length));
+    pw += chars.charAt(bytes[i] % chars.length);
   }
   return pw;
 }
@@ -353,6 +354,44 @@ function AuthScreen({ onLogin }: { onLogin: (fullName: string) => void }) {
 
 // ── Interactive Charts & Meaningful Insights Dashboard (Clean White) ─────────
 
+const STAT_TONES = {
+  indigo:  { grad: 'from-indigo-500 to-indigo-400',   circle: 'bg-indigo-100/70',  glow: 'shadow-indigo-500/30' },
+  cyan:    { grad: 'from-cyan-500 to-cyan-400',       circle: 'bg-cyan-100/70',    glow: 'shadow-cyan-500/30' },
+  amber:   { grad: 'from-amber-500 to-amber-400',     circle: 'bg-amber-100/70',   glow: 'shadow-amber-500/30' },
+  emerald: { grad: 'from-emerald-500 to-emerald-400', circle: 'bg-emerald-100/70', glow: 'shadow-emerald-500/30' },
+} as const;
+
+function StatCard({
+  label, value, badge, icon, tone, footerLeft, footerRight,
+}: {
+  label: string;
+  value: React.ReactNode;
+  badge?: React.ReactNode;
+  icon: React.ReactNode;
+  tone: keyof typeof STAT_TONES;
+  footerLeft: React.ReactNode;
+  footerRight?: React.ReactNode;
+}) {
+  const t = STAT_TONES[tone];
+  return (
+    <div className="relative overflow-hidden rounded-3xl bg-white p-6 shadow-sm shadow-slate-200/70">
+      <div className={`absolute -top-10 -right-10 h-32 w-32 rounded-full ${t.circle}`} />
+      <div className={`relative flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${t.grad} text-white shadow-lg ${t.glow}`}>
+        {icon}
+      </div>
+      <div className="relative mt-5 flex items-baseline gap-2">
+        <span className="text-3xl font-bold text-slate-900">{value}</span>
+        {badge}
+      </div>
+      <p className="relative mt-1 text-sm text-slate-500">{label}</p>
+      <div className="relative mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs text-slate-500">
+        {footerLeft}
+        {footerRight}
+      </div>
+    </div>
+  );
+}
+
 function OverviewDashboard({
   schools,
   analytics,
@@ -396,7 +435,7 @@ function OverviewDashboard({
   return (
     <div className="space-y-6">
       {/* Top Banner (Clean White with subtle border) */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="flex h-2 w-2 rounded-full bg-green-500" />
@@ -430,7 +469,7 @@ function OverviewDashboard({
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 shadow-2xs space-y-3">
+              <div key={i} className="bg-white rounded-3xl border border-slate-100 p-5 shadow-2xs space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="skeleton-shimmer h-3.5 w-24 rounded-md" />
                   <div className="skeleton-shimmer h-10 w-10 rounded-lg" />
@@ -440,7 +479,7 @@ function OverviewDashboard({
               </div>
             ))}
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+          <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4">
             <div className="skeleton-shimmer h-4 w-48 rounded-md" />
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, i) => (
@@ -452,88 +491,53 @@ function OverviewDashboard({
       ) : (
         <>
           {/* KPI Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Total Schools */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Registered Schools</span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-              <Building2 className="h-5 w-5" />
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <StatCard
+              tone="indigo"
+              label="Registered Schools"
+              icon={<Building2 className="h-6 w-6" />}
+              value={schools.length}
+              badge={<span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">{activeSchools} Active</span>}
+              footerLeft={<span>{inactiveSchools} inactive</span>}
+              footerRight={
+                <button onClick={onNavigateToSchools} className="inline-flex items-center gap-0.5 font-medium text-indigo-600 hover:underline">
+                  View all <ArrowUpRight className="h-3 w-3" />
+                </button>
+              }
+            />
+            <StatCard
+              tone="cyan"
+              label="Enrolled Students"
+              icon={<Users className="h-6 w-6" />}
+              value={totalStudents.toLocaleString('en-IN')}
+              badge={<span className="text-xs text-slate-400">total</span>}
+              footerLeft={<span>Avg {schools.length > 0 ? Math.round(totalStudents / schools.length) : 0} per school</span>}
+              footerRight={<span className="font-medium text-indigo-600">Live</span>}
+            />
+            <StatCard
+              tone="amber"
+              label="Teachers & Faculty"
+              icon={<GraduationCap className="h-6 w-6" />}
+              value={totalTeachers.toLocaleString('en-IN')}
+              badge={<span className="text-xs text-slate-400">teachers</span>}
+              footerLeft={<span>Ratio: {ratio} : 1</span>}
+              footerRight={<span className="font-medium text-indigo-600">{totalClasses} Classes</span>}
+            />
+            <StatCard
+              tone="emerald"
+              label="Backend System"
+              icon={<Activity className="h-6 w-6" />}
+              value="100%"
+              badge={<span className="text-xs font-medium text-emerald-600">Healthy</span>}
+              footerLeft={<span>Postgres + Edge Functions</span>}
+              footerRight={<span className="font-mono text-[11px] text-emerald-700">RLS Active</span>}
+            />
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-gray-900">{schools.length}</span>
-            <span className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
-              {activeSchools} Active
-            </span>
-          </div>
-          <div className="mt-3 flex items-center justify-between text-xs text-gray-500 border-t border-gray-100 pt-2.5">
-            <span>{inactiveSchools} inactive</span>
-            <button onClick={onNavigateToSchools} className="text-blue-600 font-medium hover:underline inline-flex items-center gap-0.5">
-              View all <ArrowUpRight className="h-3 w-3" />
-            </button>
-          </div>
-        </div>
-
-        {/* Card 2: Total Students */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Enrolled Students</span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-              <Users className="h-5 w-5" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-gray-900">{totalStudents.toLocaleString('en-IN')}</span>
-            <span className="text-xs text-gray-400">total</span>
-          </div>
-          <div className="mt-3 flex items-center justify-between text-xs text-gray-500 border-t border-gray-100 pt-2.5">
-            <span>Avg {schools.length > 0 ? Math.round(totalStudents / schools.length) : 0} per school</span>
-            <span className="text-blue-600 font-medium">Live</span>
-          </div>
-        </div>
-
-        {/* Card 3: Teachers & Ratio */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Teachers & Faculty</span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
-              <GraduationCap className="h-5 w-5" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-gray-900">{totalTeachers.toLocaleString('en-IN')}</span>
-            <span className="text-xs text-gray-400">teachers</span>
-          </div>
-          <div className="mt-3 flex items-center justify-between text-xs text-gray-500 border-t border-gray-100 pt-2.5">
-            <span>Ratio: {ratio} : 1</span>
-            <span className="text-blue-600 font-medium">{totalClasses} Classes</span>
-          </div>
-        </div>
-
-        {/* Card 4: Platform Health */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-gray-500">Backend System</span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-green-50 text-green-600">
-              <Activity className="h-5 w-5" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-gray-900">100%</span>
-            <span className="text-xs font-medium text-green-600">Healthy</span>
-          </div>
-          <div className="mt-3 flex items-center justify-between text-xs text-gray-500 border-t border-gray-100 pt-2.5">
-            <span>Postgres + Edge Functions</span>
-            <span className="text-green-700 font-mono text-[11px]">RLS Active</span>
-          </div>
-        </div>
-      </div>
 
       {/* Meaningful Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Chart 1: School Growth & Onboarding Timeline */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+        <div className="lg:col-span-2 bg-white rounded-3xl border border-slate-100 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
@@ -603,7 +607,7 @@ function OverviewDashboard({
         </div>
 
         {/* Chart 2: Academic Year & Distribution */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm flex flex-col justify-between">
+        <div className="bg-white rounded-3xl border border-slate-100 p-6 shadow-sm flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
@@ -770,7 +774,7 @@ Use these credentials to sign into the Veducore Admin Dashboard.`;
       )}
 
       {/* Search and Filters Toolbar (Clean White) */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div className="bg-white rounded-3xl border border-slate-100 p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
         <div className="relative w-full sm:w-80">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
@@ -803,7 +807,7 @@ Use these credentials to sign into the Veducore Admin Dashboard.`;
         <div className="space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="bg-white rounded-xl border border-gray-200 p-5 shadow-2xs space-y-3">
+              <div key={i} className="bg-white rounded-3xl border border-slate-100 p-5 shadow-2xs space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="skeleton-shimmer h-3.5 w-24 rounded-md" />
                   <div className="skeleton-shimmer h-10 w-10 rounded-lg" />
@@ -813,7 +817,7 @@ Use these credentials to sign into the Veducore Admin Dashboard.`;
               </div>
             ))}
           </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-4">
+          <div className="bg-white rounded-3xl border border-slate-100 p-6 space-y-4">
             <div className="skeleton-shimmer h-4 w-48 rounded-md" />
             <div className="space-y-3">
               {Array.from({ length: 4 }).map((_, i) => (
@@ -825,7 +829,7 @@ Use these credentials to sign into the Veducore Admin Dashboard.`;
       ) : (
         <div className="space-y-4">
           {filteredSchools.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+          <div className="bg-white rounded-3xl border border-slate-100 p-12 text-center">
             <School className="h-10 w-10 text-gray-300 mx-auto mb-3" />
             <h3 className="text-sm font-bold text-gray-700">No schools match your search</h3>
             <p className="text-xs text-gray-400 mt-1">Try adjusting the filter or search keyword.</p>
@@ -853,7 +857,13 @@ Use these credentials to sign into the Veducore Admin Dashboard.`;
 
                       {/* Status toggle badge */}
                       <button
-                        onClick={() => onStatusToggle(school.id, school.status)}
+                        onClick={() => {
+                          if (
+                            school.status === 'Active' &&
+                            !window.confirm(`Deactivate "${school.name}"? Its admin and users may lose access.`)
+                          ) return;
+                          onStatusToggle(school.id, school.status);
+                        }}
                         title="Click to toggle status"
                         className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors ${
                           school.status === 'Active'
@@ -1120,7 +1130,7 @@ Use these credentials to sign into the Veducore Admin Dashboard.`;
 
                       {/* ── SCHOOL DETAILED SPECS & SERVICES ── */}
                       <div className="space-y-4">
-                        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+                        <div className="bg-white rounded-3xl border border-slate-100 p-5 space-y-3">
                           <h4 className="text-sm font-bold text-gray-900 border-b border-gray-100 pb-2">
                             Institutional Profile
                           </h4>
@@ -1585,9 +1595,11 @@ function StudentIdCardCard({
 function IdCardsSection({
   schools,
   onNavigateToSchools,
+  onTemplateSaved,
 }: {
   schools: SchoolRecord[];
   onNavigateToSchools: () => void;
+  onTemplateSaved?: () => void;
 }) {
   // If null, shows the registered schools directory. When selected, enters school's ID Card Studio.
   const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(null);
@@ -1627,18 +1639,15 @@ function IdCardsSection({
   const currentSchool = schools.find(s => s.id === selectedSchoolId) || null;
 
   // Check whether school has a template configured
-  const hasConfiguredTemplate = Boolean(
-    templateSaved ||
-    templateConfig.customBackgroundUrl ||
-    currentSchool?.idCardTemplateUrl ||
-    (currentSchool?.idCardConfig && Object.keys(currentSchool.idCardConfig).length > 0)
-  );
+  const hasConfiguredTemplate = templateSaved;
 
   // Fetch school data when a school is selected
   useEffect(() => {
     if (!selectedSchoolId) {
       setSchoolData({ students: [], metrics: null, classes: [], sections: [] });
+      setTemplateConfig(DEFAULT_TEMPLATE_CONFIG);
       setTemplateSaved(false);
+      setFetchError('');
       return;
     }
 
@@ -1647,6 +1656,9 @@ function IdCardsSection({
     async function fetchCards() {
       setLoadingCards(true);
       setFetchError('');
+      setSchoolData({ students: [], metrics: null, classes: [], sections: [] });
+      setTemplateConfig(DEFAULT_TEMPLATE_CONFIG);
+      setTemplateSaved(false);
       try {
         const res = await callManageSchools({
           action: 'get-school-id-cards',
@@ -1771,6 +1783,7 @@ function IdCardsSection({
 
       if (res.error) throw new Error(res.error);
       setTemplateSaved(true);
+      onTemplateSaved?.();
       setSaveMessage('ID Card template saved! All student cards will generate according to this template.');
       setTimeout(() => {
         setSaveMessage(null);
@@ -1799,7 +1812,7 @@ function IdCardsSection({
     return (
       <div className="space-y-6">
         {/* Header */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-3">
+        <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
@@ -1831,7 +1844,7 @@ function IdCardsSection({
 
         {/* Schools Cards Grid */}
         {filteredSchools.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-200 p-12 text-center max-w-lg mx-auto shadow-sm">
+          <div className="bg-white rounded-3xl border border-slate-100 p-12 text-center max-w-lg mx-auto shadow-sm">
             <School className="h-12 w-12 text-gray-300 mx-auto mb-3" />
             <h3 className="text-base font-bold text-gray-900">No School Found</h3>
             <p className="text-xs text-gray-500 mt-1 mb-4">
@@ -1856,7 +1869,7 @@ function IdCardsSection({
               return (
                 <div
                   key={school.id}
-                  className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md hover:border-blue-200 transition-all flex flex-col justify-between space-y-4"
+                  className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm hover:shadow-md hover:border-blue-200 transition-all flex flex-col justify-between space-y-4"
                 >
                   <div className="space-y-3">
                     <div className="flex items-start justify-between gap-3">
@@ -1961,7 +1974,7 @@ function IdCardsSection({
       `}</style>
 
       {/* ── TOP BREADCRUMB & SCHOOL HEADER ── */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-3">
+      <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
@@ -2000,6 +2013,19 @@ function IdCardsSection({
         </div>
       </div>
 
+      {fetchError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs font-medium text-red-700 flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+          <span>{fetchError}</span>
+        </div>
+      )}
+      {loadingCards && (
+        <div className="rounded-3xl border border-slate-100 bg-white p-4 text-xs font-medium text-gray-600 flex items-center gap-2">
+          <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+          <span>Loading students and template...</span>
+        </div>
+      )}
+
       {/* ── CONDITIONAL FLOW: IF NO TEMPLATE CONFIGURED YET -> GUIDED STEP 1 ── */}
       {!hasConfiguredTemplate ? (
         <div className="space-y-6">
@@ -2020,7 +2046,7 @@ function IdCardsSection({
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
               {/* Custom Artwork Upload */}
-              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-4">
+              <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm space-y-4">
                 <div>
                   <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                     <Upload className="h-4 w-4 text-blue-600" />
@@ -2083,7 +2109,7 @@ function IdCardsSection({
               </div>
 
               {/* Built-in Presets */}
-              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-4">
+              <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm space-y-4">
                 <div>
                   <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                     <Palette className="h-4 w-4 text-blue-600" />
@@ -2133,7 +2159,7 @@ function IdCardsSection({
               </div>
 
               {/* Orientation & Toggles */}
-              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-4">
+              <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm space-y-4">
                 <div className="flex items-center gap-3">
                   <span className="text-xs font-semibold text-gray-700 min-w-[120px]">
                     Orientation:
@@ -2227,7 +2253,7 @@ function IdCardsSection({
 
             {/* Right: Preview Card */}
             <div className="space-y-4">
-              <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-3">
+              <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm space-y-3">
                 <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                   <Eye className="h-4 w-4 text-blue-600" />
                   Live Template Preview
@@ -2236,7 +2262,7 @@ function IdCardsSection({
                   Real-time preview of how student ID cards will look with this template.
                 </p>
 
-                <div className="flex justify-center p-4 bg-gray-50 rounded-xl border border-gray-200">
+                <div className="flex justify-center p-4 bg-gray-50 rounded-3xl border border-slate-100">
                   <StudentIdCardCard
                     student={PREVIEW_PLACEHOLDER_STUDENT}
                     school={currentSchool}
@@ -2252,7 +2278,7 @@ function IdCardsSection({
         <div className="space-y-6">
           {/* Readiness Metrics Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-3">
+            <div className="bg-white rounded-3xl border border-slate-100 p-4 shadow-sm flex items-center gap-3">
               <div className="h-10 w-10 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
                 <Users className="h-5 w-5" />
               </div>
@@ -2263,7 +2289,7 @@ function IdCardsSection({
               </div>
             </div>
 
-            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-3">
+            <div className="bg-white rounded-3xl border border-slate-100 p-4 shadow-sm flex items-center gap-3">
               <div className={`h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
                 missingPhotoCount === 0 && totalStudents > 0 ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'
               }`}>
@@ -2295,7 +2321,7 @@ function IdCardsSection({
               </div>
             </div>
 
-            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-3">
+            <div className="bg-white rounded-3xl border border-slate-100 p-4 shadow-sm flex items-center gap-3">
               <div className={`h-10 w-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
                 incompleteInfoCount === 0 && totalStudents > 0 ? 'bg-indigo-50 text-indigo-600' : 'bg-orange-50 text-orange-600'
               }`}>
@@ -2327,7 +2353,7 @@ function IdCardsSection({
               </div>
             </div>
 
-            <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-center gap-3">
+            <div className="bg-white rounded-3xl border border-slate-100 p-4 shadow-sm flex items-center gap-3">
               <div className="h-10 w-10 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
                 <Printer className="h-5 w-5" />
               </div>
@@ -2387,7 +2413,7 @@ function IdCardsSection({
           {activeTab === 'batch' && (
             <div className="space-y-4">
               {/* Controls bar */}
-              <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
+              <div className="bg-white rounded-3xl border border-slate-100 p-4 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-3">
                 <div className="flex items-center gap-2 flex-1 flex-wrap">
                   <div className="relative flex-1 min-w-[200px] max-w-sm">
                     <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
@@ -2472,9 +2498,9 @@ function IdCardsSection({
               </div>
 
               {/* 10-Students Batch Sheet Container */}
-              <div className="bg-gray-50/60 rounded-xl border border-gray-200 p-6">
+              <div className="bg-gray-50/60 rounded-3xl border border-slate-100 p-6">
                 {filteredStudents.length === 0 ? (
-                  <div className="bg-white rounded-xl border border-gray-200 p-12 text-center max-w-md mx-auto shadow-sm space-y-3">
+                  <div className="bg-white rounded-3xl border border-slate-100 p-12 text-center max-w-md mx-auto shadow-sm space-y-3">
                     <div className="h-12 w-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mx-auto">
                       <Users className="h-6 w-6" />
                     </div>
@@ -2557,7 +2583,7 @@ function IdCardsSection({
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-6">
                 {/* Custom Artwork */}
-                <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-4">
+                <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm space-y-4">
                   <div>
                     <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                       <Upload className="h-4 w-4 text-blue-600" />
@@ -2620,7 +2646,7 @@ function IdCardsSection({
                 </div>
 
                 {/* Built-in Presets */}
-                <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-4">
+                <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm space-y-4">
                   <div>
                     <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                       <Palette className="h-4 w-4 text-blue-600" />
@@ -2670,7 +2696,7 @@ function IdCardsSection({
                 </div>
 
                 {/* Orientation & Toggles */}
-                <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-4">
+                <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm space-y-4">
                   <div className="flex items-center gap-3">
                     <span className="text-xs font-semibold text-gray-700 min-w-[120px]">
                       Orientation:
@@ -2763,7 +2789,7 @@ function IdCardsSection({
 
               {/* Right: Live Preview */}
               <div className="space-y-4">
-                <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm space-y-3">
+                <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm space-y-3">
                   <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
                     <Eye className="h-4 w-4 text-blue-600" />
                     Live Template Preview
@@ -2772,7 +2798,7 @@ function IdCardsSection({
                     Sample preview reflecting your current template settings.
                   </p>
 
-                  <div className="flex justify-center p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <div className="flex justify-center p-4 bg-gray-50 rounded-3xl border border-slate-100">
                     <StudentIdCardCard
                       student={PREVIEW_PLACEHOLDER_STUDENT}
                       school={currentSchool}
@@ -2786,7 +2812,7 @@ function IdCardsSection({
 
           {/* ── TAB 3: STUDENT PHOTO & INFO INSPECTOR ── */}
           {activeTab === 'inspector' && (
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
               <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="text-sm font-bold text-gray-900">
@@ -2907,7 +2933,7 @@ function IdCardsSection({
               </button>
             </div>
 
-            <div className="flex justify-center py-4 bg-gray-50 rounded-xl border border-gray-200">
+            <div className="flex justify-center py-4 bg-gray-50 rounded-3xl border border-slate-100">
               <StudentIdCardCard
                 student={zoomedStudent}
                 school={currentSchool}
@@ -2984,7 +3010,7 @@ function AddSchoolSection({ onAdd }: { onAdd: (school: SchoolRecord) => void }) 
           },
           body: JSON.stringify({
             name: form.name.trim(),
-            address: form.address || form.city || undefined,
+            address: [form.address, form.city].filter(Boolean).join(', ') || undefined,
             contact_number: form.contactNumber || undefined,
             email: form.email.trim(),
             academic_year: form.academicYear || '2026-27',
@@ -3082,7 +3108,7 @@ function AddSchoolSection({ onAdd }: { onAdd: (school: SchoolRecord) => void }) 
         </div>
       )}
 
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6 sm:p-8">
+      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 sm:p-8">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
@@ -3265,8 +3291,6 @@ export default function VeducoreManagement() {
   const [deletingSchool, setDeletingSchool] = useState<SchoolRecord | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // Template override state
-  const [idCardTemplates, setIdCardTemplates] = useState<Record<string, string>>({});
 
   async function loadData() {
     setLoading(true);
@@ -3382,105 +3406,111 @@ export default function VeducoreManagement() {
 
   const schoolsWithTemplates = schools.map(s => ({
     ...s,
-    idCardTemplate: idCardTemplates[s.id] || s.idCardTemplate,
+    idCardTemplate: s.idCardTemplate,
   }));
 
   const navItems: { id: Section; label: string; icon: React.ReactNode }[] = [
-    { id: 'overview', label: 'Dashboard & Insights', icon: <BarChart3 className="h-4 w-4" /> },
-    { id: 'schools', label: 'Schools & Credentials', icon: <Building2 className="h-4 w-4" /> },
-    { id: 'id-cards', label: 'ID Card', icon: <Contact2 className="h-4 w-4" /> },
-    { id: 'add-school', label: 'Add New School', icon: <Plus className="h-4 w-4" /> },
+    { id: 'overview', label: 'Dashboard & Insights', icon: <BarChart3 className="h-5 w-5" /> },
+    { id: 'schools', label: 'Schools & Credentials', icon: <Building2 className="h-5 w-5" /> },
+    { id: 'id-cards', label: 'ID Card', icon: <Contact2 className="h-5 w-5" /> },
+    { id: 'add-school', label: 'Add New School', icon: <Plus className="h-5 w-5" /> },
   ];
 
+  const initials =
+    adminName.split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase() || 'A';
+
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar (Clean White Style) */}
-      <aside className="w-72 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col min-h-screen sticky top-0 h-screen select-none">
-        {/* Brand Header */}
-        <div className="flex items-center gap-2.5 h-16 px-5 border-b border-gray-200">
+    <div className="min-h-screen bg-[#f3f4fb] flex">
+      {/* Sidebar */}
+      <aside className="w-72 flex-shrink-0 bg-white border-r border-slate-100 flex flex-col h-screen sticky top-0 select-none">
+        <div className="flex items-center gap-2.5 h-20 px-6 border-b border-slate-100">
           <img src={veducoreLogo} alt="Veducore" className="h-6 w-auto object-contain" />
-          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Management</span>
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Management</span>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 px-3 py-4">
-          <ul className="space-y-1">
-            {navItems.map(item => (
-              <li key={item.id}>
-                <button
-                  type="button"
-                  onClick={() => setActiveSection(item.id)}
-                  className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors whitespace-nowrap flex-nowrap ${
-                    activeSection === item.id
-                      ? 'bg-blue-50 text-blue-700 font-semibold'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  <span className="flex-shrink-0">{item.icon}</span>
-                  <span className="whitespace-nowrap flex-shrink-0">{item.label}</span>
-                  {item.id === 'schools' && schools.length > 0 && (
-                    <span className="ml-auto text-[11px] font-semibold bg-blue-100 text-blue-700 rounded-full px-2 py-0.5 flex-shrink-0">
-                      {schools.length}
-                    </span>
-                  )}
-                  {item.id === 'id-cards' && (
-                    <span className="ml-auto text-[10px] font-bold bg-green-100 text-green-700 rounded-full px-2 py-0.5 flex-shrink-0">
-                      10/page
-                    </span>
-                  )}
-                </button>
-              </li>
-            ))}
+        <nav className="flex-1 overflow-y-auto px-4 py-5">
+          <ul className="space-y-1.5">
+            {navItems.map(item => {
+              const active = activeSection === item.id;
+              return (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveSection(item.id)}
+                    className={`flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-[15px] font-medium transition-all whitespace-nowrap ${
+                      active
+                        ? 'bg-gradient-to-r from-indigo-500 to-indigo-400 text-white shadow-lg shadow-indigo-500/30'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                    }`}
+                  >
+                    <span className="flex-shrink-0">{item.icon}</span>
+                    <span>{item.label}</span>
+                    {item.id === 'schools' && schools.length > 0 && (
+                      <span className={`ml-auto rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        active ? 'bg-white/25 text-white' : 'bg-indigo-50 text-indigo-600'
+                      }`}>
+                        {schools.length}
+                      </span>
+                    )}
+                    {item.id === 'id-cards' && (
+                      <span className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        active ? 'bg-white/25 text-white' : 'bg-emerald-50 text-emerald-700'
+                      }`}>
+                        10/page
+                      </span>
+                    )}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </nav>
 
-        {/* User Profile & Logout */}
-        <div className="border-t border-gray-200 p-3 space-y-1">
-          <div className="px-3 py-2 flex items-center gap-2">
-            <div className="h-7 w-7 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">
-              {adminName.charAt(0) || 'A'}
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-gray-900 truncate">{adminName || 'Superadmin'}</p>
-              <p className="text-[10px] text-gray-400 truncate">Veducore Admin</p>
-            </div>
-          </div>
-
+        <div className="border-t border-slate-100 p-4 space-y-3">
           <button
             onClick={handleLogout}
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors"
+            className="flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-[15px] font-medium text-slate-600 hover:bg-red-50 hover:text-red-600 transition-colors"
           >
-            <LogOut className="h-4 w-4" />
+            <LogOut className="h-5 w-5" />
             Sign Out
           </button>
+          <div className="px-4">
+            <img src={veducoreLogo} alt="Veducore" className="h-5 w-auto object-contain" />
+            <p className="mt-1 text-xs text-slate-400">Powered by Veducore</p>
+          </div>
         </div>
       </aside>
 
-      {/* Main Body */}
+      {/* Main */}
       <main className="flex-1 min-w-0 flex flex-col min-h-screen">
-        {/* Top Navbar (Clean White) */}
-        <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 sticky top-0 z-10">
-          <h1 className="text-lg font-semibold text-gray-900">
+        <header className="flex items-center justify-between gap-4 px-8 pt-6 pb-2">
+          <h1 className="text-[26px] font-bold text-slate-900 tracking-tight truncate">
             {activeSection === 'overview' && 'Main Executive Dashboard & Insights'}
             {activeSection === 'schools' && 'Schools Directory & Admin Credentials'}
             {activeSection === 'id-cards' && 'ID Card Management & Batch Sheet Generator'}
             {activeSection === 'add-school' && 'Onboard New School Instance'}
           </h1>
 
-          <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 border border-green-200 px-2.5 py-1 text-xs font-medium text-green-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-green-500 animate-pulse" />
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <span className="hidden md:inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Connected to Production
             </span>
-            <div className="flex items-center gap-1.5 text-xs text-gray-500">
-              <Globe className="h-3.5 w-3.5" />
-              {adminName || 'Veducore Admin'}
+            <div className="flex items-center gap-3 rounded-2xl bg-white py-2 pl-2 pr-4 shadow-sm shadow-slate-200/70">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-400 text-sm font-bold text-white">
+                {initials}
+              </div>
+              <div className="leading-tight">
+                <p className="text-sm font-semibold text-slate-900">{adminName || 'Superadmin'}</p>
+                <p className="text-xs text-slate-400">Veducore Admin</p>
+              </div>
+              <ChevronDown className="h-4 w-4 text-slate-400" />
             </div>
           </div>
         </header>
 
         {/* Content Area */}
-        <div className="p-6 flex-1 space-y-4">
+        <div className="px-8 pb-8 pt-4 flex-1 space-y-4">
           {fetchError && !loading && (
             <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs font-medium text-red-700 flex items-center gap-2">
               <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
@@ -3514,6 +3544,7 @@ export default function VeducoreManagement() {
             <IdCardsSection
               schools={schoolsWithTemplates}
               onNavigateToSchools={() => setActiveSection('schools')}
+              onTemplateSaved={loadData}
             />
           )}
 

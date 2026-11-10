@@ -512,8 +512,7 @@ export default function AdminFees() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="h-[42px] rounded-xl border border-gray-200 bg-white px-3 pr-8 text-sm text-gray-700 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 sm:w-44 appearance-none bg-no-repeat"
-                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundPosition: 'right 12px center' }}
+                className="h-10 w-full sm:w-44 rounded-[10px] border border-gray-200 bg-white px-3 pr-9 text-sm text-gray-700 transition-colors focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25 appearance-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2712%27%20height%3D%2712%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%239ca3af%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpolyline%20points%3D%276%209%2012%2015%2018%209%27%3E%3C/polyline%3E%3C/svg%3E')] bg-no-repeat bg-[right_12px_center]"
               >
                 <option value="">All Status</option>
                 <option value="paid">Paid</option>
@@ -524,8 +523,7 @@ export default function AdminFees() {
               <select
                 value={methodFilter}
                 onChange={(e) => setMethodFilter(e.target.value as MethodFilter)}
-                className="h-[42px] rounded-xl border border-gray-200 bg-white px-3 pr-8 text-sm text-gray-700 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 sm:w-44 appearance-none bg-no-repeat"
-                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundPosition: 'right 12px center' }}
+                className="h-10 w-full sm:w-44 rounded-[10px] border border-gray-200 bg-white px-3 pr-9 text-sm text-gray-700 transition-colors focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25 appearance-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2712%27%20height%3D%2712%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%239ca3af%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpolyline%20points%3D%276%209%2012%2015%2018%209%27%3E%3C/polyline%3E%3C/svg%3E')] bg-no-repeat bg-[right_12px_center]"
               >
                 <option value="all">All Methods</option>
                 <option value="online">Online</option>
@@ -750,20 +748,20 @@ export default function AdminFees() {
                   {setupErrors.bank_name && <p className="mt-1 text-xs text-red-600">{setupErrors.bank_name}</p>}
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Account Number</label>
+                  <label className="mb-1 block text-[13px] font-medium text-gray-700">Account Number</label>
                   <div className="relative">
                     <input
                       type={showAccountNo ? 'text' : 'password'}
                       value={setupForm.account_number}
                       onChange={(e) => setSetupForm({ ...setupForm, account_number: e.target.value })}
-                      className="h-10 w-full rounded-xl border border-gray-200 bg-white px-3 pr-10 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      className="h-10 w-full rounded-[10px] border border-gray-200 bg-white px-3 pr-10 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
                       placeholder="Account number"
                     />
                     <button type="button" onClick={() => setShowAccountNo((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                       {showAccountNo ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
-                  {setupErrors.account_number && <p className="mt-1 text-xs text-red-600">{setupErrors.account_number}</p>}
+                  {setupErrors.account_number && <p className="mt-1 text-xs text-red-500">{setupErrors.account_number}</p>}
                 </div>
                 <div>
                   <Input

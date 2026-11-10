@@ -309,8 +309,8 @@ function AdminParentsView() {
               <label className="mb-1.5 block text-sm font-medium text-gray-700">
                 Phone Number
               </label>
-              <div className="flex rounded-lg shadow-2xs">
-                <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-600 text-sm font-medium select-none">
+              <div className="flex rounded-[10px] overflow-hidden">
+                <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-gray-200 bg-gray-50 text-gray-600 text-sm font-medium select-none">
                   +91
                 </span>
                 <input
@@ -321,7 +321,7 @@ function AdminParentsView() {
                     const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
                     setEditPhone(digits);
                   }}
-                  className="flex-1 rounded-r-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                  className="flex-1 rounded-r-[10px] border border-gray-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
                   placeholder="10-digit mobile number"
                 />
               </div>
@@ -339,7 +339,7 @@ function AdminParentsView() {
                 rows={3}
                 value={editAddress}
                 onChange={(e) => setEditAddress(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="w-full rounded-[10px] border border-gray-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
                 placeholder="Enter complete residential address..."
               />
               <p className="mt-1 text-xs text-gray-400">

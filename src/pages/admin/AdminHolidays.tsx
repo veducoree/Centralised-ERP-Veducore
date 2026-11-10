@@ -3,6 +3,7 @@ import { Upload, Download, Calendar, Smile, Sun } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Select } from '@/components/ui/Form';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -203,21 +204,17 @@ export default function AdminHolidays() {
             <h2 className="text-xl font-bold text-gray-900">Monthly Holiday Planner</h2>
             <p className="text-sm text-gray-500 mt-0.5">Upload a CSV to mark holidays and festivals for any month.</p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <select
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(Number(e.target.value))}
-              className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            >
-              {MONTH_NAMES.map((m, i) => <option key={m} value={i}>{m}</option>)}
-            </select>
-            <select
-              value={selectedYear}
-              onChange={(e) => setSelectedYear(Number(e.target.value))}
-              className="h-9 rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-            >
-              {years.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
+          <div className="flex items-end gap-2 flex-wrap">
+            <div className="w-36">
+              <Select value={String(selectedMonth)} onChange={(e) => setSelectedMonth(Number(e.target.value))}>
+                {MONTH_NAMES.map((m, i) => <option key={m} value={i}>{m}</option>)}
+              </Select>
+            </div>
+            <div className="w-28">
+              <Select value={String(selectedYear)} onChange={(e) => setSelectedYear(Number(e.target.value))}>
+                {years.map((y) => <option key={y} value={y}>{y}</option>)}
+              </Select>
+            </div>
           </div>
         </div>
 

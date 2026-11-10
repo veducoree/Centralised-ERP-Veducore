@@ -410,10 +410,10 @@ function Step1({ formData, errors, update }: StepProps) {
         <div>
           <label className="mb-1.5 block text-sm font-medium text-gray-700">Phone Number <span className="text-red-500">*</span></label>
           <div className="flex">
-            <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">+91</span>
+            <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-sm">+91</span>
             <input type="tel" maxLength={10} value={formData.phone}
               onChange={(e) => { const d = e.target.value.replace(/\D/g, '').slice(0, 10); update({ phone: d, whatsapp: formData.same_as_phone ? d : formData.whatsapp }); }}
-              className="flex-1 rounded-r-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              className="flex-1 rounded-r-[10px] border border-gray-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
               placeholder="10-digit mobile number" />
           </div>
           {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone}</p>}
@@ -421,10 +421,10 @@ function Step1({ formData, errors, update }: StepProps) {
         <div>
           <label className="mb-1.5 block text-sm font-medium text-gray-700">WhatsApp Number</label>
           <div className="flex">
-            <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">+91</span>
+            <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-sm">+91</span>
             <input type="tel" maxLength={10} value={formData.whatsapp} disabled={formData.same_as_phone}
               onChange={(e) => { const d = e.target.value.replace(/\D/g, '').slice(0, 10); update({ whatsapp: d }); }}
-              className="flex-1 rounded-r-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
+              className="flex-1 rounded-r-[10px] border border-gray-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
               placeholder="10-digit mobile number" />
           </div>
           <label className="mt-1.5 flex cursor-pointer items-center gap-2 text-xs text-gray-600">
