@@ -543,7 +543,7 @@ export default function AdminTransport() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-12 rounded-xl border border-blue-100 bg-blue-50/40 p-4">
         <div className="sm:col-span-4">
           <Input label="Bus Number *" placeholder="e.g. UP50BS353"
-            value={busNumber} onChange={(e) => setBusNumber(e.target.value)} required />
+            value={busNumber} onChange={(e) => setBusNumber(e.target.value.toUpperCase())} required />
         </div>
         <div className="sm:col-span-5">
           <Input label="Route Name *" placeholder="e.g. Sector 14 → School"
