@@ -21,9 +21,9 @@ import { useToast } from '@/components/ui/Toast';
 
 /** These paths are always pinned and cannot be removed or reordered away. */
 export const FIXED_PATHS: Record<string, string[]> = {
-  admin:   ['/admin/all-modules',   '/admin/profile'],
-  teacher: ['/teacher/profile'],
-  parent:  ['/parent/profile'],
+  admin:   ['/admin/dashboard', '/admin/all-modules'],
+  teacher: ['/teacher/dashboard'],
+  parent:  ['/parent/dashboard'],
 };
 
 const CACHE_KEY = (uid: string, sid: string | null) =>
@@ -122,13 +122,18 @@ export function SidebarPrefProvider({ children }: { children: ReactNode }) {
       ? orderedPaths.filter((p) => allItems.some((i) => i.path === p))
       : defaultPaths;
 
-    // Ensure fixed items are always included
+    // Ensure fixed items are always present
     const withFixed = [...validPaths];
     for (const fp of fixedPaths) {
       if (!withFixed.includes(fp)) withFixed.push(fp);
     }
 
-    return withFixed
+    // Fixed items always stay at the top in their defined order
+    const fixedOrdered = fixedPaths.filter((p) => withFixed.includes(p));
+    const nonFixed = withFixed.filter((p) => !fixedPaths.includes(p));
+    const finalPaths = [...fixedOrdered, ...nonFixed];
+
+    return finalPaths
       .map((p) => allItems.find((i) => i.path === p))
       .filter(Boolean) as NavItem[];
   })();
