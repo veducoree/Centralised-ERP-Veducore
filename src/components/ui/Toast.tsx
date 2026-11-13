@@ -50,32 +50,57 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
     requestAnimationFrame(() => setVisible(true));
   }, []);
 
-  const icons = {
-    success: <CheckCircle2 className="h-5 w-5 text-emerald-600" />,
-    error: <XCircle className="h-5 w-5 text-red-600" />,
-    warning: <AlertTriangle className="h-5 w-5 text-amber-600" />,
-    info: <Info className="h-5 w-5 text-brand-600" />,
-  };
-
-  const borders = {
-    success: 'border-l-emerald-500',
-    error: 'border-l-red-500',
-    warning: 'border-l-amber-500',
-    info: 'border-l-brand-500',
-  };
+  const styles = {
+    success: {
+      box: 'border-emerald-200 bg-emerald-50',
+      badge: 'bg-emerald-100 text-emerald-600',
+      text: 'text-emerald-900',
+      close: 'text-emerald-500 hover:bg-emerald-100 hover:text-emerald-700',
+      icon: <CheckCircle2 className="h-4 w-4" />,
+    },
+    error: {
+      box: 'border-red-200 bg-red-50',
+      badge: 'bg-red-100 text-red-600',
+      text: 'text-red-900',
+      close: 'text-red-400 hover:bg-red-100 hover:text-red-700',
+      icon: <XCircle className="h-4 w-4" />,
+    },
+    warning: {
+      box: 'border-amber-200 bg-amber-50',
+      badge: 'bg-amber-100 text-amber-600',
+      text: 'text-amber-900',
+      close: 'text-amber-500 hover:bg-amber-100 hover:text-amber-700',
+      icon: <AlertTriangle className="h-4 w-4" />,
+    },
+    info: {
+      box: 'border-[#D9DDFA] bg-[#F3F4FE]',
+      badge: 'bg-[#E4E7FC] text-[#5B6EE8]',
+      text: 'text-slate-800',
+      close: 'text-slate-400 hover:bg-[#E4E7FC] hover:text-slate-600',
+      icon: <Info className="h-4 w-4" />,
+    },
+  }[toast.type];
 
   return (
     <div
+      role={toast.type === 'error' ? 'alert' : 'status'}
       className={cn(
-        'flex items-start gap-3 rounded-[12px] border border-l-4 bg-white px-4 py-3 shadow-lg transition-all duration-300',
-        borders[toast.type],
-        visible ? 'translate-x-0 opacity-100' : 'translate-x-8 opacity-0'
+        'flex min-w-[280px] items-center gap-3 rounded-xl border py-2.5 pl-3 pr-2.5',
+        'shadow-[0_8px_24px_rgba(15,23,42,0.08)] transition-all duration-300',
+        styles.box,
+        visible ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0'
       )}
     >
-      {icons[toast.type]}
-      <p className="flex-1 text-sm text-slate-800">{toast.message}</p>
-      <button onClick={onDismiss} className="text-slate-400 hover:text-slate-600">
-        <X className="h-4 w-4" />
+      <span className={cn('flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full', styles.badge)}>
+        {styles.icon}
+      </span>
+      <p className={cn('flex-1 text-sm font-medium', styles.text)}>{toast.message}</p>
+      <button
+        onClick={onDismiss}
+        aria-label="Dismiss"
+        className={cn('flex-shrink-0 rounded-md p-1 transition-colors', styles.close)}
+      >
+        <X className="h-3.5 w-3.5" />
       </button>
     </div>
   );
