@@ -395,6 +395,26 @@ export default function ParentDashboard() {
               </View>
             </View>
 
+            {/* Class timetable */}
+            {selectedChild && (
+              <TouchableOpacity
+                style={styles.timetableBanner}
+                onPress={() =>
+                  router.push(`/parent-modal/timetable?studentId=${selectedChild.student.id}` as never)
+                }
+                activeOpacity={0.8}
+              >
+                <View style={[styles.iconBox, styles.timetableIcon]}>
+                  <Ionicons name="calendar-outline" size={20} color="#7C3AED" />
+                </View>
+                <View style={styles.timetableText}>
+                  <Text style={styles.gridLabel}>Class Timetable</Text>
+                  <Text style={styles.gridSub}>Weekly periods and substitute teachers</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
+              </TouchableOpacity>
+            )}
+
             {/* Recent Result & Teacher Remarks */}
             <View style={styles.recentRow}>
               <TouchableOpacity
@@ -563,6 +583,20 @@ const styles = StyleSheet.create({
   gridValue: { fontSize: 19, fontWeight: '800', color: '#0F172A' },
   gridLabel: { fontSize: 13, fontWeight: '700', color: '#0F172A', marginTop: 2 },
   gridSub: { fontSize: 11, color: '#64748B', marginTop: 1 },
+
+  timetableBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: RADIUS.lg,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: 14,
+    gap: 12,
+  },
+  timetableIcon: { backgroundColor: '#F5F3FF', marginBottom: 0 },
+  timetableText: { flex: 1 },
 
   transportBanner: {
     flexDirection: 'row',

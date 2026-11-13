@@ -318,6 +318,15 @@ export default function TeacherDashboard() {
               </View>
             </View>
 
+            <TouchableOpacity
+              style={styles.timetableLink}
+              onPress={() => router.push('/teacher-modal/schedule' as never)}
+              activeOpacity={0.8}>
+              <Ionicons name="calendar-outline" size={16} color={COLORS.primary} />
+              <Text style={styles.timetableLinkText}>My Timetable & Substitution Duties</Text>
+              <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
+            </TouchableOpacity>
+
             {/* 7-Day Cycle Strip */}
             <View style={styles.cycleStrip}>
               {CYCLE_DAYS.map(item => {
@@ -535,6 +544,24 @@ export default function TeacherDashboard() {
 }
 
 const styles = StyleSheet.create({
+  timetableLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: SPACING.sm,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: RADIUS.md,
+    backgroundColor: '#EEF2FF',
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+  },
+  timetableLinkText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '700',
+    color: COLORS.primary,
+  },
   container: { flex: 1, backgroundColor: COLORS.canvas },
   centerContainer: { flex: 1, backgroundColor: COLORS.canvas, alignItems: 'center', justifyContent: 'center' },
   content: { flex: 1 },

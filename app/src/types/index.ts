@@ -265,12 +265,48 @@ export interface TeacherSchedule {
   class_id: string;
   section_id: string;
   subject_id: string;
+  /** Bell-schedule period (NULL for old free-time entries). */
+  period_id?: string | null;
   day_of_week: number;
   start_time: string;
   end_time: string;
   room_number: string;
   created_at: string;
   updated_at: string;
+  class?: { id: string; name: string } | null;
+  section?: { id: string; name: string } | null;
+  subject?: { id: string; name: string } | null;
+  teacher?: { id: string; full_name: string } | null;
+}
+
+/** One row of the school's bell schedule (a teaching period or a break). */
+export interface TimetablePeriod {
+  id: string;
+  school_id: string;
+  name: string;
+  start_time: string;
+  end_time: string;
+  is_break: boolean;
+}
+
+/** A free teacher covering an absent teacher's slot on one date. */
+export interface TimetableSubstitution {
+  id: string;
+  school_id: string;
+  date: string;
+  schedule_id: string;
+  original_teacher_id: string | null;
+  substitute_teacher_id: string;
+  section_id: string | null;
+  period_id: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  note: string | null;
+  substitute_teacher?: { id: string; full_name: string } | null;
+  class?: { id: string; name: string } | null;
+  section?: { id: string; name: string } | null;
+  subject?: { id: string; name: string } | null;
+  period?: { id: string; name: string } | null;
 }
 
 export interface MockUser {

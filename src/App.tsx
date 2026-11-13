@@ -22,6 +22,7 @@ const AdminTeachers = lazy(() => import('@/pages/admin/AdminTeachers'));
 const AdminParents = lazy(() => import('@/pages/admin/AdminParents'));
 const AdminClasses = lazy(() => import('@/pages/admin/AdminClasses'));
 const AdminSubjects = lazy(() => import('@/pages/admin/AdminSubjects'));
+const AdminTimetable = lazy(() => import('@/pages/admin/AdminTimetable'));
 const AdminAttendance = lazy(() => import('@/pages/admin/AdminAttendance'));
 const AdminFees = lazy(() => import('@/pages/admin/AdminFees'));
 const AdminTransport = lazy(() => import('@/pages/admin/AdminTransport'));
@@ -58,6 +59,7 @@ const ParentFees = lazy(() => import('@/pages/parent/ParentFees'));
 const ParentTransport = lazy(() => import('@/pages/parent/ParentTransport'));
 const ParentRecords = lazy(() => import('@/pages/parent/ParentRecords'));
 const ParentRemarks = lazy(() => import('@/pages/parent/ParentRemarks'));
+const ParentTimetable = lazy(() => import('@/pages/parent/ParentTimetable'));
 
 function RoutePrefetcher() {
   const { profile } = useAuth();
@@ -74,6 +76,7 @@ function RoutePrefetcher() {
         import('@/pages/admin/AdminParents');
         import('@/pages/admin/AdminClasses');
         import('@/pages/admin/AdminSubjects');
+        import('@/pages/admin/AdminTimetable');
         import('@/pages/admin/AdminAttendance');
         import('@/pages/admin/AdminFees');
         import('@/pages/admin/AdminTransport');
@@ -106,6 +109,7 @@ function RoutePrefetcher() {
         import('@/pages/parent/ParentTransport');
         import('@/pages/parent/ParentRecords');
         import('@/pages/parent/ParentRemarks');
+        import('@/pages/parent/ParentTimetable');
         import('@/pages/shared/ProfilePage');
       }
     }, 100);
@@ -144,6 +148,7 @@ function App() {
             <Route path="/admin/parents" element={<ProtectedRoute allowedRoles={['admin']}><AdminParents /></ProtectedRoute>} />
             <Route path="/admin/classes" element={<ProtectedRoute allowedRoles={['admin']}><AdminClasses /></ProtectedRoute>} />
             <Route path="/admin/subjects" element={<ProtectedRoute allowedRoles={['admin']}><AdminSubjects /></ProtectedRoute>} />
+            <Route path="/admin/timetable" element={<ProtectedRoute allowedRoles={['admin']}><AdminTimetable /></ProtectedRoute>} />
             <Route path="/admin/attendance" element={<ProtectedRoute allowedRoles={['admin']}><AdminAttendance /></ProtectedRoute>} />
             <Route path="/admin/fees" element={<ProtectedRoute allowedRoles={['admin']}><AdminFees /></ProtectedRoute>} />
             <Route path="/admin/transport" element={<ProtectedRoute allowedRoles={['admin']}><AdminTransport /></ProtectedRoute>} />
@@ -181,6 +186,7 @@ function App() {
             <Route path="/parent/transport" element={<ProtectedRoute allowedRoles={['parent']}><ParentTransport /></ProtectedRoute>} />
             <Route path="/parent/records" element={<ProtectedRoute allowedRoles={['parent']}><ParentRecords /></ProtectedRoute>} />
             <Route path="/parent/remarks" element={<ProtectedRoute allowedRoles={['parent']}><ParentRemarks /></ProtectedRoute>} />
+            <Route path="/parent/timetable" element={<ProtectedRoute allowedRoles={['parent']}><ParentTimetable /></ProtectedRoute>} />
             <Route path="/parent/profile" element={<ProtectedRoute allowedRoles={['parent']}><ProfilePage /></ProtectedRoute>} />
 
             <Route path="/veducore/management" element={<VeducoreManagement />} />

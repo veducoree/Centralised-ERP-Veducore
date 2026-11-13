@@ -5,7 +5,7 @@ import {
   IndianRupee, FileText, Bell, Settings, LogOut,
   X, UserCircle, ChevronDown, Shield, User,
   Megaphone, UserPlus, ClipboardCheck, CreditCard, CalendarDays, Bus,
-  LayoutGrid, GripVertical, RotateCcw, Pencil, Check, ChevronRight, ChevronLeft, UserRound, Boxes, Library,
+  LayoutGrid, GripVertical, RotateCcw, Pencil, Check, ChevronRight, ChevronLeft, UserRound, Boxes, Library, CalendarClock,
 } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
@@ -41,6 +41,7 @@ export const adminNav: NavItem[] = [
   { label: 'Parents',            path: '/admin/parents',       icon: <User className="h-5 w-5" /> },
   { label: 'Classes & Sections', path: '/admin/classes',       icon: <BookOpen className="h-5 w-5" /> },
   { label: 'Subjects',           path: '/admin/subjects',      icon: <Library className="h-5 w-5" /> },
+  { label: 'Timetable',          path: '/admin/timetable',     icon: <CalendarClock className="h-5 w-5" /> },
   { label: 'Attendance',         path: '/admin/attendance',    icon: <ClipboardList className="h-5 w-5" /> },
   { label: 'Fees',               path: '/admin/fees',          icon: <IndianRupee className="h-5 w-5" /> },
   { label: 'Transport',          path: '/admin/transport',     icon: <Bus className="h-5 w-5" /> },
@@ -56,6 +57,7 @@ export const adminNav: NavItem[] = [
 export const teacherNav: NavItem[] = [
   { label: 'Dashboard',        path: '/teacher/dashboard',   icon: <LayoutDashboard className="h-5 w-5" /> },
   { label: 'My Classes',       path: '/teacher/classes',     icon: <BookOpen className="h-5 w-5" /> },
+  { label: 'My Timetable',     path: '/teacher/schedule',    icon: <CalendarClock className="h-5 w-5" /> },
   { label: 'Students',         path: '/teacher/students',    icon: <Users className="h-5 w-5" /> },
   { label: 'Add Student',      path: '/teacher/add-student', icon: <UserPlus className="h-5 w-5" /> },
   { label: 'Attendance',       path: '/teacher/attendance',  icon: <ClipboardList className="h-5 w-5" /> },
@@ -67,6 +69,7 @@ export const teacherNav: NavItem[] = [
 export const parentNav: NavItem[] = [
   { label: 'Dashboard',        path: '/parent/dashboard',    icon: <LayoutDashboard className="h-5 w-5" /> },
   { label: 'My Child',         path: '/parent/child',        icon: <Users className="h-5 w-5" /> },
+  { label: 'Timetable',        path: '/parent/timetable',    icon: <CalendarClock className="h-5 w-5" /> },
   { label: 'Attendance',       path: '/parent/attendance',   icon: <ClipboardList className="h-5 w-5" /> },
   { label: 'Fees',             path: '/parent/fees',         icon: <IndianRupee className="h-5 w-5" /> },
   { label: 'Transport',        path: '/parent/transport',    icon: <Bus className="h-5 w-5" /> },

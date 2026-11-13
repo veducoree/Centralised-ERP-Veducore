@@ -5,6 +5,7 @@ import { generateParentCredentials } from '@/lib/parentUtils';
 import type {
   Teacher, Parent, Student, Class, Section, Subject,
   ClassAssignment, TeacherSchedule, Attendance, StudentRecord,
+  TimetablePeriod, TimetableSubstitution,
   Remark, FeeType, Fee, FeePayment, Notification, AuditLog,
   ParentStudent, School, Profile,
   Holiday, ExamDef, FeeStructure, PaymentSetup,
@@ -902,16 +903,22 @@ export async function fetchTeacherSchedules(schoolId: string) {
   return data as TeacherSchedule[];
 }
 
+function invalidateTimetableCache() {
+  invalidateCache('teacherSchedulesByTeacher:');
+  invalidateCache('sectionTimetable:');
+}
+
 export async function createTeacherSchedule(schedule: {
   school_id: string;
   teacher_id: string;
   class_id: string;
   section_id: string;
-  subject_id?: string;
+  subject_id?: string | null;
+  period_id?: string | null;
   day_of_week: number;
   start_time: string;
   end_time: string;
-  room_number?: string;
+  room_number?: string | null;
 }) {
   const { data, error } = await supabase
     .from('teacher_schedules')
@@ -919,14 +926,149 @@ export async function createTeacherSchedule(schedule: {
     .select()
     .maybeSingle();
   if (error) throw error;
-  invalidateCache('teacherSchedulesByTeacher:');
+  invalidateTimetableCache();
+  return data as TeacherSchedule | null;
+}
+
+export async function updateTeacherSchedule(id: string, updates: {
+  teacher_id?: string;
+  subject_id?: string | null;
+  room_number?: string | null;
+}) {
+  const { data, error } = await supabase
+    .from('teacher_schedules')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  invalidateTimetableCache();
   return data as TeacherSchedule | null;
 }
 
 export async function deleteTeacherSchedule(id: string) {
   const { error } = await supabase.from('teacher_schedules').delete().eq('id', id);
   if (error) throw error;
-  invalidateCache('teacherSchedulesByTeacher:');
+  invalidateTimetableCache();
+}
+
+/** Timetable of one section (used by parents; teacher names follow RLS). */
+export async function fetchSectionTimetable(sectionId: string) {
+  return cachedFetch(`sectionTimetable:${sectionId}`, async () => {
+    const { data, error } = await supabase
+      .from('teacher_schedules')
+      .select('*, teacher:teachers(id, full_name), subject:subjects(id, name)')
+      .eq('section_id', sectionId)
+      .order('day_of_week')
+      .order('start_time');
+    if (error) throw error;
+    return (data || []) as TeacherSchedule[];
+  });
+}
+
+// ── Timetable periods (bell schedule) ───────────────────────────────────────
+
+export async function fetchTimetablePeriods(schoolId: string) {
+  return cachedFetch(`timetablePeriods:${schoolId}`, async () => {
+    const { data, error } = await supabase
+      .from('timetable_periods')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('start_time');
+    if (error) throw error;
+    return (data || []) as TimetablePeriod[];
+  });
+}
+
+export async function createTimetablePeriod(period: {
+  school_id: string;
+  name: string;
+  start_time: string;
+  end_time: string;
+  is_break: boolean;
+}) {
+  const { data, error } = await supabase.from('timetable_periods').insert(period).select().maybeSingle();
+  if (error) throw error;
+  invalidateCache(`timetablePeriods:${period.school_id}`);
+  return data as TimetablePeriod | null;
+}
+
+export async function updateTimetablePeriod(
+  schoolId: string,
+  id: string,
+  updates: Partial<Pick<TimetablePeriod, 'name' | 'start_time' | 'end_time' | 'is_break'>>,
+) {
+  const { data, error } = await supabase.from('timetable_periods').update(updates).eq('id', id).select().maybeSingle();
+  if (error) throw error;
+  invalidateCache(`timetablePeriods:${schoolId}`);
+  invalidateTimetableCache();
+  return data as TimetablePeriod | null;
+}
+
+export async function deleteTimetablePeriod(schoolId: string, id: string) {
+  const { error } = await supabase.from('timetable_periods').delete().eq('id', id);
+  if (error) throw error;
+  invalidateCache(`timetablePeriods:${schoolId}`);
+  invalidateTimetableCache();
+}
+
+/** Save working days in schools.settings.timetable_days without touching other settings. */
+export async function saveTimetableDays(schoolId: string, days: number[]) {
+  const { data, error } = await supabase.from('schools').select('settings').eq('id', schoolId).maybeSingle();
+  if (error) throw error;
+  const settings = { ...((data?.settings as Record<string, unknown>) || {}), timetable_days: [...days].sort((a, b) => a - b) };
+  return updateSchool(schoolId, { settings });
+}
+
+// ── Substitutions ───────────────────────────────────────────────────────────
+
+const SUBSTITUTION_SELECT = `*,
+  original_teacher:teachers!timetable_substitutions_original_teacher_id_fkey(id, full_name),
+  substitute_teacher:teachers!timetable_substitutions_substitute_teacher_id_fkey(id, full_name),
+  class:classes(id, name), section:sections(id, name), subject:subjects(id, name),
+  period:timetable_periods(id, name)`;
+
+export async function fetchSubstitutions(filters: {
+  schoolId?: string;
+  sectionId?: string;
+  substituteTeacherId?: string;
+  from: string;
+  to: string;
+}) {
+  let q = supabase
+    .from('timetable_substitutions')
+    .select(SUBSTITUTION_SELECT)
+    .gte('date', filters.from)
+    .lte('date', filters.to)
+    .order('date')
+    .order('start_time');
+  if (filters.schoolId) q = q.eq('school_id', filters.schoolId);
+  if (filters.sectionId) q = q.eq('section_id', filters.sectionId);
+  if (filters.substituteTeacherId) q = q.eq('substitute_teacher_id', filters.substituteTeacherId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data || []) as unknown as TimetableSubstitution[];
+}
+
+export async function createSubstitution(sub: {
+  school_id: string;
+  date: string;
+  schedule_id: string;
+  substitute_teacher_id: string;
+  note?: string | null;
+}) {
+  const { data, error } = await supabase
+    .from('timetable_substitutions')
+    .upsert(sub, { onConflict: 'schedule_id,date' })
+    .select(SUBSTITUTION_SELECT)
+    .maybeSingle();
+  if (error) throw error;
+  return data as unknown as TimetableSubstitution | null;
+}
+
+export async function deleteSubstitution(id: string) {
+  const { error } = await supabase.from('timetable_substitutions').delete().eq('id', id);
+  if (error) throw error;
 }
 
 // Teacher-specific: get their assigned sections

@@ -174,6 +174,8 @@ export interface TeacherSchedule {
   class_id: string;
   section_id: string;
   subject_id: string | null;
+  /** Bell-schedule period this slot sits in (NULL for old free-time entries). */
+  period_id: string | null;
   day_of_week: number;
   start_time: string;
   end_time: string;
@@ -184,6 +186,43 @@ export interface TeacherSchedule {
   class?: Class;
   section?: Section;
   subject?: Subject;
+}
+
+/** One row of the school's bell schedule (a teaching period or a break). */
+export interface TimetablePeriod {
+  id: string;
+  school_id: string;
+  name: string;
+  start_time: string;
+  end_time: string;
+  is_break: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A free teacher covering an absent teacher's slot on one date. */
+export interface TimetableSubstitution {
+  id: string;
+  school_id: string;
+  date: string;
+  schedule_id: string;
+  original_teacher_id: string | null;
+  substitute_teacher_id: string;
+  class_id: string | null;
+  section_id: string | null;
+  subject_id: string | null;
+  period_id: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+  original_teacher?: Pick<Teacher, 'id' | 'full_name'> | null;
+  substitute_teacher?: Pick<Teacher, 'id' | 'full_name'> | null;
+  class?: Pick<Class, 'id' | 'name'> | null;
+  section?: Pick<Section, 'id' | 'name'> | null;
+  subject?: Pick<Subject, 'id' | 'name'> | null;
+  period?: Pick<TimetablePeriod, 'id' | 'name'> | null;
 }
 
 export interface Attendance {

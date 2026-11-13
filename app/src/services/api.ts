@@ -10,6 +10,8 @@ import type {
   Subject,
   ClassAssignment,
   TeacherSchedule,
+  TimetablePeriod,
+  TimetableSubstitution,
   Attendance,
   StudentRecord,
   Remark,
@@ -313,6 +315,58 @@ export async function fetchTeacherScheduleByTeacher(teacherId: string) {
     if (error) throw error;
     return (data || []) as TeacherSchedule[];
   });
+}
+
+// ==========================================
+// Timetable
+// ==========================================
+export async function fetchTimetablePeriods(schoolId: string) {
+  return cachedFetch(`timetablePeriods:${schoolId}`, async () => {
+    const { data, error } = await supabase
+      .from('timetable_periods')
+      .select('*')
+      .eq('school_id', schoolId)
+      .order('start_time');
+    if (error) throw error;
+    return (data || []) as TimetablePeriod[];
+  });
+}
+
+/** Timetable of one section (parents; teacher names follow RLS). */
+export async function fetchSectionTimetable(sectionId: string) {
+  return cachedFetch(`sectionTimetable:${sectionId}`, async () => {
+    const { data, error } = await supabase
+      .from('teacher_schedules')
+      .select('*, teacher:teachers(id, full_name), subject:subjects(id, name)')
+      .eq('section_id', sectionId)
+      .order('day_of_week')
+      .order('start_time');
+    if (error) throw error;
+    return (data || []) as TeacherSchedule[];
+  });
+}
+
+export async function fetchSubstitutions(filters: {
+  sectionId?: string;
+  substituteTeacherId?: string;
+  from: string;
+  to: string;
+}) {
+  let q = supabase
+    .from('timetable_substitutions')
+    .select(`*,
+      substitute_teacher:teachers!timetable_substitutions_substitute_teacher_id_fkey(id, full_name),
+      class:classes(id, name), section:sections(id, name), subject:subjects(id, name),
+      period:timetable_periods(id, name)`)
+    .gte('date', filters.from)
+    .lte('date', filters.to)
+    .order('date')
+    .order('start_time');
+  if (filters.sectionId) q = q.eq('section_id', filters.sectionId);
+  if (filters.substituteTeacherId) q = q.eq('substitute_teacher_id', filters.substituteTeacherId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data || []) as unknown as TimetableSubstitution[];
 }
 
 export async function createTeacherSchedule(schedule: {

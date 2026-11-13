@@ -12,20 +12,34 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '@/components/layout/Header';
-import { fetchTeacherByUserId, fetchTeacherScheduleByTeacher } from '@/services/api';
+import {
+  fetchTeacherByUserId,
+  fetchTeacherScheduleByTeacher,
+  fetchTimetablePeriods,
+  fetchSubstitutions,
+  fetchSchool,
+} from '@/services/api';
 import { COLORS, SPACING, RADIUS, SHADOW, formatTime, getDayName } from '@/lib/utils';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { MobileListSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/context/AuthContext';
-import type { TeacherSchedule } from '@/types';
-
-const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+import type { TeacherSchedule, TimetableSubstitution } from '@/types';
+import {
+  addDays,
+  getTimetableDays,
+  periodOfSlot,
+  sortPeriods,
+  toISODate,
+  weekdayOf,
+} from '@/lib/timetable';
 
 interface ScheduleSlot extends TeacherSchedule {
   className: string;
   sectionName: string;
   subjectName: string;
+  /** Bell-schedule period name, e.g. "Period 3". */
+  periodName: string | null;
 }
 
 type DaySchedule = {
@@ -34,20 +48,16 @@ type DaySchedule = {
   slots: ScheduleSlot[];
 };
 
-/** Convert JS getDay() (0=Sun,1=Mon,...,5=Fri) to seed day_of_week (1=Mon,...,5=Fri). Returns 0 if weekend. */
-function jsDayToSeedDay(jsDay: number): number {
-  if (jsDay === 0 || jsDay === 6) return 0;
-  return jsDay;
-}
-
 export default function TeacherScheduleModal() {
-  const { user } = useAuth();
+  const { user, school: authSchool } = useAuth();
   const [daySchedules, setDaySchedules] = useState<DaySchedule[]>([]);
+  const [duties, setDuties] = useState<TimetableSubstitution[]>([]);
   const [selectedDayFilter, setSelectedDayFilter] = useState<number | 'all'>('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const todaySeedDay = useMemo(() => jsDayToSeedDay(new Date().getDay()), []);
+  // JS weekday (0 = Sunday), same numbering as teacher_schedules.day_of_week.
+  const todaySeedDay = useMemo(() => new Date().getDay(), []);
 
   const loadData = useCallback(async () => {
     if (!user?.id) return;
@@ -55,33 +65,42 @@ export default function TeacherScheduleModal() {
       const currentTeacher = await fetchTeacherByUserId(user.id);
       if (!currentTeacher) return;
 
-      const schedules = await fetchTeacherScheduleByTeacher(currentTeacher.id);
+      const today = toISODate(new Date());
+      const [schedules, periods, school, subs] = await Promise.all([
+        fetchTeacherScheduleByTeacher(currentTeacher.id),
+        fetchTimetablePeriods(currentTeacher.school_id).catch(() => []),
+        authSchool ? Promise.resolve(authSchool) : fetchSchool(currentTeacher.school_id).catch(() => null),
+        fetchSubstitutions({ substituteTeacherId: currentTeacher.id, from: today, to: addDays(today, 6) }).catch(() => []),
+      ]);
+      const sortedPeriods = sortPeriods(periods);
 
       const enriched: ScheduleSlot[] = schedules.map(s => ({
         ...s,
-        className: (s as any).class?.name ?? 'Class',
-        sectionName: (s as any).section?.name ?? 'A',
-        subjectName: (s as any).subject?.name ?? 'General',
+        className: s.class?.name ?? 'Class',
+        sectionName: s.section?.name ?? '',
+        subjectName: s.subject?.name ?? 'General',
+        periodName: periodOfSlot(s, sortedPeriods)?.name ?? null,
       }));
 
-      const days: DaySchedule[] = DAY_NAMES.map((name, idx) => {
-        const dayNum = idx + 1; // 1=Mon ... 5=Fri
+      const workingDays = getTimetableDays(school);
+      const days: DaySchedule[] = workingDays.map(dayNum => {
         const slots = enriched
           .filter(s => s.day_of_week === dayNum)
           .sort((a, b) => a.start_time.localeCompare(b.start_time));
-        return { dayNum, dayName: name, slots };
+        return { dayNum, dayName: getDayName(dayNum), slots };
       });
 
       setDaySchedules(days);
+      setDuties(subs);
 
-      // Default filter to today if it's a weekday, otherwise 'all'
-      if (todaySeedDay >= 1 && todaySeedDay <= 5) {
+      // Default filter to today if it's a working day, otherwise 'all'
+      if (workingDays.includes(todaySeedDay)) {
         setSelectedDayFilter(todaySeedDay);
       }
     } catch (err) {
       console.error('Load schedule error', err);
     }
-  }, [user?.id, todaySeedDay]);
+  }, [user?.id, todaySeedDay, authSchool]);
 
   useEffect(() => {
     loadData().finally(() => setLoading(false));
@@ -101,6 +120,11 @@ export default function TeacherScheduleModal() {
   const totalClasses = useMemo(() => {
     return daySchedules.reduce((acc, d) => acc + d.slots.length, 0);
   }, [daySchedules]);
+
+  const displayedDuties = useMemo(() => {
+    if (selectedDayFilter === 'all') return duties;
+    return duties.filter(d => weekdayOf(d.date) === selectedDayFilter);
+  }, [duties, selectedDayFilter]);
 
   if (loading) {
     return (
@@ -142,8 +166,7 @@ export default function TeacherScheduleModal() {
               </Text>
             </TouchableOpacity>
 
-            {DAY_NAMES.map((name, idx) => {
-              const dayNum = idx + 1;
+            {daySchedules.map(({ dayNum, dayName: name }) => {
               const isToday = dayNum === todaySeedDay;
               const isSelected = selectedDayFilter === dayNum;
               const daySlotCount = daySchedules.find(d => d.dayNum === dayNum)?.slots.length ?? 0;
@@ -184,6 +207,60 @@ export default function TeacherScheduleModal() {
               colors={[COLORS.primary]}
             />
           }>
+
+          {displayedDuties.length > 0 && (
+            <View style={styles.dayGroup}>
+              <View style={styles.dayHeader}>
+                <View style={styles.dayTitleRow}>
+                  <Ionicons name="swap-horizontal" size={16} color="#059669" />
+                  <Text style={styles.dayTitle}>Substitution Duties</Text>
+                </View>
+                <Text style={styles.slotCountText}>{displayedDuties.length}</Text>
+              </View>
+              <View style={styles.slotsList}>
+                {displayedDuties.map(duty => {
+                  const isTodayDuty = duty.date === toISODate(new Date());
+                  const dutyDay = `${getDayName(weekdayOf(duty.date)).slice(0, 3)} ${duty.date.slice(8, 10)}`;
+                  return (
+                    <GlassCard key={duty.id} style={[styles.slotCard, styles.dutyCard]} padding={SPACING.md}>
+                      <View style={styles.slotMainRow}>
+                        <View style={[styles.timeBadge, styles.dutyTimeBadge]}>
+                          <Ionicons name="swap-horizontal" size={13} color="#059669" />
+                          <Text style={[styles.timeStart, styles.dutyText]}>{formatTime(duty.start_time ?? '')}</Text>
+                          <Text style={styles.timeEnd}>{formatTime(duty.end_time ?? '')}</Text>
+                        </View>
+                        <View style={styles.slotContent}>
+                          <View style={styles.slotSubjectRow}>
+                            <Text style={styles.subjectTitle} numberOfLines={1}>
+                              {duty.subject?.name ?? 'Class'}
+                            </Text>
+                            <View style={[styles.periodPill, styles.dutyPill]}>
+                              <Text style={[styles.periodPillText, styles.dutyText]}>
+                                {isTodayDuty ? 'Today' : dutyDay}
+                              </Text>
+                            </View>
+                          </View>
+                          <View style={styles.slotMetaRow}>
+                            <View style={styles.classPill}>
+                              <Ionicons name="people-outline" size={12} color={COLORS.textMuted} />
+                              <Text style={styles.classPillText}>
+                                {duty.class?.name ?? ''} - Sec {duty.section?.name ?? ''}
+                              </Text>
+                            </View>
+                            {duty.period?.name ? (
+                              <View style={styles.roomPill}>
+                                <Text style={styles.roomPillText}>{duty.period.name}</Text>
+                              </View>
+                            ) : null}
+                          </View>
+                        </View>
+                      </View>
+                    </GlassCard>
+                  );
+                })}
+              </View>
+            </View>
+          )}
 
           {displayedDays.length === 0 || displayedDays.every(d => d.slots.length === 0) ? (
             <View style={styles.emptyWrap}>
@@ -240,7 +317,7 @@ export default function TeacherScheduleModal() {
                                   {slot.subjectName}
                                 </Text>
                                 <View style={styles.periodPill}>
-                                  <Text style={styles.periodPillText}>Period {index + 1}</Text>
+                                  <Text style={styles.periodPillText}>{slot.periodName ?? `Period ${index + 1}`}</Text>
                                 </View>
                               </View>
 
@@ -417,6 +494,19 @@ const styles = StyleSheet.create({
   },
   slotsList: {
     gap: SPACING.sm,
+  },
+  dutyCard: {
+    borderColor: '#A7F3D0',
+  },
+  dutyTimeBadge: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  dutyPill: {
+    backgroundColor: '#ECFDF5',
+  },
+  dutyText: {
+    color: '#059669',
   },
   slotCard: {
     backgroundColor: '#FFFFFF',
