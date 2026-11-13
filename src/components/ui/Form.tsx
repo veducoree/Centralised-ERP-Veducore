@@ -13,12 +13,12 @@ const BLOCKED_NUMBER_KEYS_NO_NEG = ['e', 'E', '+', '-'];
 
 const BASE_FIELD = [
   'w-full rounded-[10px] border bg-white',
-  'px-3.5 h-10 text-sm text-gray-900 placeholder-gray-400',
+  'px-3.5 h-10 text-sm text-slate-900 placeholder-slate-400',
   'transition-colors focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25',
-  'disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed',
+  'disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed',
 ].join(' ');
 
-const FIELD_NORMAL = 'border-gray-200 focus:border-[#5B6EE8]';
+const FIELD_NORMAL = 'border-slate-200 focus:border-[#5B6EE8]';
 const FIELD_ERROR  = 'border-red-300 focus:border-red-400 focus:ring-red-400/20';
 
 // ── Input ─────────────────────────────────────────────────────────────────────
@@ -59,7 +59,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="mb-1 block text-[13px] font-medium text-gray-700"
+            className="mb-1 block text-[13px] font-medium text-slate-700"
           >
             {label}
             {required && <span className="ml-0.5 text-red-500">*</span>}
@@ -80,7 +80,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           {...props}
         />
         {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
-        {!error && hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
+        {!error && hint && <p className="mt-1 text-xs text-slate-400">{hint}</p>}
       </div>
     );
   }
@@ -105,7 +105,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
         {label && (
           <label
             htmlFor={selectId}
-            className="mb-1 block text-[13px] font-medium text-gray-700"
+            className="mb-1 block text-[13px] font-medium text-slate-700"
           >
             {label}
             {required && <span className="ml-0.5 text-red-500">*</span>}
@@ -151,7 +151,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
         {label && (
           <label
             htmlFor={textareaId}
-            className="mb-1 block text-[13px] font-medium text-gray-700"
+            className="mb-1 block text-[13px] font-medium text-slate-700"
           >
             {label}
             {required && <span className="ml-0.5 text-red-500">*</span>}
@@ -161,9 +161,9 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(
           ref={ref}
           id={textareaId}
           className={cn(
-            'w-full rounded-[10px] border bg-white px-3.5 py-2.5 text-sm text-gray-900',
-            'placeholder-gray-400 transition-colors focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25',
-            'disabled:bg-gray-50 disabled:text-gray-400',
+            'w-full rounded-[10px] border bg-white px-3.5 py-2.5 text-sm text-slate-900',
+            'placeholder-slate-400 transition-colors focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25',
+            'disabled:bg-slate-50 disabled:text-slate-400',
             error ? FIELD_ERROR : FIELD_NORMAL,
             className
           )}

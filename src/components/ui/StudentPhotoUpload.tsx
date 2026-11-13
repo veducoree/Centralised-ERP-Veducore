@@ -88,7 +88,7 @@ export function StudentPhotoUpload({ student, onUpdated, size = 40 }: StudentPho
         onClick={() => !uploading && inputRef.current?.click()}
         disabled={uploading}
         title={uploading ? 'Uploading…' : student.avatar_url ? 'Change photo' : 'Upload photo'}
-        className="group relative flex items-center justify-center overflow-hidden rounded-full bg-blue-100 text-blue-700 font-bold transition hover:ring-2 hover:ring-blue-400 disabled:cursor-not-allowed"
+        className="group relative flex items-center justify-center overflow-hidden rounded-full bg-brand-100 text-brand-700 font-bold transition hover:ring-2 hover:ring-brand-400 disabled:cursor-not-allowed"
         style={{ width: size, height: size }}
       >
         {student.avatar_url ? (
@@ -113,7 +113,7 @@ export function StudentPhotoUpload({ student, onUpdated, size = 40 }: StudentPho
       {uploading && (
         <span className="absolute inset-0 flex items-center justify-center rounded-full bg-white/70">
           <span
-            className="animate-spin rounded-full border-2 border-gray-200 border-t-blue-500"
+            className="animate-spin rounded-full border-2 border-slate-200 border-t-brand-500"
             style={{ width: size * 0.5, height: size * 0.5 }}
           />
         </span>

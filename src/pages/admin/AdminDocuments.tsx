@@ -22,10 +22,10 @@ const DOC_LABELS: Record<DocType, string> = {
 };
 
 const docTypes = [
-  { id: 'bonafide' as DocType, icon: <ScrollText className="h-5 w-5 text-blue-600" />, title: 'Bonafide Certificate', desc: 'Confirms the student is currently enrolled.' },
-  { id: 'transfer' as DocType, icon: <FileText className="h-5 w-5 text-blue-600" />, title: 'Transfer Certificate (TC)', desc: 'Issued when a student transfers to another school.' },
-  { id: 'character' as DocType, icon: <Award className="h-5 w-5 text-blue-600" />, title: 'Character Certificate', desc: 'Attests the good conduct and character of the student.' },
-  { id: 'fee_receipt' as DocType, icon: <Printer className="h-5 w-5 text-blue-600" />, title: 'Fee Receipt / No-Dues', desc: 'Certifies all fee dues have been cleared.' },
+  { id: 'bonafide' as DocType, icon: <ScrollText className="h-5 w-5 text-brand-600" />, title: 'Bonafide Certificate', desc: 'Confirms the student is currently enrolled.' },
+  { id: 'transfer' as DocType, icon: <FileText className="h-5 w-5 text-brand-600" />, title: 'Transfer Certificate (TC)', desc: 'Issued when a student transfers to another school.' },
+  { id: 'character' as DocType, icon: <Award className="h-5 w-5 text-brand-600" />, title: 'Character Certificate', desc: 'Attests the good conduct and character of the student.' },
+  { id: 'fee_receipt' as DocType, icon: <Printer className="h-5 w-5 text-brand-600" />, title: 'Fee Receipt / No-Dues', desc: 'Certifies all fee dues have been cleared.' },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -381,21 +381,21 @@ export default function AdminDocuments() {
         <div className="mb-4 flex flex-wrap items-center gap-3 print:hidden">
           <button
             onClick={() => { setShowGenerator(false); setSelectedStudent(null); }}
-            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
+            className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 transition-colors"
           >
             ← Back
           </button>
-          <span className="text-gray-300">|</span>
-          <span className="text-sm font-semibold text-gray-800">Document Generator</span>
+          <span className="text-slate-300">|</span>
+          <span className="text-sm font-semibold text-slate-800">Document Generator</span>
 
           <div className="ml-auto flex items-center gap-3 flex-wrap">
             {/* Doc type */}
             <div className="flex items-center gap-2">
-              <label className="text-gray-500 text-xs font-medium">Type</label>
+              <label className="text-slate-500 text-xs font-medium">Type</label>
               <select
                 value={docType}
                 onChange={e => setDocType(e.target.value as DocType)}
-                className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
               >
                 {(Object.keys(DOC_LABELS) as DocType[]).map(k => (
                   <option key={k} value={k}>{DOC_LABELS[k]}</option>
@@ -404,16 +404,16 @@ export default function AdminDocuments() {
             </div>
 
             {/* Page mode toggle */}
-            <div className="flex items-center gap-1 rounded-lg border border-gray-300 bg-white p-0.5">
+            <div className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white p-0.5">
               <button
                 onClick={() => setPageMode('normal')}
-                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${pageMode === 'normal' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${pageMode === 'normal' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
               >
                 Normal Page
               </button>
               <button
                 onClick={() => setPageMode('letterhead')}
-                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${pageMode === 'letterhead' ? 'bg-blue-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${pageMode === 'letterhead' ? 'bg-brand-600 text-white shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
               >
                 Letterhead
               </button>
@@ -421,11 +421,11 @@ export default function AdminDocuments() {
 
             {/* Class */}
             <div className="flex items-center gap-2">
-              <label className="text-gray-500 text-xs font-medium">Class</label>
+              <label className="text-slate-500 text-xs font-medium">Class</label>
               <select
                 value={classFilter}
                 onChange={e => setClassFilter(e.target.value)}
-                className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                className="border border-slate-300 rounded-lg px-2.5 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
               >
                 {classes.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -433,13 +433,13 @@ export default function AdminDocuments() {
 
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search student…"
-                className="pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                className="pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500 bg-white"
               />
             </div>
 
@@ -447,7 +447,7 @@ export default function AdminDocuments() {
             <button
               onClick={() => window.print()}
               disabled={!selectedStudent}
-              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+              className="flex items-center gap-2 bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
             >
               <Printer className="h-4 w-4" /> Export PDF
             </button>
@@ -458,25 +458,25 @@ export default function AdminDocuments() {
         <div className="flex gap-4 print:hidden" style={{ minHeight: '72vh' }}>
 
           {/* Student list */}
-          <div className="w-60 flex-shrink-0 rounded-xl border border-gray-200 bg-white overflow-y-auto">
+          <div className="w-60 flex-shrink-0 rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)] overflow-y-auto">
             {loading ? (
               <div className="flex h-full min-h-[60vh] items-center justify-center p-4">
                 <LoadingSpinner size="sm" variant="spinner" />
               </div>
             ) : filtered.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-10">No students found</p>
+              <p className="text-sm text-slate-400 text-center py-10">No students found</p>
             ) : (
-              <ul className="divide-y divide-gray-100">
+              <ul className="divide-y divide-slate-100">
                 {filtered.map(s => {
                   const active = selectedStudent?.id === s.id;
                   return (
                     <li key={s.id}>
                       <button
                         onClick={() => setSelectedStudent(s)}
-                        className={`w-full text-left px-4 py-3 transition-colors ${active ? 'bg-blue-50 border-l-2 border-blue-500' : 'hover:bg-gray-50'}`}
+                        className={`w-full text-left px-4 py-3 transition-colors ${active ? 'bg-brand-50 border-l-2 border-brand-500' : 'hover:bg-slate-50'}`}
                       >
-                        <p className="text-sm font-semibold text-gray-900 truncate">{s.full_name}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">
+                        <p className="text-sm font-semibold text-slate-900 truncate">{s.full_name}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">
                           {s.admission_number}
                           {s.class?.name ? ` · ${s.class.name}${s.section?.name ? '-' + s.section.name : ''}` : ''}
                         </p>
@@ -489,9 +489,9 @@ export default function AdminDocuments() {
           </div>
 
           {/* Preview */}
-          <div className="flex-1 rounded-xl bg-gray-300 p-6 overflow-y-auto flex items-start justify-center">
+          <div className="flex-1 rounded-xl bg-slate-300 p-6 overflow-y-auto flex items-start justify-center">
             {!selectedStudent ? (
-              <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-2 mt-24">
+              <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2 mt-24">
                 <FileText className="h-8 w-8 opacity-30" />
                 <p className="text-sm">Select a student to preview the document</p>
                 {pageMode === 'letterhead' && (
@@ -535,8 +535,8 @@ export default function AdminDocuments() {
 
         {/* Hero */}
         <Card className="p-6 sm:p-8">
-          <h2 className="text-2xl font-bold text-gray-900">School Documents</h2>
-          <p className="mt-2 text-sm text-gray-600 max-w-2xl">
+          <h2 className="text-2xl font-bold text-slate-900">School Documents</h2>
+          <p className="mt-2 text-sm text-slate-600 max-w-2xl">
             Issue official school documents — bonafide certificates, transfer certificates,
             character certificates, fee receipts, and more — with student data pulled directly from your ERP.
           </p>
@@ -547,7 +547,7 @@ export default function AdminDocuments() {
           <div className="mt-5">
             <button
               onClick={() => setShowGenerator(true)}
-              className="inline-flex items-center justify-center gap-2 rounded-lg h-10 px-5 text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500/40"
+              className="inline-flex items-center justify-center gap-2 rounded-lg h-10 px-5 text-sm font-medium bg-brand-600 text-white hover:bg-brand-700 shadow-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-500/40"
             >
               <FileText className="h-4 w-4" />
               Generate Document
@@ -557,22 +557,22 @@ export default function AdminDocuments() {
 
         {/* Document Types */}
         <div>
-          <h3 className="text-base font-semibold text-gray-900 mb-4">Document Types</h3>
+          <h3 className="text-base font-semibold text-slate-900 mb-4">Document Types</h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {docTypes.map((dt) => (
               <Card
                 key={dt.id}
-                className="p-5 flex flex-col gap-3 cursor-pointer hover:border-blue-300 hover:shadow-md transition-all"
+                className="p-5 flex flex-col gap-3 cursor-pointer hover:border-brand-300 hover:shadow-md transition-all"
                 onClick={() => { setDocType(dt.id); setShowGenerator(true); }}
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50">
                   {dt.icon}
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-gray-900">{dt.title}</p>
-                  <p className="mt-1 text-xs text-gray-500">{dt.desc}</p>
+                  <p className="text-sm font-semibold text-slate-900">{dt.title}</p>
+                  <p className="mt-1 text-xs text-slate-500">{dt.desc}</p>
                 </div>
-                <span className="mt-auto text-xs text-blue-600 font-medium">Generate →</span>
+                <span className="mt-auto text-xs text-brand-600 font-medium">Generate →</span>
               </Card>
             ))}
           </div>

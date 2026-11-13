@@ -101,33 +101,33 @@ export default function AdminNotifications() {
         {loading ? (
           <LoadingSpinner variant="cards" />
         ) : notifications.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-            <Bell className="h-12 w-12 text-gray-300 mb-3" />
-            <p className="font-medium text-gray-600">No notifications</p>
+          <div className="flex flex-col items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-white py-16 text-center">
+            <Bell className="h-12 w-12 text-slate-300 mb-3" />
+            <p className="font-medium text-slate-600">No notifications</p>
           </div>
         ) : (
           <div className="space-y-3">
             {notifications.map((n) => (
-              <Card key={n.id} className={`p-4 ${!n.is_read ? 'border-l-4 border-l-blue-500' : ''}`}>
+              <Card key={n.id} className={`p-4 ${!n.is_read ? 'border-l-4 border-l-brand-500' : ''}`}>
                 <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-blue-50">
-                    <Bell className="h-4 w-4 text-blue-600" />
+                  <div className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-brand-50">
+                    <Bell className="h-4 w-4 text-brand-600" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-gray-900">{n.title}</h3>
-                      {!n.is_read && <span className="h-2 w-2 rounded-full bg-blue-500" />}
+                      <h3 className="text-sm font-semibold text-slate-900">{n.title}</h3>
+                      {!n.is_read && <span className="h-2 w-2 rounded-full bg-brand-500" />}
                     </div>
-                    <p className="mt-1 text-sm text-gray-600">{n.message}</p>
-                    <p className="mt-1 text-xs text-gray-400">{formatDateTime(n.created_at)}</p>
+                    <p className="mt-1 text-sm text-slate-600">{n.message}</p>
+                    <p className="mt-1 text-xs text-slate-400">{formatDateTime(n.created_at)}</p>
                   </div>
                   <div className="flex items-center gap-1">
                     {!n.is_read && (
-                      <button onClick={() => handleMarkRead(n.id)} className="rounded-lg p-1.5 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600" title="Mark as read">
+                      <button onClick={() => handleMarkRead(n.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-emerald-50 hover:text-emerald-600" title="Mark as read">
                         <Check className="h-4 w-4" />
                       </button>
                     )}
-                    <button onClick={() => setDeleteId(n.id)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600">
+                    <button onClick={() => setDeleteId(n.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>

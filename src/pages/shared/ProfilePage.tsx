@@ -103,13 +103,13 @@ export default function ProfilePage() {
         <Card className="p-6">
           {/* Avatar + name header */}
           <div className="flex items-center gap-4 mb-6">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-blue-100 text-2xl font-bold text-blue-700 flex-shrink-0">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-brand-100 text-2xl font-bold text-brand-700 flex-shrink-0">
               {getInitials(profile.full_name)}
             </div>
             <div>
-              <h2 className="text-base font-semibold text-gray-900">{profile.full_name}</h2>
-              <p className="text-sm font-mono text-blue-700">{displayUsername}</p>
-              <span className="mt-1 inline-block rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-200">
+              <h2 className="text-base font-semibold text-slate-900">{profile.full_name}</h2>
+              <p className="text-sm font-mono text-brand-700">{displayUsername}</p>
+              <span className="mt-1 inline-block rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700 ring-1 ring-inset ring-brand-200">
                 {roleLabel}
               </span>
             </div>
@@ -118,30 +118,30 @@ export default function ProfilePage() {
           {/* Institutional Credentials Grid (Non-editable as requested) */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 Full Name
               </label>
-              <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50/75 px-3.5 py-2.5 text-sm font-medium text-gray-900 shadow-sm">
+              <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50/75 px-3.5 py-2.5 text-sm font-medium text-slate-900 shadow-sm">
                 <span>{profile.full_name}</span>
-                <span className="ml-auto text-[11px] font-semibold text-gray-400">Verified</span>
+                <span className="ml-auto text-[11px] font-semibold text-slate-400">Verified</span>
               </div>
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 Login Identifier (Email / Username)
               </label>
-              <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50/75 px-3.5 py-2.5 text-sm font-mono text-blue-700 shadow-sm">
+              <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50/75 px-3.5 py-2.5 text-sm font-mono text-brand-700 shadow-sm">
                 <span className="truncate">{displayUsername}</span>
-                <span className="ml-auto text-[11px] font-semibold text-gray-400 flex-shrink-0">Locked</span>
+                <span className="ml-auto text-[11px] font-semibold text-slate-400 flex-shrink-0">Locked</span>
               </div>
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 Contact Number
               </label>
-              <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50/75 px-3.5 py-2.5 text-sm font-medium text-gray-900 shadow-sm">
+              <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50/75 px-3.5 py-2.5 text-sm font-medium text-slate-900 shadow-sm">
                 <span>{profile.phone || school?.contact_number || 'Not Provided'}</span>
                 <span className="ml-auto text-[11px] font-semibold text-green-700 bg-green-50 border border-green-200 rounded px-1.5 py-0.5">
                   Verified Contact
@@ -150,12 +150,12 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase tracking-wider">
                 Institutional Role
               </label>
-              <div className="flex items-center rounded-lg border border-gray-200 bg-gray-50/75 px-3.5 py-2.5 text-sm font-medium text-gray-900 shadow-sm">
+              <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50/75 px-3.5 py-2.5 text-sm font-medium text-slate-900 shadow-sm">
                 <span>{roleLabel}</span>
-                <span className="ml-auto text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 rounded px-1.5 py-0.5">
+                <span className="ml-auto text-[11px] font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded px-1.5 py-0.5">
                   {school?.name || 'Veducore Platform'}
                 </span>
               </div>
@@ -164,28 +164,28 @@ export default function ProfilePage() {
             {profile.role === 'teacher' && teacher && (
               <>
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Employee ID
                   </label>
-                  <div className="rounded-lg border border-gray-200 bg-gray-50/75 px-3.5 py-2.5 text-sm font-mono text-gray-800 shadow-sm">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/75 px-3.5 py-2.5 text-sm font-mono text-slate-800 shadow-sm">
                     {teacher.employee_id}
                   </div>
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Primary Subject
                   </label>
-                  <div className="rounded-lg border border-gray-200 bg-gray-50/75 px-3.5 py-2.5 text-sm text-gray-800 shadow-sm">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/75 px-3.5 py-2.5 text-sm text-slate-800 shadow-sm">
                     {teacher.subject ?? 'General'}
                   </div>
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  <label className="mb-1 block text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     Academic Qualification
                   </label>
-                  <div className="rounded-lg border border-gray-200 bg-gray-50/75 px-3.5 py-2.5 text-sm text-gray-800 shadow-sm">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/75 px-3.5 py-2.5 text-sm text-slate-800 shadow-sm">
                     {teacher.qualification ?? 'Certified Faculty'}
                   </div>
                 </div>
@@ -194,7 +194,7 @@ export default function ProfilePage() {
           </div>
 
           {/* Info Banner */}
-          <div className="mt-6 rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-xs text-blue-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="mt-6 rounded-xl border border-brand-100 bg-brand-50/60 p-4 text-xs text-brand-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <p>
               Institutional records, mobile numbers, and login credentials are centrally managed by the school administration and cannot be edited directly.
             </p>
@@ -204,7 +204,7 @@ export default function ProfilePage() {
                 size="sm"
                 icon={<KeyRound className="h-4 w-4" />}
                 onClick={openPwModal}
-                className="bg-white hover:bg-gray-50 shadow-sm"
+                className="bg-white hover:bg-slate-50 shadow-sm"
               >
                 Change Password
               </Button>
@@ -242,7 +242,7 @@ export default function ProfilePage() {
         <div className="space-y-4">
           {/* Current password */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
               Current Password <span className="text-red-500">*</span>
             </label>
             <div className="relative">
@@ -250,14 +250,14 @@ export default function ProfilePage() {
                 type={showCurrent ? 'text' : 'password'}
                 value={pwForm.current}
                 onChange={(e) => setPwForm({ ...pwForm, current: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 pr-10 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 pr-10 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                 placeholder="Enter current password"
                 autoComplete="current-password"
               />
               <button
                 type="button"
                 onClick={() => setShowCurrent(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
                 {showCurrent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -266,7 +266,7 @@ export default function ProfilePage() {
 
           {/* New password */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
               New Password <span className="text-red-500">*</span>
             </label>
             <div className="relative">
@@ -274,14 +274,14 @@ export default function ProfilePage() {
                 type={showNext ? 'text' : 'password'}
                 value={pwForm.next}
                 onChange={(e) => setPwForm({ ...pwForm, next: e.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 pr-10 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 pr-10 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                 placeholder="Minimum 6 characters"
                 autoComplete="new-password"
               />
               <button
                 type="button"
                 onClick={() => setShowNext(v => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
                 {showNext ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -290,14 +290,14 @@ export default function ProfilePage() {
 
           {/* Confirm password */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
               Confirm New Password <span className="text-red-500">*</span>
             </label>
             <input
               type="password"
               value={pwForm.confirm}
               onChange={(e) => setPwForm({ ...pwForm, confirm: e.target.value })}
-              className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
               placeholder="Re-enter new password"
               autoComplete="new-password"
             />

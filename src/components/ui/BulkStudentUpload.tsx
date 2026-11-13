@@ -391,13 +391,13 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
           onDrop={handleDrop}
           className={`flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-10 text-center cursor-pointer transition-colors ${
             dragOver
-              ? 'border-blue-400 bg-blue-50'
-              : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50'
+              ? 'border-brand-400 bg-brand-50'
+              : 'border-slate-300 hover:border-brand-400 hover:bg-brand-50'
           }`}
         >
-          <Upload className="h-10 w-10 text-gray-400 mb-3" />
-          <p className="font-medium text-gray-600 text-sm">Drag &amp; drop a CSV file here, or click to browse</p>
-          <p className="mt-1 text-xs text-gray-400">Only .csv files are accepted</p>
+          <Upload className="h-10 w-10 text-slate-400 mb-3" />
+          <p className="font-medium text-slate-600 text-sm">Drag &amp; drop a CSV file here, or click to browse</p>
+          <p className="mt-1 text-xs text-slate-400">Only .csv files are accepted</p>
         </div>
 
         <input
@@ -416,12 +416,12 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
         </div>
 
         {/* Column reference */}
-        <div className="mt-4 rounded-lg bg-gray-50 px-4 py-3">
-          <p className="text-xs font-medium text-gray-500 mb-1">Expected CSV columns</p>
-          <p className="text-xs text-gray-400 font-mono break-all">
+        <div className="mt-4 rounded-lg bg-slate-50 px-4 py-3">
+          <p className="text-xs font-medium text-slate-500 mb-1">Expected CSV columns</p>
+          <p className="text-xs text-slate-400 font-mono break-all">
             admission_number, full_name, father_name, mother_name, parent_email, phone_number, date_of_birth, gender, class_name, section_name, address, admission_date
           </p>
-          <p className="mt-1 text-xs text-gray-400">Required: admission_number, full_name, class_name, section_name</p>
+          <p className="mt-1 text-xs text-slate-400">Required: admission_number, full_name, class_name, section_name</p>
         </div>
       </>
     );
@@ -440,36 +440,36 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
               <span className="font-semibold text-red-500">{invalidCount} invalid</span>
             </span>
           )}
-          <span className="text-gray-400">rows found</span>
+          <span className="text-slate-400">rows found</span>
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <div className="overflow-x-auto rounded-lg border border-slate-200">
           <table className="w-full text-left text-xs">
-            <thead className="border-b border-gray-200 bg-gray-50">
+            <thead className="border-b border-slate-200 bg-slate-50">
               <tr>
-                <th className="px-3 py-2 font-semibold text-gray-600">#</th>
-                <th className="px-3 py-2 font-semibold text-gray-600">Admission No.</th>
-                <th className="px-3 py-2 font-semibold text-gray-600">Full Name</th>
-                <th className="px-3 py-2 font-semibold text-gray-600">Father's Name</th>
-                <th className="px-3 py-2 font-semibold text-gray-600">Mother's Name</th>
-                <th className="px-3 py-2 font-semibold text-gray-600">Phone</th>
-                <th className="px-3 py-2 font-semibold text-gray-600">Class</th>
-                <th className="px-3 py-2 font-semibold text-gray-600">Section</th>
-                <th className="px-3 py-2 font-semibold text-gray-600">Status</th>
+                <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">#</th>
+                <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Admission No.</th>
+                <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Full Name</th>
+                <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Father's Name</th>
+                <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Mother's Name</th>
+                <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Phone</th>
+                <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Class</th>
+                <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Section</th>
+                <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-slate-100">
               {parsedRows.map((row, idx) => (
                 <tr key={idx} className={row.errors.length > 0 ? 'bg-red-50' : ''}>
-                  <td className="px-3 py-2 text-gray-500">{idx + 1}</td>
-                  <td className="px-3 py-2 text-gray-700">{row.admission_number || '—'}</td>
-                  <td className="px-3 py-2 text-gray-700">{row.full_name || '—'}</td>
-                  <td className="px-3 py-2 text-gray-700">{row.father_name || '—'}</td>
-                  <td className="px-3 py-2 text-gray-700">{row.mother_name || '—'}</td>
-                  <td className="px-3 py-2 text-gray-700">{row.phone_number ? `+91 ${row.phone_number}` : '—'}</td>
-                  <td className="px-3 py-2 text-gray-700">{row.class_name || '—'}</td>
-                  <td className="px-3 py-2 text-gray-700">{row.section_name || '—'}</td>
+                  <td className="px-3 py-2 text-slate-500">{idx + 1}</td>
+                  <td className="px-3 py-2 text-slate-700">{row.admission_number || '—'}</td>
+                  <td className="px-3 py-2 text-slate-700">{row.full_name || '—'}</td>
+                  <td className="px-3 py-2 text-slate-700">{row.father_name || '—'}</td>
+                  <td className="px-3 py-2 text-slate-700">{row.mother_name || '—'}</td>
+                  <td className="px-3 py-2 text-slate-700">{row.phone_number ? `+91 ${row.phone_number}` : '—'}</td>
+                  <td className="px-3 py-2 text-slate-700">{row.class_name || '—'}</td>
+                  <td className="px-3 py-2 text-slate-700">{row.section_name || '—'}</td>
                   <td className="px-3 py-2">
                     {row.errors.length === 0 ? (
                       <span className="text-green-600 font-medium">Valid</span>
@@ -489,9 +489,9 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
   function renderImportingPhase() {
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-3">
-        <Loader2 className="h-10 w-10 animate-spin text-blue-500" />
-        <p className="text-sm font-medium text-gray-700">Enrolling students and provisioning parent accounts…</p>
-        <p className="text-xs text-gray-400">Please wait while student and parent records are created.</p>
+        <Loader2 className="h-10 w-10 animate-spin text-brand-500" />
+        <p className="text-sm font-medium text-slate-700">Enrolling students and provisioning parent accounts…</p>
+        <p className="text-xs text-slate-400">Please wait while student and parent records are created.</p>
       </div>
     );
   }
@@ -527,7 +527,7 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
                 <CheckCircle className="h-6 w-6" />
                 <span className="font-semibold">{importResult.success} student{importResult.success !== 1 ? 's' : ''} added successfully</span>
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-slate-500">
                 ⚡ Parent accounts have been automatically created and linked for all {importResult.success} students.
               </p>
               <Button
@@ -548,7 +548,7 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
             </div>
           )}
           {importResult.success === 0 && importResult.failed === 0 && importResult.skipped.length === 0 && (
-            <p className="text-sm text-gray-500">No students were imported.</p>
+            <p className="text-sm text-slate-500">No students were imported.</p>
           )}
         </div>
 

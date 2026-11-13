@@ -21,6 +21,7 @@ const AdminStudents = lazy(() => import('@/pages/admin/AdminStudents'));
 const AdminTeachers = lazy(() => import('@/pages/admin/AdminTeachers'));
 const AdminParents = lazy(() => import('@/pages/admin/AdminParents'));
 const AdminClasses = lazy(() => import('@/pages/admin/AdminClasses'));
+const AdminSubjects = lazy(() => import('@/pages/admin/AdminSubjects'));
 const AdminAttendance = lazy(() => import('@/pages/admin/AdminAttendance'));
 const AdminFees = lazy(() => import('@/pages/admin/AdminFees'));
 const AdminTransport = lazy(() => import('@/pages/admin/AdminTransport'));
@@ -40,7 +41,6 @@ const AllModulesPage = lazy(() => import('@/pages/admin/AllModulesPage'));
 const TeacherDashboard = lazy(() => import('@/pages/teacher/TeacherDashboard'));
 const TeacherClasses = lazy(() => import('@/pages/teacher/TeacherClasses'));
 const TeacherAssignments = lazy(() => import('@/pages/teacher/TeacherAssignments'));
-const TeacherSubjects = lazy(() => import('@/pages/teacher/TeacherSubjects'));
 const TeacherStudents = lazy(() => import('@/pages/teacher/TeacherStudents'));
 const TeacherAddStudent = lazy(() => import('@/pages/teacher/TeacherAddStudent'));
 const TeacherNewAdmission = lazy(() => import('@/pages/teacher/TeacherNewAdmission'));
@@ -73,6 +73,7 @@ function RoutePrefetcher() {
         import('@/pages/admin/AdminTeachers');
         import('@/pages/admin/AdminParents');
         import('@/pages/admin/AdminClasses');
+        import('@/pages/admin/AdminSubjects');
         import('@/pages/admin/AdminAttendance');
         import('@/pages/admin/AdminFees');
         import('@/pages/admin/AdminTransport');
@@ -88,7 +89,6 @@ function RoutePrefetcher() {
         import('@/pages/teacher/TeacherDashboard');
         import('@/pages/teacher/TeacherClasses');
         import('@/pages/teacher/TeacherAssignments');
-        import('@/pages/teacher/TeacherSubjects');
         import('@/pages/teacher/TeacherStudents');
         import('@/pages/teacher/TeacherAddStudent');
         import('@/pages/teacher/TeacherNewAdmission');
@@ -143,6 +143,7 @@ function App() {
             <Route path="/admin/teachers" element={<ProtectedRoute allowedRoles={['admin']}><AdminTeachers /></ProtectedRoute>} />
             <Route path="/admin/parents" element={<ProtectedRoute allowedRoles={['admin']}><AdminParents /></ProtectedRoute>} />
             <Route path="/admin/classes" element={<ProtectedRoute allowedRoles={['admin']}><AdminClasses /></ProtectedRoute>} />
+            <Route path="/admin/subjects" element={<ProtectedRoute allowedRoles={['admin']}><AdminSubjects /></ProtectedRoute>} />
             <Route path="/admin/attendance" element={<ProtectedRoute allowedRoles={['admin']}><AdminAttendance /></ProtectedRoute>} />
             <Route path="/admin/fees" element={<ProtectedRoute allowedRoles={['admin']}><AdminFees /></ProtectedRoute>} />
             <Route path="/admin/transport" element={<ProtectedRoute allowedRoles={['admin']}><AdminTransport /></ProtectedRoute>} />
@@ -161,7 +162,7 @@ function App() {
             <Route path="/teacher/dashboard" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherDashboard /></ProtectedRoute>} />
             <Route path="/teacher/classes" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherClasses /></ProtectedRoute>} />
             <Route path="/teacher/assignments" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherAssignments /></ProtectedRoute>} />
-            <Route path="/teacher/subjects" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherSubjects /></ProtectedRoute>} />
+            <Route path="/teacher/subjects" element={<Navigate to="/teacher/classes" replace />} />
             <Route path="/teacher/students" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherStudents /></ProtectedRoute>} />
             <Route path="/teacher/add-student" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherAddStudent /></ProtectedRoute>} />
             <Route path="/teacher/new-admission" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherNewAdmission /></ProtectedRoute>} />

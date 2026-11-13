@@ -80,31 +80,31 @@ export default function AdminAssignments() {
         {loading ? (
           <LoadingSpinner />
         ) : assignments.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-            <Layers className="h-12 w-12 text-gray-300 mb-3" />
-            <p className="font-medium text-gray-600">No assignments found</p>
+          <div className="flex flex-col items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-white py-16 text-center">
+            <Layers className="h-12 w-12 text-slate-300 mb-3" />
+            <p className="font-medium text-slate-600">No assignments found</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <div className="overflow-x-auto rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50/50">
+              <thead className="border-b border-slate-100 bg-[#F7F8FE]">
                 <tr>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Teacher</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Class</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Section</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Subject</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600 text-right">Action</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Teacher</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Class</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Section</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Subject</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 {assignments.map((a) => (
-                  <tr key={a.id} className="hover:bg-gray-50/50">
-                    <td className="px-4 py-3 font-medium text-gray-900">{a.teacher?.full_name}</td>
-                    <td className="px-4 py-3 text-gray-700">{a.class?.name}</td>
-                    <td className="px-4 py-3 text-gray-700">{a.section?.name}</td>
-                    <td className="px-4 py-3 text-gray-700">{a.subject?.name || '—'}</td>
+                  <tr key={a.id} className="hover:bg-[#F7F8FE]">
+                    <td className="px-4 py-3 font-medium text-slate-900">{a.teacher?.full_name}</td>
+                    <td className="px-4 py-3 text-slate-700">{a.class?.name}</td>
+                    <td className="px-4 py-3 text-slate-700">{a.section?.name}</td>
+                    <td className="px-4 py-3 text-slate-700">{a.subject?.name || '—'}</td>
                     <td className="px-4 py-3 text-right">
-                      <button onClick={() => setDeleteId(a.id)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600">
+                      <button onClick={() => setDeleteId(a.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600">
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </td>
@@ -123,17 +123,17 @@ export default function AdminAssignments() {
             <option value="">Select teacher...</option>
             {teachers.map((t) => <option key={t.id} value={t.id}>{t.full_name}</option>)}
           </Select>
-          <Select label="Class" required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value, section_id: '' })}>
+          <Select label="Class" required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value, section_id: '', subject_id: '' })}>
             <option value="">Select class...</option>
             {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
-          <Select label="Section" required value={form.section_id} onChange={(e) => setForm({ ...form, section_id: e.target.value })} disabled={!form.class_id}>
+          <Select label="Section" required value={form.section_id} onChange={(e) => setForm({ ...form, section_id: e.target.value, subject_id: '' })} disabled={!form.class_id}>
             <option value="">Select section...</option>
             {availableSections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </Select>
-          <Select label="Subject" required value={form.subject_id} onChange={(e) => setForm({ ...form, subject_id: e.target.value })}>
-            <option value="">Select subject...</option>
-            {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          <Select label="Subject" required value={form.subject_id} onChange={(e) => setForm({ ...form, subject_id: e.target.value })} disabled={!form.section_id}>
+            <option value="">{form.section_id ? 'Select subject...' : 'Select section first'}</option>
+            {subjects.filter((s) => s.section_ids.includes(form.section_id)).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </Select>
         </div>
       </Modal>

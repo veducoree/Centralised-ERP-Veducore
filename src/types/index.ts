@@ -142,10 +142,13 @@ export interface Section {
 export interface Subject {
   id: string;
   school_id: string;
+  class_id: string;
   name: string;
   code: string | null;
   created_at: string;
   updated_at: string;
+  /** Sections of the class that study this subject (from section_subjects). */
+  section_ids: string[];
 }
 
 export interface ClassAssignment {

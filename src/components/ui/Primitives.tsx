@@ -27,13 +27,13 @@ interface SearchInputProps {
 export function SearchInput({ value, onChange, placeholder = 'Search...', className }: SearchInputProps) {
   return (
     <div className={`relative min-w-0 ${className || ''}`}>
-      <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 z-10" />
+      <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 z-10" />
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="block w-full rounded-[10px] border border-gray-200 bg-white h-10 pl-10 pr-4 text-sm text-gray-900 placeholder-gray-400 shadow-sm transition-all focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
+        className="block w-full rounded-[10px] border border-slate-200 bg-white h-10 pl-10 pr-4 text-sm text-slate-900 placeholder-slate-400 shadow-sm transition-all focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
       />
     </div>
   );
@@ -45,14 +45,15 @@ interface PageHeaderProps {
   action?: React.ReactNode;
 }
 
+// Same white card as the dashboard greeting, so every page opens the same way.
 export function PageHeader({ title, description, action }: PageHeaderProps) {
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-      <div>
-        <h1 className="text-[22px] font-bold tracking-tight text-gray-900">{title}</h1>
-        {description && <p className="mt-1 text-sm text-gray-500">{description}</p>}
+    <div className="flex flex-col gap-4 rounded-[20px] bg-white px-6 py-5 shadow-[0_4px_20px_rgba(91,110,232,0.08)] sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0">
+        <h1 className="text-lg font-semibold text-[#0F172A]">{title}</h1>
+        {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
       </div>
-      {action && <div className="flex items-center gap-2">{action}</div>}
+      {action && <div className="flex flex-shrink-0 flex-wrap items-center gap-2">{action}</div>}
     </div>
   );
 }
@@ -91,9 +92,9 @@ export function LoadingSpinner({
 
 export function EmptyState({ title, message }: { title: string; message?: string }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-      <p className="font-medium text-gray-600">{title}</p>
-      {message && <p className="mt-1 text-sm text-gray-400">{message}</p>}
+    <div className="flex flex-col items-center justify-center rounded-[20px] bg-white py-16 text-center shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
+      <p className="font-medium text-slate-600">{title}</p>
+      {message && <p className="mt-1 text-sm text-slate-400">{message}</p>}
     </div>
   );
 }

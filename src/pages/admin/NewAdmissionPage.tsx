@@ -276,9 +276,9 @@ function UploadField({ label, required, file, onChange, accept, error, note, sho
 
   return (
     <div className="w-full">
-      <label className="mb-1.5 block text-sm font-medium text-gray-700">
+      <label className="mb-1.5 block text-sm font-medium text-slate-700">
         {label} {required && <span className="text-red-500">*</span>}
-        {note && <span className="ml-1 font-normal text-gray-400">{note}</span>}
+        {note && <span className="ml-1 font-normal text-slate-400">{note}</span>}
       </label>
       {file ? (
         <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
@@ -299,17 +299,17 @@ function UploadField({ label, required, file, onChange, accept, error, note, sho
       ) : (
         <div role="button" tabIndex={0}
           className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-5 transition-colors ${
-            dragOver ? 'border-blue-400 bg-blue-50'
+            dragOver ? 'border-brand-400 bg-brand-50'
             : error ? 'border-red-300 bg-red-50'
-            : 'border-gray-200 bg-gray-50 hover:border-blue-300 hover:bg-blue-50'}`}
+            : 'border-slate-200 bg-slate-50 hover:border-brand-300 hover:bg-brand-50'}`}
           onClick={() => inputRef.current?.click()}
           onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.click()}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) onChange(f); }}>
-          {showPreview ? <ImageIcon className="mb-2 h-8 w-8 text-gray-300" /> : <Upload className="mb-2 h-8 w-8 text-gray-300" />}
-          <span className="text-sm font-medium text-gray-500">Click to upload or drag & drop</span>
-          {accept && <span className="mt-1 text-xs text-gray-400">{accept.replace(/\./g, '').replace(/,/g, ', ').toUpperCase()}</span>}
+          {showPreview ? <ImageIcon className="mb-2 h-8 w-8 text-slate-300" /> : <Upload className="mb-2 h-8 w-8 text-slate-300" />}
+          <span className="text-sm font-medium text-slate-500">Click to upload or drag & drop</span>
+          {accept && <span className="mt-1 text-xs text-slate-400">{accept.replace(/\./g, '').replace(/,/g, ', ').toUpperCase()}</span>}
         </div>
       )}
       <input ref={inputRef} type="file" accept={accept} className="hidden"
@@ -325,7 +325,7 @@ function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button type="button" onClick={() => { navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }); }}
-      className="ml-2 rounded-md p-1 text-blue-400 hover:bg-blue-100 hover:text-blue-600 transition-colors" title="Copy">
+      className="ml-2 rounded-md p-1 text-brand-400 hover:bg-brand-100 hover:text-brand-600 transition-colors" title="Copy">
       {copied ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
     </button>
   );
@@ -335,12 +335,12 @@ function CopyButton({ text }: { text: string }) {
 
 function ReviewCard({ title, children, onEdit }: { title: string; children: React.ReactNode; onEdit?: () => void }) {
   return (
-    <div className="rounded-xl bg-gray-50 p-4">
+    <div className="rounded-xl bg-slate-50 p-4">
       <div className="mb-3 flex items-center justify-between">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</p>
         {onEdit && (
           <button type="button" onClick={onEdit}
-            className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors">
+            className="flex items-center gap-1 text-xs font-medium text-brand-600 hover:text-brand-800 transition-colors">
             <Pencil className="h-3 w-3" /> Edit
           </button>
         )}
@@ -351,10 +351,10 @@ function ReviewCard({ title, children, onEdit }: { title: string; children: Reac
 }
 
 function ReviewRow({ label, value, capitalize, highlight }: { label: string; value: string; capitalize?: boolean; highlight?: 'red' | 'green' }) {
-  const valClass = highlight === 'red' ? 'text-red-600 font-semibold' : highlight === 'green' ? 'text-emerald-600 font-semibold' : 'font-medium text-gray-900';
+  const valClass = highlight === 'red' ? 'text-red-600 font-semibold' : highlight === 'green' ? 'text-emerald-600 font-semibold' : 'font-medium text-slate-900';
   return (
     <div className="flex justify-between gap-2 text-sm">
-      <span className="flex-shrink-0 text-gray-500">{label}</span>
+      <span className="flex-shrink-0 text-slate-500">{label}</span>
       <span className={`text-right ${valClass} ${capitalize ? 'capitalize' : ''}`}>{value || '—'}</span>
     </div>
   );
@@ -362,28 +362,28 @@ function ReviewRow({ label, value, capitalize, highlight }: { label: string; val
 
 function CredentialsBox({ username, password }: { username: string; password: string }) {
   return (
-    <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+    <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
       <div className="mb-3 flex items-center gap-2">
-        <Lock className="h-4 w-4 text-blue-600" />
-        <span className="text-sm font-semibold text-blue-800">Parent Portal Credentials</span>
+        <Lock className="h-4 w-4 text-brand-600" />
+        <span className="text-sm font-semibold text-brand-800">Parent Portal Credentials</span>
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-blue-700">Username:</span>
+          <span className="text-brand-700">Username:</span>
           <div className="flex items-center gap-1">
-            <code className="rounded bg-white px-2 py-0.5 font-mono text-blue-800">{username}</code>
+            <code className="rounded bg-white px-2 py-0.5 font-mono text-brand-800">{username}</code>
             <CopyButton text={username} />
           </div>
         </div>
         <div className="flex items-center justify-between text-sm">
-          <span className="text-blue-700">Password:</span>
+          <span className="text-brand-700">Password:</span>
           <div className="flex items-center gap-1">
-            <code className="rounded bg-white px-2 py-0.5 font-mono text-blue-800">{password}</code>
+            <code className="rounded bg-white px-2 py-0.5 font-mono text-brand-800">{password}</code>
             <CopyButton text={password} />
           </div>
         </div>
       </div>
-      <p className="mt-3 text-xs text-blue-600">Share these credentials with the parent. Advise them to change their password after first login.</p>
+      <p className="mt-3 text-xs text-brand-600">Share these credentials with the parent. Advise them to change their password after first login.</p>
     </div>
   );
 }
@@ -401,33 +401,33 @@ interface StepProps {
 function Step1({ formData, errors, update }: StepProps) {
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700">Personal Details</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Personal Details</h3>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Input label="Student Full Name" required value={formData.full_name} onChange={(e) => update({ full_name: e.target.value })} error={errors.full_name} placeholder="Enter full name" />
         <Input label="Father's Name" required value={formData.father_name} onChange={(e) => update({ father_name: e.target.value })} error={errors.father_name} placeholder="Father's full name" />
         <Input label="Mother's Name" required value={formData.mother_name} onChange={(e) => update({ mother_name: e.target.value })} error={errors.mother_name} placeholder="Mother's full name" />
         <Input label="Parent Email (preferred)" type="email" required value={formData.parent_email} onChange={(e) => update({ parent_email: e.target.value })} error={errors.parent_email} placeholder="parent@example.com" />
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">Phone Number <span className="text-red-500">*</span></label>
+          <label className="mb-1.5 block text-sm font-medium text-slate-700">Phone Number <span className="text-red-500">*</span></label>
           <div className="flex">
-            <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-sm">+91</span>
+            <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-slate-200 bg-slate-50 text-slate-500 text-sm">+91</span>
             <input type="tel" maxLength={10} value={formData.phone}
               onChange={(e) => { const d = e.target.value.replace(/\D/g, '').slice(0, 10); update({ phone: d, whatsapp: formData.same_as_phone ? d : formData.whatsapp }); }}
-              className="flex-1 rounded-r-[10px] border border-gray-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
+              className="flex-1 rounded-r-[10px] border border-slate-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
               placeholder="10-digit mobile number" />
           </div>
           {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone}</p>}
         </div>
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">WhatsApp Number</label>
+          <label className="mb-1.5 block text-sm font-medium text-slate-700">WhatsApp Number</label>
           <div className="flex">
-            <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-sm">+91</span>
+            <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-slate-200 bg-slate-50 text-slate-500 text-sm">+91</span>
             <input type="tel" maxLength={10} value={formData.whatsapp} disabled={formData.same_as_phone}
               onChange={(e) => { const d = e.target.value.replace(/\D/g, '').slice(0, 10); update({ whatsapp: d }); }}
-              className="flex-1 rounded-r-[10px] border border-gray-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed"
+              className="flex-1 rounded-r-[10px] border border-slate-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed"
               placeholder="10-digit mobile number" />
           </div>
-          <label className="mt-1.5 flex cursor-pointer items-center gap-2 text-xs text-gray-600">
+          <label className="mt-1.5 flex cursor-pointer items-center gap-2 text-xs text-slate-600">
             <input type="checkbox" checked={formData.same_as_phone}
               onChange={(e) => update({ same_as_phone: e.target.checked, whatsapp: e.target.checked ? formData.phone : formData.whatsapp })}
               className="rounded" />
@@ -451,7 +451,7 @@ function Step1({ formData, errors, update }: StepProps) {
 function Step2({ formData, errors, update }: StepProps) {
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700">Address Details</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Address Details</h3>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">
           <Input label="Address Line 1" required value={formData.address_line1} onChange={(e) => update({ address_line1: e.target.value })} error={errors.address_line1} placeholder="House/Flat No., Street, Area" />
@@ -480,7 +480,7 @@ function Step3({ formData, errors, update, classes }: Step3Props) {
   const availableSections = selectedClass?.sections ?? [];
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700">Class & Admission Details</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Class & Admission Details</h3>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Select label="Class" required value={formData.class_id}
           onChange={(e) => {
@@ -513,12 +513,12 @@ function Step3({ formData, errors, update, classes }: Step3Props) {
         <Input label="Transfer Certificate Number" value={formData.tc_number} onChange={(e) => update({ tc_number: e.target.value })} placeholder="Optional" />
         <Input label="TC Issued Date" type="date" value={formData.tc_date} onChange={(e) => update({ tc_date: e.target.value })} />
         <div className="sm:col-span-2">
-          <label className="flex cursor-pointer items-center gap-2.5 text-sm text-gray-700">
+          <label className="flex cursor-pointer items-center gap-2.5 text-sm text-slate-700">
             <input type="checkbox" checked={formData.transport_selected}
               onChange={(e) => update({ transport_selected: e.target.checked })} className="rounded" />
             <span>Student requires school transport</span>
           </label>
-          <p className="mt-1 text-xs text-gray-400">Transport Fee will be included in the fee structure if checked.</p>
+          <p className="mt-1 text-xs text-slate-400">Transport Fee will be included in the fee structure if checked.</p>
         </div>
       </div>
     </div>
@@ -530,7 +530,7 @@ function Step3({ formData, errors, update, classes }: Step3Props) {
 function Step4({ formData, errors, update }: StepProps) {
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700">Document Uploads</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Document Uploads</h3>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <UploadField label="Previous School TC" file={formData.prev_tc_file} onChange={(f) => update({ prev_tc_file: f })} accept=".pdf,image/*" note="(if applicable, optional)" />
         <UploadField label="Student Aadhar Card" required file={formData.student_aadhar} onChange={(f) => update({ student_aadhar: f })} accept=".pdf,image/*" error={errors.student_aadhar} />
@@ -626,7 +626,7 @@ function Step5Fees({ formData, errors, update, schoolId, academicYear, canCollec
 
   return (
     <div className="space-y-6">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700">Fee Collection</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Fee Collection</h3>
 
       {/* No-structure warning */}
       {fees.no_structure_warning && (
@@ -644,54 +644,54 @@ function Step5Fees({ formData, errors, update, schoolId, academicYear, canCollec
 
       {/* Fee table */}
       {loadingStructures ? (
-        <div className="flex items-center justify-center rounded-xl border border-gray-200 bg-gray-50 py-10">
-          <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-400 border-t-transparent mr-2" />
-          <span className="text-sm text-gray-500">Loading fee structure…</span>
+        <div className="flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 py-10">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-brand-400 border-t-transparent mr-2" />
+          <span className="text-sm text-slate-500">Loading fee structure…</span>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200">
+        <div className="overflow-x-auto rounded-xl border border-slate-200">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50/80 border-b border-gray-200">
+            <thead className="bg-slate-50/80 border-b border-slate-200">
               <tr>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 w-8"></th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">Fee Head</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 w-36">Amount (₹)</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-8"></th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Fee Head</th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wider text-slate-500 w-36">Amount (₹)</th>
                 <th className="w-8"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 bg-white">
+            <tbody className="divide-y divide-slate-100 bg-white">
               {fees.line_items.map((line, idx) => (
                 <tr key={idx} className={line.include ? '' : 'opacity-50'}>
                   <td className="px-4 py-3 text-center">
                     <input type="checkbox" checked={line.include}
                       onChange={(e) => updateLine(idx, { include: e.target.checked })}
-                      className="rounded border-gray-300 text-blue-600" />
+                      className="rounded border-slate-300 text-brand-600" />
                   </td>
                   <td className="px-4 py-3">
                     <input
                       type="text"
                       value={line.fee_type}
                       onChange={(e) => updateLine(idx, { fee_type: e.target.value })}
-                      className="w-full rounded-lg border border-gray-200 px-2.5 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/30"
+                      className="w-full rounded-lg border border-slate-200 px-2.5 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/30"
                       placeholder="Fee head name"
                     />
                   </td>
                   <td className="px-4 py-3">
                     <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">₹</span>
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">₹</span>
                       <input
                         type="number" min="0" step="0.01"
                         value={line.amount === 0 ? '' : line.amount}
                         onChange={(e) => updateLine(idx, { amount: parseFloat(e.target.value) || 0 })}
                         disabled={!line.editable}
-                        className="w-full rounded-lg border border-gray-200 pl-6 pr-2.5 py-1.5 text-sm text-right focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500/30 disabled:bg-gray-50"
+                        className="w-full rounded-lg border border-slate-200 pl-6 pr-2.5 py-1.5 text-sm text-right focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/30 disabled:bg-slate-50"
                       />
                     </div>
                     {errors[`fee_amount_${idx}`] && <p className="text-xs text-red-500 mt-0.5">{errors[`fee_amount_${idx}`]}</p>}
                   </td>
                   <td className="px-2 py-3 text-center">
                     <button type="button" onClick={() => removeLine(idx)}
-                      className="rounded p-1 text-gray-300 hover:text-red-500 transition-colors">
+                      className="rounded p-1 text-slate-300 hover:text-red-500 transition-colors">
                       <X className="h-4 w-4" />
                     </button>
                   </td>
@@ -699,9 +699,9 @@ function Step5Fees({ formData, errors, update, schoolId, academicYear, canCollec
               ))}
             </tbody>
           </table>
-          <div className="border-t border-gray-100 bg-gray-50/50 px-4 py-2">
+          <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-2">
             <button type="button" onClick={addLine}
-              className="flex items-center gap-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 transition-colors">
+              className="flex items-center gap-1.5 text-xs font-medium text-brand-600 hover:text-brand-800 transition-colors">
               <PlusCircle className="h-3.5 w-3.5" /> Add fee line
             </button>
           </div>
@@ -709,37 +709,37 @@ function Step5Fees({ formData, errors, update, schoolId, academicYear, canCollec
       )}
 
       {/* Discount */}
-      <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-3">
-        <p className="text-sm font-semibold text-gray-700">Discount / Concession <span className="font-normal text-gray-400">(optional)</span></p>
+      <div className="rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)] p-4 space-y-3">
+        <p className="text-sm font-semibold text-slate-700">Discount / Concession <span className="font-normal text-slate-400">(optional)</span></p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">Type</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Type</label>
             <div className="flex gap-3">
               {(['flat', 'percent'] as const).map((t) => (
-                <label key={t} className="flex items-center gap-1.5 cursor-pointer text-sm text-gray-700">
+                <label key={t} className="flex items-center gap-1.5 cursor-pointer text-sm text-slate-700">
                   <input type="radio" name="discount_type" value={t}
                     checked={fees.discount.type === t}
                     onChange={() => updateFees({ discount: { ...fees.discount, type: t } })}
-                    className="text-blue-600" />
+                    className="text-brand-600" />
                   {t === 'flat' ? 'Flat (₹)' : 'Percent (%)'}
                 </label>
               ))}
             </div>
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">
+            <label className="mb-1 block text-xs font-medium text-slate-600">
               {fees.discount.type === 'flat' ? 'Amount (₹)' : 'Percent (%)'}
             </label>
             <input type="number" min="0" step="0.01" value={fees.discount.value === 0 ? '' : fees.discount.value}
               onChange={(e) => updateFees({ discount: { ...fees.discount, value: parseFloat(e.target.value) || 0 } })}
-              className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
               placeholder="0" />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-medium text-gray-600">Reason</label>
+            <label className="mb-1 block text-xs font-medium text-slate-600">Reason</label>
             <select value={fees.discount.reason}
               onChange={(e) => updateFees({ discount: { ...fees.discount, reason: e.target.value as AdmissionDiscount['reason'] } })}
-              className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none">
+              className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 appearance-none">
               <option>Sibling</option>
               <option>Staff Child</option>
               <option>Merit</option>
@@ -750,15 +750,15 @@ function Step5Fees({ formData, errors, update, schoolId, academicYear, canCollec
         {fees.discount.reason === 'Other' && fees.discount.value > 0 && (
           <input type="text" value={fees.discount.reason_note}
             onChange={(e) => updateFees({ discount: { ...fees.discount, reason_note: e.target.value } })}
-            className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+            className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             placeholder="Specify discount reason…" />
         )}
       </div>
 
       {/* Live summary box */}
-      <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 space-y-2">
-        <p className="text-xs font-semibold uppercase tracking-wider text-blue-700 mb-3">Fee Summary</p>
-        <div className="flex justify-between text-sm text-gray-700">
+      <div className="rounded-xl border border-brand-100 bg-brand-50/60 p-4 space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-wider text-brand-700 mb-3">Fee Summary</p>
+        <div className="flex justify-between text-sm text-slate-700">
           <span>Total Fees</span>
           <span className="font-medium">{formatCurrency(totalFees, '₹')}</span>
         </div>
@@ -768,13 +768,13 @@ function Step5Fees({ formData, errors, update, schoolId, academicYear, canCollec
             <span className="font-medium">− {formatCurrency(discountAmount, '₹')}</span>
           </div>
         )}
-        <div className="flex justify-between text-sm font-semibold border-t border-blue-200 pt-2 text-gray-900">
+        <div className="flex justify-between text-sm font-semibold border-t border-brand-200 pt-2 text-slate-900">
           <span>Net Payable</span>
           <span>{formatCurrency(netPayable, '₹')}</span>
         </div>
         {fees.payment_option !== 'later' && (
           <>
-            <div className="flex justify-between text-sm text-blue-700">
+            <div className="flex justify-between text-sm text-brand-700">
               <span>Paid Now</span>
               <span className="font-medium">{formatCurrency(paidNow, '₹')}</span>
             </div>
@@ -787,8 +787,8 @@ function Step5Fees({ formData, errors, update, schoolId, academicYear, canCollec
       </div>
 
       {/* Payment */}
-      <div className="rounded-xl border border-gray-200 bg-white p-4 space-y-4">
-        <p className="text-sm font-semibold text-gray-700">Payment</p>
+      <div className="rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)] p-4 space-y-4">
+        <p className="text-sm font-semibold text-slate-700">Payment</p>
 
         {!canCollectPayment && (
           <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-3">
@@ -805,8 +805,8 @@ function Step5Fees({ formData, errors, update, schoolId, academicYear, canCollec
             return (
               <label key={opt} className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 text-sm cursor-pointer transition-all ${
                 fees.payment_option === opt
-                  ? 'border-blue-500 bg-blue-50 text-blue-700 font-medium'
-                  : 'border-gray-200 text-gray-600 hover:border-blue-300'
+                  ? 'border-brand-500 bg-brand-50 text-brand-700 font-medium'
+                  : 'border-slate-200 text-slate-600 hover:border-brand-300'
               } ${disabled ? 'opacity-40 cursor-not-allowed' : ''}`}>
                 <input type="radio" name="payment_option" value={opt}
                   checked={fees.payment_option === opt} disabled={disabled}
@@ -824,27 +824,27 @@ function Step5Fees({ formData, errors, update, schoolId, academicYear, canCollec
         {fees.payment_option !== 'later' && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">
                 Amount Paying Now <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">₹</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">₹</span>
                 <input type="number" min="0" max={netPayable} step="0.01"
                   value={fees.amount_paying}
                   readOnly={fees.payment_option === 'full'}
                   onChange={(e) => updateFees({ amount_paying: e.target.value })}
-                  className={`w-full rounded-xl border pl-7 pr-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
-                    errors.amount_paying ? 'border-red-400 bg-red-50' : 'border-gray-300'
-                  } ${fees.payment_option === 'full' ? 'bg-gray-50 cursor-not-allowed' : ''}`}
+                  className={`w-full rounded-xl border pl-7 pr-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 ${
+                    errors.amount_paying ? 'border-red-400 bg-red-50' : 'border-slate-300'
+                  } ${fees.payment_option === 'full' ? 'bg-slate-50 cursor-not-allowed' : ''}`}
                   placeholder="0.00" />
               </div>
               {errors.amount_paying && <p className="mt-1 text-xs text-red-600">{errors.amount_paying}</p>}
             </div>
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Payment Mode <span className="text-red-500">*</span></label>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">Payment Mode <span className="text-red-500">*</span></label>
               <select value={fees.payment_mode}
                 onChange={(e) => updateFees({ payment_mode: e.target.value as AdmissionPaymentMode })}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none">
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 appearance-none">
                 <option>Cash</option>
                 <option>UPI</option>
                 <option>Card</option>
@@ -854,28 +854,28 @@ function Step5Fees({ formData, errors, update, schoolId, academicYear, canCollec
             </div>
             {needsRef && (
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                <label className="mb-1.5 block text-sm font-medium text-slate-700">
                   Transaction / Reference No. <span className="text-red-500">*</span>
                 </label>
                 <input type="text" value={fees.transaction_ref}
                   onChange={(e) => updateFees({ transaction_ref: e.target.value })}
-                  className={`w-full rounded-xl border px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 ${
-                    errors.transaction_ref ? 'border-red-400 bg-red-50' : 'border-gray-300'}`}
+                  className={`w-full rounded-xl border px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 ${
+                    errors.transaction_ref ? 'border-red-400 bg-red-50' : 'border-slate-300'}`}
                   placeholder="Enter transaction or reference number" />
                 {errors.transaction_ref && <p className="mt-1 text-xs text-red-600">{errors.transaction_ref}</p>}
               </div>
             )}
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Payment Date</label>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">Payment Date</label>
               <input type="date" value={fees.payment_date}
                 onChange={(e) => updateFees({ payment_date: e.target.value })}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20" />
             </div>
             <div className="sm:col-span-2">
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">Remarks <span className="text-gray-400 font-normal">(optional)</span></label>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">Remarks <span className="text-slate-400 font-normal">(optional)</span></label>
               <input type="text" value={fees.remarks}
                 onChange={(e) => updateFees({ remarks: e.target.value })}
-                className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                 placeholder="Optional note about this payment" />
             </div>
           </div>
@@ -912,7 +912,7 @@ function Step6({ formData, credentials, onEditStep }: Step6Props) {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700">Review & Confirm</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Review & Confirm</h3>
 
       <ReviewCard title="Personal Details" onEdit={() => onEditStep(1)}>
         <ReviewRow label="Name" value={formData.full_name} />
@@ -941,8 +941,8 @@ function Step6({ formData, credentials, onEditStep }: Step6Props) {
         <div className="grid grid-cols-2 gap-2">
           {docs.map(({ label, file }) => (
             <div key={label} className="flex items-center gap-2">
-              {file ? <CheckCircle className="h-4 w-4 flex-shrink-0 text-emerald-500" /> : <span className="text-gray-400">—</span>}
-              <span className={`text-sm ${file ? 'text-gray-700' : 'text-gray-400'}`}>{label}</span>
+              {file ? <CheckCircle className="h-4 w-4 flex-shrink-0 text-emerald-500" /> : <span className="text-slate-400">—</span>}
+              <span className={`text-sm ${file ? 'text-slate-700' : 'text-slate-400'}`}>{label}</span>
             </div>
           ))}
         </div>
@@ -951,18 +951,18 @@ function Step6({ formData, credentials, onEditStep }: Step6Props) {
       {/* Fees & Payment summary */}
       <ReviewCard title="Fees & Payment" onEdit={() => onEditStep(5)}>
         {formData.fees.line_items.filter((l) => l.include).length === 0 ? (
-          <p className="text-sm text-gray-400">No fee items selected — student will be enrolled with Pay Later.</p>
+          <p className="text-sm text-slate-400">No fee items selected — student will be enrolled with Pay Later.</p>
         ) : (
           <>
             <div className="mb-2 space-y-1">
               {formData.fees.line_items.filter((l) => l.include).map((l, i) => (
                 <div key={i} className="flex justify-between text-sm">
-                  <span className="text-gray-600">{l.fee_type}</span>
-                  <span className="font-medium text-gray-900">{formatCurrency(l.amount, '₹')}</span>
+                  <span className="text-slate-600">{l.fee_type}</span>
+                  <span className="font-medium text-slate-900">{formatCurrency(l.amount, '₹')}</span>
                 </div>
               ))}
             </div>
-            <div className="border-t border-gray-200 pt-2 space-y-1">
+            <div className="border-t border-slate-200 pt-2 space-y-1">
               <ReviewRow label="Total Fees" value={formatCurrency(totalFees, '₹')} />
               {discountAmount > 0 && <ReviewRow label={`Discount (${formData.fees.discount.reason})`} value={`− ${formatCurrency(discountAmount, '₹')}`} highlight="green" />}
               <ReviewRow label="Net Payable" value={formatCurrency(netPayable, '₹')} />
@@ -981,9 +981,9 @@ function Step6({ formData, credentials, onEditStep }: Step6Props) {
       </ReviewCard>
 
       {credentials === null ? (
-        <div className="flex items-center justify-center rounded-xl border border-blue-100 bg-blue-50 p-4">
-          <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-400 border-t-transparent mr-2" />
-          <span className="text-sm text-blue-600">Loading credentials…</span>
+        <div className="flex items-center justify-center rounded-xl border border-brand-100 bg-brand-50 p-4">
+          <div className="h-5 w-5 animate-spin rounded-full border-2 border-brand-400 border-t-transparent mr-2" />
+          <span className="text-sm text-brand-600">Loading credentials…</span>
         </div>
       ) : (
         <CredentialsBox username={credentials.username} password={credentials.password} />
@@ -1262,14 +1262,14 @@ export default function NewAdmissionPage() {
         {/* Page header */}
         <div className="flex items-center mb-6">
           <button onClick={() => navigate('/admin/students')}
-            className="mr-3 rounded-lg p-2 text-gray-500 hover:bg-gray-100 transition-colors">
+            className="mr-3 rounded-lg p-2 text-slate-500 hover:bg-slate-100 transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </button>
-          <h1 className="text-xl font-bold text-gray-900">New Student Admission</h1>
+          <h1 className="text-xl font-bold text-slate-900">New Student Admission</h1>
         </div>
 
         {classesLoading ? (
-          <div className="rounded-2xl border border-gray-200 bg-white p-6 space-y-5">
+          <div className="rounded-2xl border border-slate-200 bg-white p-6 space-y-5">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="space-y-2">
@@ -1280,41 +1280,41 @@ export default function NewAdmissionPage() {
             </div>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-200">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-200">
             {submitted ? (
               // ── Success Screen ──────────────────────────────────────────────
               <div className="flex flex-col items-center px-6 py-12 text-center sm:px-10">
                 <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
                   <CheckCircle className="h-10 w-10 text-emerald-500" />
                 </div>
-                <h2 className="text-xl font-bold text-gray-900">Admission Successful!</h2>
-                <p className="mt-1 text-sm text-gray-500">Student has been enrolled and fee records created.</p>
+                <h2 className="text-xl font-bold text-slate-900">Admission Successful!</h2>
+                <p className="mt-1 text-sm text-slate-500">Student has been enrolled and fee records created.</p>
 
                 {/* Admission + Receipt info */}
-                <div className="mt-6 w-full rounded-xl bg-gray-50 p-4 text-left space-y-2">
+                <div className="mt-6 w-full rounded-xl bg-slate-50 p-4 text-left space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">Student Name</span>
-                    <span className="text-sm font-semibold text-gray-900">{resultStudentName}</span>
+                    <span className="text-sm text-slate-500">Student Name</span>
+                    <span className="text-sm font-semibold text-slate-900">{resultStudentName}</span>
                   </div>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-gray-500">Admission Number</span>
-                    <span className="text-sm font-semibold text-gray-900">{resultAdmissionNumber}</span>
+                    <span className="text-sm text-slate-500">Admission Number</span>
+                    <span className="text-sm font-semibold text-slate-900">{resultAdmissionNumber}</span>
                   </div>
                   {resultReceiptNumber && (
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-500">Receipt Number</span>
-                      <span className="text-sm font-semibold text-blue-700">{resultReceiptNumber}</span>
+                      <span className="text-sm text-slate-500">Receipt Number</span>
+                      <span className="text-sm font-semibold text-brand-700">{resultReceiptNumber}</span>
                     </div>
                   )}
                   {formData.fees.payment_option !== 'later' && (
                     <>
                       <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-500">Paid Now</span>
+                        <span className="text-sm text-slate-500">Paid Now</span>
                         <span className="text-sm font-semibold text-emerald-700">{formatCurrency(resultPaidNow, '₹')}</span>
                       </div>
                       {resultBalanceDue > 0 && (
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-500">Balance Due</span>
+                          <span className="text-sm text-slate-500">Balance Due</span>
                           <span className="text-sm font-semibold text-red-600">{formatCurrency(resultBalanceDue, '₹')}</span>
                         </div>
                       )}
@@ -1346,7 +1346,7 @@ export default function NewAdmissionPage() {
                         collectedByName: profile?.full_name ?? '',
                         paymentDate: formData.fees.payment_date,
                       })}
-                      className="flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                      className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
                       <Printer className="h-4 w-4" /> Print Receipt
                     </button>
                   )}
@@ -1378,12 +1378,12 @@ export default function NewAdmissionPage() {
                       setSubmitted(false);
                       setErrors({});
                     }}
-                    className="flex items-center gap-2 rounded-xl border border-blue-300 bg-blue-50 px-4 py-2.5 text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors">
+                    className="flex items-center gap-2 rounded-xl border border-brand-300 bg-brand-50 px-4 py-2.5 text-sm font-medium text-brand-700 hover:bg-brand-100 transition-colors">
                     <PlusCircle className="h-4 w-4" /> Add Another Admission
                   </button>
 
                   <button onClick={() => navigate('/admin/students')}
-                    className="rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors">
+                    className="rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 transition-colors">
                     Go to Students
                   </button>
                 </div>
@@ -1397,7 +1397,7 @@ export default function NewAdmissionPage() {
             ) : (
               <>
                 {/* ── Stepper ─────────────────────────────────────────────── */}
-                <div className="border-b border-gray-100 px-4 py-5 sm:px-6">
+                <div className="border-b border-slate-100 px-4 py-5 sm:px-6">
                   <div className="flex items-center overflow-x-auto">
                     {STEP_LABELS.map((label, idx) => {
                       const step = idx + 1;
@@ -1408,17 +1408,17 @@ export default function NewAdmissionPage() {
                           <div className="flex flex-col items-center flex-shrink-0">
                             <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
                               isCompleted ? 'bg-emerald-500 text-white'
-                              : isActive ? 'bg-blue-600 text-white'
-                              : 'border-2 border-gray-200 bg-gray-100 text-gray-400'}`}>
+                              : isActive ? 'bg-brand-600 text-white'
+                              : 'border-2 border-slate-200 bg-slate-100 text-slate-400'}`}>
                               {isCompleted ? <CheckCircle className="h-4 w-4" /> : step}
                             </div>
                             <span className={`mt-1 whitespace-nowrap text-xs font-medium ${
-                              isCompleted ? 'text-emerald-600' : isActive ? 'text-blue-600' : 'text-gray-400'}`}>
+                              isCompleted ? 'text-emerald-600' : isActive ? 'text-brand-600' : 'text-slate-400'}`}>
                               {label}
                             </span>
                           </div>
                           {idx < STEP_LABELS.length - 1 && (
-                            <div className={`mb-4 mx-1 h-0.5 flex-1 min-w-[8px] ${step < currentStep ? 'bg-emerald-400' : 'bg-gray-200'}`} />
+                            <div className={`mb-4 mx-1 h-0.5 flex-1 min-w-[8px] ${step < currentStep ? 'bg-emerald-400' : 'bg-slate-200'}`} />
                           )}
                         </React.Fragment>
                       );
@@ -1445,7 +1445,7 @@ export default function NewAdmissionPage() {
                 </div>
 
                 {/* ── Footer ─────────────────────────────────────────────── */}
-                <div className="flex items-center justify-between border-t border-gray-100 px-4 py-4 sm:px-6">
+                <div className="flex items-center justify-between border-t border-slate-100 px-4 py-4 sm:px-6">
                   <div>
                     {currentStep > 1 && (
                       <Button variant="outline" onClick={handleBack}>← Back</Button>
@@ -1456,7 +1456,7 @@ export default function NewAdmissionPage() {
                     {currentStep === 5 && formData.fees.no_structure_warning && formData.fees.payment_option !== 'later' && (
                       <button type="button"
                         onClick={() => { update({ fees: { ...formData.fees, payment_option: 'later' } }); setErrors({}); setCurrentStep(6); }}
-                        className="text-xs text-gray-500 hover:text-gray-700 underline">
+                        className="text-xs text-slate-500 hover:text-slate-700 underline">
                         Skip — Pay Later
                       </button>
                     )}

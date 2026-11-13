@@ -54,14 +54,14 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
     success: <CheckCircle2 className="h-5 w-5 text-emerald-600" />,
     error: <XCircle className="h-5 w-5 text-red-600" />,
     warning: <AlertTriangle className="h-5 w-5 text-amber-600" />,
-    info: <Info className="h-5 w-5 text-blue-600" />,
+    info: <Info className="h-5 w-5 text-brand-600" />,
   };
 
   const borders = {
     success: 'border-l-emerald-500',
     error: 'border-l-red-500',
     warning: 'border-l-amber-500',
-    info: 'border-l-blue-500',
+    info: 'border-l-brand-500',
   };
 
   return (
@@ -73,8 +73,8 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: () => void }
       )}
     >
       {icons[toast.type]}
-      <p className="flex-1 text-sm text-gray-800">{toast.message}</p>
-      <button onClick={onDismiss} className="text-gray-400 hover:text-gray-600">
+      <p className="flex-1 text-sm text-slate-800">{toast.message}</p>
+      <button onClick={onDismiss} className="text-slate-400 hover:text-slate-600">
         <X className="h-4 w-4" />
       </button>
     </div>

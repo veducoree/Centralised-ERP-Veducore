@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus, Trash2, BookOpen, X, UserCheck, ChevronDown, ChevronUp,
-  GraduationCap, Users, Pencil,
+  GraduationCap, Users, Pencil, Library,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
@@ -14,13 +15,14 @@ import { useAuth } from '@/auth/AuthContext';
 import {
   fetchClasses, createClass, deleteClass,
   createSection, deleteSection,
-  fetchSubjects, createSubject, generateSubjectCode,
+  fetchSubjects, subjectsForSection,
   fetchTeachers,
   fetchClassTeacherForSection, assignClassTeacher, removeClassTeacher,
   fetchSubjectAssignmentsForSection, assignSubjectTeacher, removeSubjectTeacher,
 } from '@/services/api';
 import type { Section, Teacher, Subject, ClassAssignment } from '@/types';
 import { Badge } from '@/components/ui/Badge';
+import { sortByClassOrder } from '@/lib/classOrder';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -41,41 +43,12 @@ interface SectionData {
   subjectsLoaded: boolean;
 }
 
-// ── Class sort order ───────────────────────────────────────────────────────────
-// Returns a numeric sort key so Nursery < LKG/KG < UKG < Class 1 < Class 2 …
-function getClassSortKey(name: string, gradeLevel: number | null): number {
-  const n = name.trim().toLowerCase();
-
-  // Pre-primary order: nursery=0, lkg/kg=1, ukg=2
-  if (n === 'nursery' || n === 'pre-nursery' || n === 'pre nursery') return 0;
-  if (n === 'lkg' || n === 'kg' || n === 'lower kg' || n === 'lower kindergarten') return 1;
-  if (n === 'ukg' || n === 'upper kg' || n === 'upper kindergarten') return 2;
-
-  // If grade_level is set, use it (offset by 3 to place after pre-primary)
-  if (gradeLevel != null) return gradeLevel + 3;
-
-  // Try to extract a number from the name ("Class 1", "Grade 5", "1st", "std 3", etc.)
-  const match = n.match(/(\d+)/);
-  if (match) return parseInt(match[1], 10) + 3;
-
-  // Alphabetical fallback — far down the list
-  return 9999;
-}
-
-function sortClasses(rows: ClassRow[]): ClassRow[] {
-  return [...rows].sort((a, b) => {
-    const ka = getClassSortKey(a.name, a.grade_level);
-    const kb = getClassSortKey(b.name, b.grade_level);
-    if (ka !== kb) return ka - kb;
-    return a.name.localeCompare(b.name);
-  });
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function AdminClasses() {
   const { profile } = useAuth();
   const toast = useToast();
+  const navigate = useNavigate();
 
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [search, setSearch] = useState('');
@@ -111,13 +84,6 @@ export default function AdminClasses() {
   const [selectedSTId, setSelectedSTId] = useState('');
   const [savingST, setSavingST] = useState(false);
 
-  // ── Add Subject Modal ─────────────────────────────────────────────────
-  const [addSubjectOpen, setAddSubjectOpen] = useState(false);
-  const [newSubName, setNewSubName] = useState('');
-  const [newSubCode, setNewSubCode] = useState('');
-  const [savingSub, setSavingSub] = useState(false);
-  const [activeSectionIdForSub, setActiveSectionIdForSub] = useState<string | null>(null);
-
   // ── Delete confirms ──────────────────────────────────────────────────
   const [deleteClassId, setDeleteClassId] = useState<string | null>(null);
   const [deleteSectionId, setDeleteSectionId] = useState<string | null>(null);
@@ -142,7 +108,7 @@ export default function AdminClasses() {
         sections: c.sections,
         expanded: true,
       }));
-      setClasses(sortClasses(rows));
+      setClasses(sortByClassOrder(rows));
 
       // Load class teachers for all sections in parallel
       const allSections = rawClasses.flatMap((c) => c.sections);
@@ -323,43 +289,6 @@ export default function AdminClasses() {
     }
   }
 
-  // ── Add Subject Handlers ─────────────────────────────────────────────
-  function openAddSubject(sectionId?: string) {
-    setNewSubName('');
-    setNewSubCode('');
-    setActiveSectionIdForSub(sectionId || null);
-    setAddSubjectOpen(true);
-  }
-
-  function handleSubNameChange(name: string) {
-    setNewSubName(name);
-    const autoCode = generateSubjectCode(name, subjects.map((s) => s.code));
-    setNewSubCode(autoCode);
-  }
-
-  async function handleCreateSubject() {
-    if (!profile?.school_id || !newSubName.trim()) {
-      toast('Enter a subject name', 'error');
-      return;
-    }
-    setSavingSub(true);
-    try {
-      const finalCode = newSubCode.trim() || generateSubjectCode(newSubName, subjects.map((s) => s.code));
-      await createSubject(profile.school_id, newSubName.trim(), finalCode);
-      toast(`Subject "${newSubName.trim()}" added with code ${finalCode}`, 'success');
-      setAddSubjectOpen(false);
-      const freshSubs = await fetchSubjects(profile.school_id);
-      setSubjects(freshSubs);
-      if (activeSectionIdForSub) {
-        refreshSubjectsAndSection(activeSectionIdForSub);
-      }
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to add subject', 'error');
-    } finally {
-      setSavingSub(false);
-    }
-  }
-
   // ── Deletes ──────────────────────────────────────────────────────────
   async function handleDeleteClass() {
     if (!deleteClassId) return;
@@ -384,9 +313,9 @@ export default function AdminClasses() {
               <Button
                 variant="outline"
                 icon={<BookOpen className="h-4 w-4" />}
-                onClick={() => openAddSubject()}
+                onClick={() => navigate('/admin/subjects')}
               >
-                Add Subject
+                Manage Subjects
               </Button>
               <Button
                 icon={<Plus className="h-4 w-4" />}
@@ -405,10 +334,10 @@ export default function AdminClasses() {
         {loading ? (
           <LoadingSpinner variant="cards" />
         ) : classes.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-20 text-center">
-            <BookOpen className="h-12 w-12 text-gray-300 mb-3" />
-            <p className="font-medium text-gray-600">No classes yet</p>
-            <p className="mt-1 text-sm text-gray-400">Click "Add Classes" to get started</p>
+          <div className="flex flex-col items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-white py-20 text-center">
+            <BookOpen className="h-12 w-12 text-slate-300 mb-3" />
+            <p className="font-medium text-slate-600">No classes yet</p>
+            <p className="mt-1 text-sm text-slate-400">Click "Add Classes" to get started</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -420,17 +349,17 @@ export default function AdminClasses() {
             }).map((cls) => (
               <Card key={cls.id} className="overflow-hidden p-0">
                 {/* ── Class header ── */}
-                <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100">
+                <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100">
                   <button
                     onClick={() => toggleClass(cls.id)}
                     className="flex items-center gap-2.5 text-left min-w-0"
                   >
                     {cls.expanded
-                      ? <ChevronUp className="h-4 w-4 flex-shrink-0 text-gray-400" />
-                      : <ChevronDown className="h-4 w-4 flex-shrink-0 text-gray-400" />}
-                    <span className="font-semibold text-gray-900">{cls.name}</span>
+                      ? <ChevronUp className="h-4 w-4 flex-shrink-0 text-slate-400" />
+                      : <ChevronDown className="h-4 w-4 flex-shrink-0 text-slate-400" />}
+                    <span className="font-semibold text-slate-900">{cls.name}</span>
                     {cls.grade_level != null && (
-                      <span className="text-xs text-gray-400">Grade {cls.grade_level}</span>
+                      <span className="text-xs text-slate-400">Grade {cls.grade_level}</span>
                     )}
                     <Badge variant="neutral">
                       {cls.sections.length} section{cls.sections.length !== 1 ? 's' : ''}
@@ -438,7 +367,7 @@ export default function AdminClasses() {
                   </button>
                   <button
                     onClick={() => setDeleteClassId(cls.id)}
-                    className="ml-3 flex-shrink-0 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                    className="ml-3 flex-shrink-0 rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -446,9 +375,9 @@ export default function AdminClasses() {
 
                 {/* ── Sections list ── */}
                 {cls.expanded && (
-                  <div className="divide-y divide-gray-100">
+                  <div className="divide-y divide-slate-100">
                     {cls.sections.length === 0 ? (
-                      <p className="px-5 py-4 text-sm text-gray-400">No sections in this class</p>
+                      <p className="px-5 py-4 text-sm text-slate-400">No sections in this class</p>
                     ) : cls.sections.map((sec) => {
                       const sd = sectionData[sec.id];
                       const isSectionOpen = expandedSection[cls.id] === sec.id;
@@ -457,29 +386,29 @@ export default function AdminClasses() {
                       return (
                         <div key={sec.id}>
                           {/* Section row */}
-                          <div className="flex items-center justify-between px-5 py-3 bg-gray-50/40">
+                          <div className="flex items-center justify-between px-5 py-3 bg-slate-50/40">
                             {/* Left: section name + class teacher */}
                             <button
                               onClick={() => toggleSection(cls.id, sec.id)}
                               className="flex items-center gap-3 text-left min-w-0 flex-1"
                             >
                               {isSectionOpen
-                                ? <ChevronUp className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />
-                                : <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-gray-400" />}
+                                ? <ChevronUp className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />
+                                : <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-slate-400" />}
                               <div className="min-w-0">
-                                <p className="text-sm font-semibold text-gray-800">
+                                <p className="text-sm font-semibold text-slate-800">
                                   Section {sec.name}
                                 </p>
                                 {sd?.classTeacher ? (
                                   <div className="flex items-center gap-1 mt-0.5">
-                                    <GraduationCap className="h-3 w-3 flex-shrink-0 text-blue-500" />
-                                    <span className="text-xs font-medium text-blue-600 truncate">
+                                    <GraduationCap className="h-3 w-3 flex-shrink-0 text-brand-500" />
+                                    <span className="text-xs font-medium text-brand-600 truncate">
                                       {sd.classTeacher.full_name}
                                     </span>
-                                    <span className="text-xs text-gray-400">(Class Teacher)</span>
+                                    <span className="text-xs text-slate-400">(Class Teacher)</span>
                                   </div>
                                 ) : (
-                                  <p className="text-xs text-gray-400 italic mt-0.5">No class teacher assigned</p>
+                                  <p className="text-xs text-slate-400 italic mt-0.5">No class teacher assigned</p>
                                 )}
                               </div>
                             </button>
@@ -489,7 +418,7 @@ export default function AdminClasses() {
                               <button
                                 title="Assign class teacher"
                                 onClick={() => openAssignCT(cls.id, sec.id, `${cls.name} — Section ${sec.name}`)}
-                                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-500 border border-gray-200 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-colors"
+                                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-500 border border-slate-200 hover:bg-brand-50 hover:text-brand-600 hover:border-brand-200 transition-colors"
                               >
                                 <UserCheck className="h-3.5 w-3.5" />
                                 Class Teacher
@@ -497,7 +426,7 @@ export default function AdminClasses() {
                               <button
                                 title="Delete section"
                                 onClick={() => setDeleteSectionId(sec.id)}
-                                className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                                className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
@@ -506,34 +435,40 @@ export default function AdminClasses() {
 
                           {/* Subject assignments panel */}
                           {isSectionOpen && (
-                            <div className="px-5 py-4 bg-white border-t border-gray-100">
+                            <div className="px-5 py-4 bg-white border-t border-slate-100">
                               <div className="mb-3 flex items-center justify-between">
-                                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
                                   Subject Teachers — {cls.name} Section {sec.name}
                                 </p>
                                 <div className="flex items-center gap-3">
                                   <button
-                                    onClick={() => openAddSubject(sec.id)}
+                                    onClick={() => navigate('/admin/subjects')}
                                     className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors flex items-center gap-1"
                                   >
-                                    <Plus className="h-3 w-3" /> Add Subject
+                                    <Library className="h-3 w-3" /> Manage Subjects
                                   </button>
                                   <button
                                     onClick={() => refreshSubjectsAndSection(sec.id)}
-                                    className="text-xs text-blue-500 hover:text-blue-700 transition-colors"
+                                    className="text-xs text-brand-500 hover:text-brand-700 transition-colors"
                                   >
                                     ↻ Refresh
                                   </button>
                                 </div>
                               </div>
 
-                              {subjects.length === 0 ? (
-                                <p className="text-sm text-gray-400">
-                                  No subjects found. Teachers can add subjects from their Subjects page.
+                              {subjectsForSection(subjects, sec.id).length === 0 ? (
+                                <p className="text-sm text-slate-400">
+                                  No subjects for this section yet.{' '}
+                                  <button
+                                    onClick={() => navigate('/admin/subjects')}
+                                    className="font-medium text-[#5B6EE8] hover:underline"
+                                  >
+                                    Add subjects for {cls.name}
+                                  </button>
                                 </p>
                               ) : (
                                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                                  {subjects.map((subj) => {
+                                  {subjectsForSection(subjects, sec.id).map((subj) => {
                                     const assignment = subjectAssignments.find(
                                       (a) => a.subject_id === subj.id
                                     );
@@ -542,15 +477,15 @@ export default function AdminClasses() {
                                     return (
                                       <div
                                         key={subj.id}
-                                        className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50/50 px-3.5 py-2.5"
+                                        className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5"
                                       >
                                         <div className="min-w-0">
                                           <div className="flex items-center gap-1.5">
-                                            <span className="text-sm font-semibold text-gray-900 truncate">
+                                            <span className="text-sm font-semibold text-slate-900 truncate">
                                               {subj.name}
                                             </span>
                                             {subj.code && (
-                                              <span className="rounded bg-blue-50 px-1.5 py-0.5 font-mono text-xs font-bold text-blue-600 flex-shrink-0">
+                                              <span className="rounded bg-brand-50 px-1.5 py-0.5 font-mono text-xs font-bold text-brand-600 flex-shrink-0">
                                                 {subj.code}
                                               </span>
                                             )}
@@ -563,7 +498,7 @@ export default function AdminClasses() {
                                               </span>
                                             </div>
                                           ) : (
-                                            <p className="mt-0.5 text-xs text-gray-400 italic">
+                                            <p className="mt-0.5 text-xs text-slate-400 italic">
                                               Not assigned
                                             </p>
                                           )}
@@ -575,7 +510,7 @@ export default function AdminClasses() {
                                             `${cls.name} — Sec ${sec.name}`,
                                             subj.id, subj.name, subj.code
                                           )}
-                                          className="ml-2 flex-shrink-0 rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                                          className="ml-2 flex-shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors"
                                         >
                                           {assignedTeacher
                                             ? <Pencil className="h-3.5 w-3.5" />
@@ -616,7 +551,7 @@ export default function AdminClasses() {
       >
         <div className="space-y-3">
           {newClasses.map((row, idx) => (
-            <div key={idx} className="rounded-xl border border-gray-200 bg-gray-50/40 p-4">
+            <div key={idx} className="rounded-xl border border-slate-200 bg-slate-50/40 p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-1 space-y-3">
                   <div className="flex gap-3">
@@ -638,7 +573,7 @@ export default function AdminClasses() {
                     </div>
                   </div>
                   <div>
-                    {idx === 0 && <p className="mb-2 text-xs font-medium text-gray-500">Sections</p>}
+                    {idx === 0 && <p className="mb-2 text-xs font-medium text-slate-500">Sections</p>}
                     <div className="flex flex-wrap items-center gap-2">
                       {row.sections.map((sec, sIdx) => (
                         <div key={sIdx} className="flex items-center gap-1">
@@ -648,10 +583,10 @@ export default function AdminClasses() {
                             maxLength={4}
                             onChange={(e) => updateSecInput(idx, sIdx, e.target.value)}
                             placeholder="A"
-                            className="w-14 rounded-lg border border-gray-300 px-2 py-1.5 text-center text-sm font-semibold focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                            className="w-14 rounded-lg border border-slate-300 px-2 py-1.5 text-center text-sm font-semibold focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
                           />
                           {row.sections.length > 1 && (
-                            <button onClick={() => removeSecInput(idx, sIdx)} className="text-gray-300 hover:text-red-500">
+                            <button onClick={() => removeSecInput(idx, sIdx)} className="text-slate-300 hover:text-red-500">
                               <X className="h-3.5 w-3.5" />
                             </button>
                           )}
@@ -659,7 +594,7 @@ export default function AdminClasses() {
                       ))}
                       <button
                         onClick={() => addSecToClass(idx)}
-                        className="flex items-center gap-1 rounded-lg border border-dashed border-gray-300 px-2.5 py-1.5 text-xs text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+                        className="flex items-center gap-1 rounded-lg border border-dashed border-slate-300 px-2.5 py-1.5 text-xs text-slate-500 hover:border-brand-400 hover:text-brand-600 transition-colors"
                       >
                         <Plus className="h-3 w-3" /> Add
                       </button>
@@ -667,7 +602,7 @@ export default function AdminClasses() {
                   </div>
                 </div>
                 {newClasses.length > 1 && (
-                  <button onClick={() => removeClassRow(idx)} className="mt-1 rounded-lg p-1.5 text-gray-300 hover:bg-red-50 hover:text-red-500 transition-colors">
+                  <button onClick={() => removeClassRow(idx)} className="mt-1 rounded-lg p-1.5 text-slate-300 hover:bg-red-50 hover:text-red-500 transition-colors">
                     <X className="h-4 w-4" />
                   </button>
                 )}
@@ -676,7 +611,7 @@ export default function AdminClasses() {
           ))}
           <button
             onClick={addClassRow}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 py-3 text-sm font-medium text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors"
+            className="flex w-full items-center justify-center gap-2 rounded-[20px] border border-dashed border-slate-200 bg-white py-3 text-sm font-medium text-slate-500 hover:border-brand-400 hover:text-brand-600 transition-colors"
           >
             <Plus className="h-4 w-4" /> Add Another Class
           </button>
@@ -745,50 +680,6 @@ export default function AdminClasses() {
             </option>
           ))}
         </Select>
-      </Modal>
-
-      {/* ══ Add Subject Modal ════════════════════════════════════════════ */}
-      <Modal
-        open={addSubjectOpen}
-        onClose={() => setAddSubjectOpen(false)}
-        title="Add New Subject"
-        description="Type the subject name — the subject code is generated automatically"
-        size="sm"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setAddSubjectOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreateSubject} loading={savingSub}>Create Subject</Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <Input
-            label="Subject Name"
-            required
-            placeholder="e.g. Mathematics, Science, French"
-            value={newSubName}
-            onChange={(e) => handleSubNameChange(e.target.value)}
-            autoFocus
-          />
-
-          <div>
-            <Input
-              label="Subject Code"
-              placeholder="Auto-generated"
-              value={newSubCode}
-              onChange={(e) => setNewSubCode(e.target.value.toUpperCase())}
-              hint="Auto-generated from name. You can modify if needed."
-            />
-            {newSubCode && (
-              <div className="mt-2 flex items-center gap-2">
-                <span className="text-xs text-gray-500">Auto Code:</span>
-                <span className="rounded-md bg-emerald-50 px-2.5 py-1 font-mono text-sm font-semibold text-emerald-700 border border-emerald-200">
-                  {newSubCode}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
       </Modal>
 
       {/* ══ Confirm Deletes ═══════════════════════════════════════════════ */}

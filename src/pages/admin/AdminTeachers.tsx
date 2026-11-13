@@ -1,15 +1,26 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, Pencil, Trash2, GraduationCap, Eye, EyeOff, Copy, CheckCircle } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card } from '@/components/ui/Card';
+import { Library } from 'lucide-react';
+import { Card, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Form';
 import { Modal, ConfirmDialog } from '@/components/ui/Modal';
 import { SearchInput, PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
-import { fetchTeachers, updateTeacher, deleteTeacher, createTeacherAccount, fetchSchool } from '@/services/api';
-import type { Teacher, School } from '@/types';
+import {
+  fetchTeachers, updateTeacher, deleteTeacher, createTeacherAccount, fetchSchool,
+  fetchTeacherByUserId, fetchClasses, fetchSubjects, fetchSubjectAllotments,
+  setTeacherSubjectAllotments,
+} from '@/services/api';
+import type { Teacher, School, Class, Section, Subject } from '@/types';
+import {
+  allotmentsToRows, rowsToAllotments, validateAllotmentRows,
+  newAllotmentRow, type AllotmentRow,
+} from '@/components/teachers/allotmentRows';
+import { SubjectAllotmentEditor } from '@/components/teachers/SubjectAllotmentEditor';
+import { sortByClassOrder, sortSections } from '@/lib/classOrder';
 import { StatusBadge, Badge } from '@/components/ui/Badge';
 import { generateTeacherUsername } from '@/lib/parentUtils';
 
@@ -26,10 +37,16 @@ export default function AdminTeachers() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     full_name: '', username: '', password: '', phone: '', employee_id: '',
-    qualification: '', subject: '', date_of_joining: '',
+    qualification: '', date_of_joining: '',
   });
   const [editForm, setEditForm] = useState<Partial<Teacher>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Class / section / subject allotment
+  const [classes, setClasses] = useState<(Class & { sections: Section[] })[]>([]);
+  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [allotments, setAllotments] = useState<Awaited<ReturnType<typeof fetchSubjectAllotments>>>([]);
+  const [allotRows, setAllotRows] = useState<AllotmentRow[]>([]);
 
   // Credentials modal state
   const [credTeacher, setCredTeacher] = useState<Teacher | null>(null);
@@ -63,8 +80,16 @@ export default function AdminTeachers() {
     if (!profile?.school_id) return;
     setLoading(true);
     try {
-      const data = await fetchTeachers(profile.school_id);
+      const [data, cls, subs, allot] = await Promise.all([
+        fetchTeachers(profile.school_id),
+        fetchClasses(profile.school_id),
+        fetchSubjects(profile.school_id),
+        fetchSubjectAllotments(profile.school_id),
+      ]);
       setTeachers(data);
+      setClasses(sortByClassOrder(cls).map((c) => ({ ...c, sections: sortSections(c.sections) })));
+      setSubjects(subs);
+      setAllotments(allot);
     } catch (err) {
       toast('Failed to load teachers', 'error');
       console.error(err);
@@ -76,7 +101,30 @@ export default function AdminTeachers() {
   useEffect(() => { loadData(); }, [loadData]);
 
   const totalTeachers = teachers.length;
-  const totalSubjects = new Set(teachers.filter(t => t.subject).map(t => t.subject)).size;
+  const totalSubjects = subjects.length;
+
+  const subjectById = new Map(subjects.map((s) => [s.id, s]));
+  const classById = new Map(classes.map((c) => [c.id, c]));
+
+  /** One entry per class-section, e.g. { label: 'Class 5 A', subjects: ['Mathematics'] }. */
+  function allotmentSummary(teacherId: string): { label: string; subjects: string[] }[] {
+    const bySection = new Map<string, { label: string; subjects: string[] }>();
+    for (const a of allotments) {
+      if (a.teacher_id !== teacherId) continue;
+      const cls = classById.get(a.class_id);
+      const sec = cls?.sections.find((x) => x.id === a.section_id);
+      const label = cls ? `${cls.name}${sec ? ` ${sec.name}` : ''}` : '—';
+      const entry = bySection.get(a.section_id) ?? { label, subjects: [] };
+      const name = subjectById.get(a.subject_id)?.name;
+      if (name) entry.subjects.push(name);
+      bySection.set(a.section_id, entry);
+    }
+    return [...bySection.values()];
+  }
+
+  function subjectNamesFor(rows: AllotmentRow[]): string[] {
+    return rowsToAllotments(rows).map((r) => subjectById.get(r.subject_id)?.name ?? '').filter(Boolean);
+  }
 
   const filtered = teachers.filter((t) => {
     const q = search.toLowerCase();
@@ -85,7 +133,8 @@ export default function AdminTeachers() {
       t.full_name.toLowerCase().includes(q) ||
       t.email.toLowerCase().includes(q) ||
       t.employee_id.toLowerCase().includes(q) ||
-      (t.subject ?? '').toLowerCase().includes(q) ||
+      allotmentSummary(t.id).some((g) =>
+        g.label.toLowerCase().includes(q) || g.subjects.some((n) => n.toLowerCase().includes(q))) ||
       getUsername(t).includes(q)
     );
   });
@@ -93,8 +142,9 @@ export default function AdminTeachers() {
   function openAdd() {
     setForm({
       full_name: '', username: '', password: '', phone: '', employee_id: '',
-      qualification: '', subject: '', date_of_joining: new Date().toISOString().split('T')[0],
+      qualification: '', date_of_joining: new Date().toISOString().split('T')[0],
     });
+    setAllotRows([newAllotmentRow()]);
     setErrors({});
     setModalOpen(true);
   }
@@ -103,9 +153,11 @@ export default function AdminTeachers() {
     setEditing(t);
     setEditForm({
       full_name: t.full_name, phone: t.phone, qualification: t.qualification,
-      subject: t.subject, date_of_joining: t.date_of_joining, status: t.status,
+      date_of_joining: t.date_of_joining, status: t.status,
       password: '',
     });
+    const own = allotmentsToRows(allotments.filter((a) => a.teacher_id === t.id));
+    setAllotRows(own.length ? own : [newAllotmentRow()]);
     setEditModalOpen(true);
   }
 
@@ -122,6 +174,8 @@ export default function AdminTeachers() {
     if (!form.employee_id.trim()) e.employee_id = 'Employee ID is required';
     if (!form.password) e.password = 'Password is required';
     else if (form.password.length < 6) e.password = 'Password must be at least 6 characters';
+    const allotErr = validateAllotmentRows(allotRows);
+    if (allotErr) e.allotment = allotErr;
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -138,15 +192,32 @@ export default function AdminTeachers() {
         phone: form.phone || undefined,
         employee_id: form.employee_id,
         qualification: form.qualification || undefined,
-        subject: form.subject || undefined,
         date_of_joining: form.date_of_joining || undefined,
       });
+
+      const wanted = rowsToAllotments(allotRows);
+      let createdTeacherId: string | undefined;
+      if (wanted.length && res?.id) {
+        try {
+          const created = await fetchTeacherByUserId(res.id);
+          if (!created) throw new Error('Teacher record not found');
+          createdTeacherId = created.id;
+          await setTeacherSubjectAllotments({
+            schoolId: profile.school_id,
+            teacherId: created.id,
+            rows: wanted,
+            subjectNames: subjectNamesFor(allotRows),
+          });
+        } catch {
+          toast('Teacher created, but subjects could not be allotted. Edit the teacher to allot them.', 'error');
+        }
+      }
       toast('Teacher account created successfully', 'success');
       setModalOpen(false);
 
       // Immediately display credentials modal with username and password visible
       const newTeacher: Teacher = {
-        id: res?.id || `teacher-${Date.now()}`,
+        id: createdTeacherId || res?.id || `teacher-${Date.now()}`,
         school_id: profile.school_id,
         user_id: res?.id,
         full_name: form.full_name,
@@ -154,7 +225,7 @@ export default function AdminTeachers() {
         employee_id: form.employee_id,
         phone: form.phone || '',
         qualification: form.qualification || '',
-        subject: form.subject || '',
+        subject: subjectNamesFor(allotRows).join(', '),
         date_of_joining: form.date_of_joining || '',
         status: 'active',
         password: form.password,
@@ -176,7 +247,9 @@ export default function AdminTeachers() {
   }
 
   async function handleUpdate() {
-    if (!editing) return;
+    if (!editing || !profile?.school_id) return;
+    const allotErr = validateAllotmentRows(allotRows);
+    if (allotErr) { toast(allotErr, 'error'); return; }
     const updates: Partial<Teacher> = { ...editForm };
     if (updates.password !== undefined && updates.password !== '') {
       if (updates.password.length < 6) {
@@ -189,6 +262,12 @@ export default function AdminTeachers() {
     setSaving(true);
     try {
       await updateTeacher(editing.id, updates);
+      await setTeacherSubjectAllotments({
+        schoolId: profile.school_id,
+        teacherId: editing.id,
+        rows: rowsToAllotments(allotRows),
+        subjectNames: subjectNamesFor(allotRows),
+      });
       toast('Teacher updated successfully', 'success');
       setEditModalOpen(false);
       loadData();
@@ -222,15 +301,9 @@ export default function AdminTeachers() {
         />
 
         {/* Stats row */}
-        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2">
-          <Card className="p-4">
-            <p className="text-sm font-medium text-gray-500">Total Teachers</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">{totalTeachers}</p>
-          </Card>
-          <Card className="p-4">
-            <p className="text-sm font-medium text-gray-500">Total Subjects</p>
-            <p className="mt-1 text-2xl font-bold text-gray-900">{totalSubjects}</p>
-          </Card>
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <StatCard label="Total Teachers" value={totalTeachers} icon={<GraduationCap />} color="emerald" />
+          <StatCard label="Total Subjects" value={totalSubjects} icon={<Library />} color="amber" />
         </div>
 
         {/* Search bar */}
@@ -241,63 +314,74 @@ export default function AdminTeachers() {
         {loading ? (
           <LoadingSpinner />
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-            <GraduationCap className="h-12 w-12 text-gray-300 mb-3" />
-            <p className="font-medium text-gray-600">No teachers found</p>
-            <p className="mt-1 text-sm text-gray-400">Add your first teacher to get started</p>
+          <div className="flex flex-col items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-white py-16 text-center">
+            <GraduationCap className="h-12 w-12 text-slate-300 mb-3" />
+            <p className="font-medium text-slate-600">No teachers found</p>
+            <p className="mt-1 text-sm text-slate-400">Add your first teacher to get started</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <div className="overflow-x-auto rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50/50">
+              <thead className="border-b border-slate-100 bg-[#F7F8FE]">
                 <tr>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Teacher</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Username</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Subject(s)</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Contact</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Status</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600 text-right">Actions</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Teacher</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Username</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Classes &amp; Subjects</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Contact</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 {filtered.map((t) => (
-                  <tr key={t.id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr key={t.id} className="hover:bg-[#F7F8FE] transition-colors">
                     {/* Teacher: bold name + gray employee_id below */}
                     <td className="px-4 py-3">
-                      <p className="font-bold text-gray-900">{t.full_name}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{t.employee_id}</p>
+                      <p className="font-bold text-slate-900">{t.full_name}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{t.employee_id}</p>
                     </td>
                     {/* Username: firstname@school.veducore — shows skeleton until school loads */}
-                    <td className="px-4 py-3 font-mono text-sm text-blue-700">
+                    <td className="px-4 py-3 font-mono text-sm text-brand-700">
                       {!schoolLoaded
-                        ? <span className="inline-block h-3.5 w-32 animate-pulse rounded bg-gray-200" />
+                        ? <span className="inline-block h-3.5 w-32 animate-pulse rounded bg-slate-200" />
                         : getUsername(t)}
                     </td>
-                    {/* Subject(s): Badge chip, or — */}
+                    {/* Classes & subjects allotted */}
                     <td className="px-4 py-3">
-                      {t.subject
-                        ? t.subject.split(',').map((s, i) => (
-                            <Badge key={i} variant="info" className="mr-1 mb-1">{s.trim()}</Badge>
-                          ))
-                        : <span className="text-gray-400">—</span>}
+                      {(() => {
+                        const groups = allotmentSummary(t.id);
+                        if (!groups.length) return <span className="text-slate-400">—</span>;
+                        return (
+                          <div className="space-y-1">
+                            {groups.map((g) => (
+                              <div key={g.label} className="flex flex-wrap items-center gap-1">
+                                <span className="text-xs font-semibold text-slate-700">{g.label}:</span>
+                                {g.subjects.map((n) => (
+                                  <Badge key={n} variant="info">{n}</Badge>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </td>
                     {/* Contact: phone + email stacked */}
                     <td className="px-4 py-3">
-                      <p className="text-gray-700">{t.phone || '—'}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{t.email}</p>
+                      <p className="text-slate-700">{t.phone || '—'}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{t.email}</p>
                     </td>
                     {/* Status */}
                     <td className="px-4 py-3"><StatusBadge status={t.status} /></td>
                     {/* Actions */}
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1 whitespace-nowrap">
-                        <button onClick={() => openCredentials(t)} className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed" title="View credentials" disabled={!schoolLoaded}>
+                        <button onClick={() => openCredentials(t)} className="rounded-lg p-1.5 text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed" title="View credentials" disabled={!schoolLoaded}>
                           <Eye className="h-4 w-4" />
                         </button>
-                        <button onClick={() => openEdit(t)} className="rounded-lg p-1.5 text-gray-400 hover:bg-amber-50 hover:text-amber-600 transition-colors" title="Edit">
+                        <button onClick={() => openEdit(t)} className="rounded-lg p-1.5 text-slate-400 hover:bg-amber-50 hover:text-amber-600 transition-colors" title="Edit">
                           <Pencil className="h-4 w-4" />
                         </button>
-                        <button onClick={() => setDeleteId(t.id)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors" title="Delete">
+                        <button onClick={() => setDeleteId(t.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors" title="Delete">
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
@@ -338,9 +422,9 @@ export default function AdminTeachers() {
           />
           <Input label="Password" type="password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} error={errors.password} hint="Minimum 6 characters" />
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Phone</label>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">Phone</label>
             <div className="flex">
-              <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-sm">+91</span>
+              <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-slate-200 bg-slate-50 text-slate-500 text-sm">+91</span>
               <input
                 type="tel"
                 maxLength={10}
@@ -349,15 +433,23 @@ export default function AdminTeachers() {
                   const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
                   setForm({ ...form, phone: digits });
                 }}
-                className="flex-1 rounded-r-[10px] border border-gray-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
+                className="flex-1 rounded-r-[10px] border border-slate-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
                 placeholder="10-digit mobile number"
               />
             </div>
           </div>
-          <Input label="Subject" value={form.subject} onChange={(e) => setForm({ ...form, subject: e.target.value })} placeholder="e.g. Mathematics" />
           <Input label="Qualification" value={form.qualification} onChange={(e) => setForm({ ...form, qualification: e.target.value })} placeholder="e.g. M.Sc, B.Ed" />
           <Input label="Date of Joining" type="date" value={form.date_of_joining} onChange={(e) => setForm({ ...form, date_of_joining: e.target.value })} />
         </div>
+        <AllotmentSection error={errors.allotment}>
+          <SubjectAllotmentEditor
+            rows={allotRows}
+            onChange={setAllotRows}
+            classes={classes}
+            subjects={subjects}
+            existing={allotments}
+          />
+        </AllotmentSection>
       </Modal>
 
       {/* Edit Teacher Modal */}
@@ -376,9 +468,9 @@ export default function AdminTeachers() {
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input label="Full Name" value={editForm.full_name || ''} onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} />
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Phone</label>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">Phone</label>
             <div className="flex">
-              <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-gray-200 bg-gray-50 text-gray-500 text-sm">+91</span>
+              <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-slate-200 bg-slate-50 text-slate-500 text-sm">+91</span>
               <input
                 type="tel"
                 maxLength={10}
@@ -387,12 +479,11 @@ export default function AdminTeachers() {
                   const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
                   setEditForm({ ...editForm, phone: digits });
                 }}
-                className="flex-1 rounded-r-[10px] border border-gray-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
+                className="flex-1 rounded-r-[10px] border border-slate-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
                 placeholder="10-digit mobile number"
               />
             </div>
           </div>
-          <Input label="Subject" value={editForm.subject || ''} onChange={(e) => setEditForm({ ...editForm, subject: e.target.value })} />
           <Input label="Qualification" value={editForm.qualification || ''} onChange={(e) => setEditForm({ ...editForm, qualification: e.target.value })} />
           <Input label="Date of Joining" type="date" value={editForm.date_of_joining || ''} onChange={(e) => setEditForm({ ...editForm, date_of_joining: e.target.value })} />
           <Input
@@ -407,6 +498,16 @@ export default function AdminTeachers() {
             <option value="inactive">Inactive</option>
           </Select>
         </div>
+        <AllotmentSection>
+          <SubjectAllotmentEditor
+            rows={allotRows}
+            onChange={setAllotRows}
+            classes={classes}
+            subjects={subjects}
+            existing={allotments}
+            teacherId={editing?.id}
+          />
+        </AllotmentSection>
       </Modal>
 
       {/* Credentials Modal */}
@@ -420,11 +521,11 @@ export default function AdminTeachers() {
       >
         {credTeacher && (
           <div className="space-y-4">
-            <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-4 space-y-3">
-              <div className="flex items-center justify-between pb-3 border-b border-blue-100/60">
+            <div className="rounded-xl border border-brand-100 bg-brand-50/40 p-4 space-y-3">
+              <div className="flex items-center justify-between pb-3 border-b border-brand-100/60">
                 <div>
-                  <p className="text-xs font-medium text-gray-500 mb-0.5">Username</p>
-                  <p className="font-mono text-sm font-semibold text-blue-700">{getUsername(credTeacher)}</p>
+                  <p className="text-xs font-medium text-slate-500 mb-0.5">Username</p>
+                  <p className="font-mono text-sm font-semibold text-brand-700">{getUsername(credTeacher)}</p>
                 </div>
                 <button
                   type="button"
@@ -432,7 +533,7 @@ export default function AdminTeachers() {
                     navigator.clipboard.writeText(getUsername(credTeacher));
                     toast('Username copied', 'success');
                   }}
-                  className="rounded-lg p-1.5 bg-white shadow-sm border border-gray-200 text-gray-500 hover:text-blue-600 hover:border-blue-300 transition-all"
+                  className="rounded-lg p-1.5 bg-white shadow-sm border border-slate-200 text-slate-500 hover:text-brand-600 hover:border-brand-300 transition-all"
                   title="Copy username"
                 >
                   <Copy className="h-4 w-4" />
@@ -440,8 +541,8 @@ export default function AdminTeachers() {
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-gray-500 mb-0.5">Password</p>
-                  <p className="font-mono text-sm font-semibold text-gray-900 tracking-wide">
+                  <p className="text-xs font-medium text-slate-500 mb-0.5">Password</p>
+                  <p className="font-mono text-sm font-semibold text-slate-900 tracking-wide">
                     {credVisible ? (credTeacher.password || '(not stored)') : '••••••••'}
                   </p>
                 </div>
@@ -449,7 +550,7 @@ export default function AdminTeachers() {
                   <button
                     type="button"
                     onClick={() => setCredVisible(v => !v)}
-                    className="rounded-lg p-1.5 bg-white shadow-sm border border-gray-200 text-gray-500 hover:text-gray-800 hover:border-gray-300 transition-all"
+                    className="rounded-lg p-1.5 bg-white shadow-sm border border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300 transition-all"
                     title={credVisible ? 'Hide' : 'Show'}
                   >
                     {credVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -463,7 +564,7 @@ export default function AdminTeachers() {
                       toast('Password copied', 'success');
                       setTimeout(() => setCredCopied(false), 1500);
                     }}
-                    className="rounded-lg p-1.5 bg-white shadow-sm border border-gray-200 text-gray-500 hover:text-blue-600 hover:border-blue-300 transition-all"
+                    className="rounded-lg p-1.5 bg-white shadow-sm border border-slate-200 text-slate-500 hover:text-brand-600 hover:border-brand-300 transition-all"
                     title="Copy password"
                   >
                     {credCopied ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
@@ -474,7 +575,7 @@ export default function AdminTeachers() {
 
             <Button
               variant="outline"
-              className="w-full flex items-center justify-center gap-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium shadow-sm"
+              className="w-full flex items-center justify-center gap-2 border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium shadow-sm"
               onClick={() => {
                 const text = `Teacher Login Credentials\nSchool: ${school?.name || 'Veducore School'}\nTeacher: ${credTeacher.full_name}\nUsername: ${getUsername(credTeacher)}\nPassword: ${credTeacher.password || ''}`;
                 navigator.clipboard.writeText(text);
@@ -497,5 +598,18 @@ export default function AdminTeachers() {
         variant="danger"
       />
     </DashboardLayout>
+  );
+}
+
+function AllotmentSection({ children, error }: { children: React.ReactNode; error?: string }) {
+  return (
+    <div className="mt-6 border-t border-slate-100 pt-5">
+      <p className="text-sm font-semibold text-slate-800">Classes &amp; Subjects</p>
+      <p className="mb-3 mt-0.5 text-xs text-slate-500">
+        Choose the class and section, then the subjects this teacher will teach there.
+      </p>
+      {children}
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
+    </div>
   );
 }

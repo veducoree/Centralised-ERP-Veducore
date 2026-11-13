@@ -464,8 +464,8 @@ export default function AdminFees() {
     : setupForm.razorpay_key_id;
 
   const TAB_CLASSES = {
-    active: 'border-b-2 border-blue-600 text-blue-600 font-semibold bg-white px-4 py-2.5 text-sm',
-    inactive: 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 px-4 py-2.5 text-sm border-b-2 border-transparent',
+    active: 'border-b-2 border-brand-600 text-brand-600 font-semibold bg-white px-4 py-2.5 text-sm',
+    inactive: 'text-slate-500 hover:text-slate-700 hover:bg-slate-50 px-4 py-2.5 text-sm border-b-2 border-transparent',
   };
 
   const frequencyLabel: Record<FeeStructure['frequency'], string> = {
@@ -478,7 +478,7 @@ export default function AdminFees() {
         <PageHeader title="Fee Management" description="Manage fee records, structures and online payment setup" />
 
         {/* ── Tab Bar ── */}
-        <div className="border-b border-gray-200">
+        <div className="border-b border-slate-200">
           <div className="flex">
             {(['records', 'structure', 'setup'] as ActiveTab[]).map((tab) => (
               <button
@@ -512,7 +512,7 @@ export default function AdminFees() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="h-10 w-full sm:w-44 rounded-[10px] border border-gray-200 bg-white px-3 pr-9 text-sm text-gray-700 transition-colors focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25 appearance-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2712%27%20height%3D%2712%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%239ca3af%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpolyline%20points%3D%276%209%2012%2015%2018%209%27%3E%3C/polyline%3E%3C/svg%3E')] bg-no-repeat bg-[right_12px_center]"
+                className="h-10 w-full sm:w-44 rounded-[10px] border border-slate-200 bg-white px-3 pr-9 text-sm text-slate-700 transition-colors focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25 appearance-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2712%27%20height%3D%2712%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%239ca3af%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpolyline%20points%3D%276%209%2012%2015%2018%209%27%3E%3C/polyline%3E%3C/svg%3E')] bg-no-repeat bg-[right_12px_center]"
               >
                 <option value="">All Status</option>
                 <option value="paid">Paid</option>
@@ -523,7 +523,7 @@ export default function AdminFees() {
               <select
                 value={methodFilter}
                 onChange={(e) => setMethodFilter(e.target.value as MethodFilter)}
-                className="h-10 w-full sm:w-44 rounded-[10px] border border-gray-200 bg-white px-3 pr-9 text-sm text-gray-700 transition-colors focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25 appearance-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2712%27%20height%3D%2712%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%239ca3af%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpolyline%20points%3D%276%209%2012%2015%2018%209%27%3E%3C/polyline%3E%3C/svg%3E')] bg-no-repeat bg-[right_12px_center]"
+                className="h-10 w-full sm:w-44 rounded-[10px] border border-slate-200 bg-white px-3 pr-9 text-sm text-slate-700 transition-colors focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25 appearance-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2712%27%20height%3D%2712%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%239ca3af%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpolyline%20points%3D%276%209%2012%2015%2018%209%27%3E%3C/polyline%3E%3C/svg%3E')] bg-no-repeat bg-[right_12px_center]"
               >
                 <option value="all">All Methods</option>
                 <option value="online">Online</option>
@@ -534,41 +534,41 @@ export default function AdminFees() {
             {loading ? (
               <LoadingSpinner />
             ) : filtered.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-                <IndianRupee className="h-12 w-12 text-gray-300 mb-3" />
-                <p className="font-medium text-gray-600">No fee records found</p>
+              <div className="flex flex-col items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-white py-16 text-center">
+                <IndianRupee className="h-12 w-12 text-slate-300 mb-3" />
+                <p className="font-medium text-slate-600">No fee records found</p>
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+              <div className="overflow-x-auto rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
                 <table className="w-full text-left text-sm">
-                  <thead className="border-b border-gray-200 bg-gray-50/50">
+                  <thead className="border-b border-slate-100 bg-[#F7F8FE]">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-gray-600">Student</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600">Fee Type</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600">Amount</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600">Paid</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600">Due Date</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600">Method</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600">Status</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600 text-right">Actions</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Student</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Fee Type</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Amount</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Paid</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Due Date</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Method</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-slate-100">
                     {filtered.map((f) => (
-                      <tr key={f.id} className="hover:bg-gray-50/50">
-                        <td className="px-4 py-3 font-medium text-gray-900">{f.student?.full_name || '—'}</td>
-                        <td className="px-4 py-3 text-gray-700">{f.fee_type}</td>
-                        <td className="px-4 py-3 text-gray-700">{formatCurrency(f.amount, '₹')}</td>
-                        <td className="px-4 py-3 text-gray-700">
+                      <tr key={f.id} className="hover:bg-[#F7F8FE]">
+                        <td className="px-4 py-3 font-medium text-slate-900">{f.student?.full_name || '—'}</td>
+                        <td className="px-4 py-3 text-slate-700">{f.fee_type}</td>
+                        <td className="px-4 py-3 text-slate-700">{formatCurrency(f.amount, '₹')}</td>
+                        <td className="px-4 py-3 text-slate-700">
                           <span>{formatCurrency(f.paid_amount, '₹')}</span>
                         </td>
-                        <td className="px-4 py-3 text-gray-700">{formatDate(f.due_date)}</td>
+                        <td className="px-4 py-3 text-slate-700">{formatDate(f.due_date)}</td>
                         <td className="px-4 py-3">
                           {f.payment_method ? (
                             isOnlinePayment(f.payment_method)
                               ? <Badge variant="default">Online</Badge>
                               : <Badge variant="neutral">Offline</Badge>
-                          ) : <span className="text-gray-400">—</span>}
+                          ) : <span className="text-slate-400">—</span>}
                         </td>
                         <td className="px-4 py-3"><StatusBadge status={f.status} /></td>
                         <td className="px-4 py-3">
@@ -576,7 +576,7 @@ export default function AdminFees() {
                             {f.status !== 'paid' && (
                               <Button size="sm" variant="outline" icon={<CreditCard className="h-3.5 w-3.5" />} onClick={() => { setSelectedFee(f); setPaymentForm({ ...paymentForm, amount: f.remaining_amount.toString() }); setPaymentModalOpen(true); }}>Pay</Button>
                             )}
-                            <button onClick={() => setDeleteId(f.id)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600">
+                            <button onClick={() => setDeleteId(f.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600">
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
@@ -598,36 +598,36 @@ export default function AdminFees() {
             </div>
 
             {feeStructures.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-                <IndianRupee className="h-12 w-12 text-gray-300 mb-3" />
-                <p className="font-medium text-gray-600">No fee structures defined</p>
+              <div className="flex flex-col items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-white py-16 text-center">
+                <IndianRupee className="h-12 w-12 text-slate-300 mb-3" />
+                <p className="font-medium text-slate-600">No fee structures defined</p>
               </div>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+              <div className="overflow-x-auto rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
                 <table className="w-full text-left text-sm">
-                  <thead className="border-b border-gray-200 bg-gray-50/50">
+                  <thead className="border-b border-slate-100 bg-[#F7F8FE]">
                     <tr>
-                      <th className="px-4 py-3 font-semibold text-gray-600">Name</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600">Type</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600">Class</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600">Amount</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600">Frequency</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600">Due Day</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600">Status</th>
-                      <th className="px-4 py-3 font-semibold text-gray-600 text-right">Actions</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Name</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Type</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Class</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Amount</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Frequency</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Due Day</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
+                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-slate-100">
                     {feeStructures.map((fs) => (
-                      <tr key={fs.id} className="hover:bg-gray-50/50">
-                        <td className="px-4 py-3 font-medium text-gray-900">{fs.name}</td>
-                        <td className="px-4 py-3 text-gray-700">{fs.fee_type}</td>
-                        <td className="px-4 py-3 text-gray-700">
+                      <tr key={fs.id} className="hover:bg-[#F7F8FE]">
+                        <td className="px-4 py-3 font-medium text-slate-900">{fs.name}</td>
+                        <td className="px-4 py-3 text-slate-700">{fs.fee_type}</td>
+                        <td className="px-4 py-3 text-slate-700">
                           {fs.class_id ? (classes.find((c) => c.id === fs.class_id)?.name || fs.class_id) : 'All Classes'}
                         </td>
-                        <td className="px-4 py-3 text-gray-700">{formatCurrency(fs.amount, '₹')}</td>
-                        <td className="px-4 py-3 text-gray-700">{frequencyLabel[fs.frequency]}</td>
-                        <td className="px-4 py-3 text-gray-700">{fs.due_day ?? '—'}</td>
+                        <td className="px-4 py-3 text-slate-700">{formatCurrency(fs.amount, '₹')}</td>
+                        <td className="px-4 py-3 text-slate-700">{frequencyLabel[fs.frequency]}</td>
+                        <td className="px-4 py-3 text-slate-700">{fs.due_day ?? '—'}</td>
                         <td className="px-4 py-3">
                           <Badge variant={fs.is_active ? 'success' : 'neutral'}>{fs.is_active ? 'Active' : 'Inactive'}</Badge>
                         </td>
@@ -635,7 +635,7 @@ export default function AdminFees() {
                           <div className="flex items-center justify-end gap-1 whitespace-nowrap">
                             <Button size="sm" variant="outline" onClick={() => openEditStructure(fs)}>Edit</Button>
                             <Button size="sm" variant="outline" onClick={() => setAssigningStructure(fs)}>Assign to Students</Button>
-                            <button onClick={() => setDeleteStructureId(fs.id)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600">
+                            <button onClick={() => setDeleteStructureId(fs.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600">
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
@@ -654,7 +654,7 @@ export default function AdminFees() {
           <div className="space-y-5">
             {/* Razorpay Key ID guide */}
             <Card className="p-6">
-              <h3 className="text-sm font-semibold text-gray-900 mb-4">How to Get Your Razorpay Key ID</h3>
+              <h3 className="text-sm font-semibold text-slate-900 mb-4">How to Get Your Razorpay Key ID</h3>
               <ol className="space-y-4">
                 {[
                   {
@@ -679,12 +679,12 @@ export default function AdminFees() {
                   },
                 ].map(({ step, title, body }) => (
                   <li key={step} className="flex gap-3">
-                    <span className="flex-shrink-0 h-6 w-6 rounded-full bg-blue-600 text-white text-xs font-bold flex items-center justify-center">
+                    <span className="flex-shrink-0 h-6 w-6 rounded-full bg-brand-600 text-white text-xs font-bold flex items-center justify-center">
                       {step}
                     </span>
                     <div>
-                      <p className="text-sm font-semibold text-gray-800">{title}</p>
-                      <p className="text-sm text-gray-600 mt-0.5">{body}</p>
+                      <p className="text-sm font-semibold text-slate-800">{title}</p>
+                      <p className="text-sm text-slate-600 mt-0.5">{body}</p>
                     </div>
                   </li>
                 ))}
@@ -694,19 +694,19 @@ export default function AdminFees() {
                   href="https://dashboard.razorpay.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 transition-colors w-fit"
+                  className="inline-flex items-center justify-center rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)] px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors w-fit"
                 >
                   Open Razorpay Dashboard →
                 </a>
-                <p className="text-xs text-gray-400">
-                  For test mode during development, use a key starting with <code className="font-mono bg-gray-100 px-1 rounded">rzp_test_</code>
+                <p className="text-xs text-slate-400">
+                  For test mode during development, use a key starting with <code className="font-mono bg-slate-100 px-1 rounded">rzp_test_</code>
                 </p>
               </div>
             </Card>
 
             <Card className="p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-gray-900">Razorpay & Bank Details</h3>
+                <h3 className="text-sm font-semibold text-slate-900">Razorpay & Bank Details</h3>
                 {setupSaved && (
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
                     <CheckCircle className="h-3.5 w-3.5" />
@@ -725,9 +725,9 @@ export default function AdminFees() {
                   />
                   {setupErrors.razorpay_key_id && <p className="mt-1 text-xs text-red-600">{setupErrors.razorpay_key_id}</p>}
                 </div>
-                <div className="flex items-start gap-2 rounded-xl bg-blue-50 border border-blue-100 p-3 sm:col-span-2">
-                  <Info className="h-4 w-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-blue-700">
+                <div className="flex items-start gap-2 rounded-xl bg-brand-50 border border-brand-100 p-3 sm:col-span-2">
+                  <Info className="h-4 w-4 text-brand-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-brand-700">
                     Only your Razorpay <strong>Key ID</strong> (publishable key) is stored here. Your <strong>Key Secret</strong> should never be entered into a browser — keep it only on your server or Razorpay dashboard.
                   </p>
                 </div>
@@ -748,16 +748,16 @@ export default function AdminFees() {
                   {setupErrors.bank_name && <p className="mt-1 text-xs text-red-600">{setupErrors.bank_name}</p>}
                 </div>
                 <div>
-                  <label className="mb-1 block text-[13px] font-medium text-gray-700">Account Number</label>
+                  <label className="mb-1 block text-[13px] font-medium text-slate-700">Account Number</label>
                   <div className="relative">
                     <input
                       type={showAccountNo ? 'text' : 'password'}
                       value={setupForm.account_number}
                       onChange={(e) => setSetupForm({ ...setupForm, account_number: e.target.value })}
-                      className="h-10 w-full rounded-[10px] border border-gray-200 bg-white px-3 pr-10 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
+                      className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 pr-10 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
                       placeholder="Account number"
                     />
-                    <button type="button" onClick={() => setShowAccountNo((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    <button type="button" onClick={() => setShowAccountNo((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
                       {showAccountNo ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
@@ -780,9 +780,9 @@ export default function AdminFees() {
             </Card>
 
             {/* How it works */}
-            <Card className="p-4 bg-blue-50 border-blue-100">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">How Online Payments Work</h3>
-              <ul className="space-y-2 text-sm text-gray-700">
+            <Card className="p-4 bg-brand-50 border-brand-100">
+              <h3 className="text-sm font-semibold text-slate-900 mb-3">How Online Payments Work</h3>
+              <ul className="space-y-2 text-sm text-slate-700">
                 <li>• Parent clicks "Pay Now" on their fee and selects a payment plan (full, quarterly, or EMI).</li>
                 <li>• Payment is processed securely via Razorpay.</li>
                 <li>• On success, the fee record is updated automatically and an invoice is generated for the parent to download or print.</li>
@@ -834,17 +834,17 @@ export default function AdminFees() {
         footer={<><Button variant="outline" onClick={() => { setPaymentModalOpen(false); setPaymentErrors({}); }}>Cancel</Button><Button onClick={handlePayment} loading={saving}>Record Payment</Button></>}>
         <div className="space-y-4">
           {/* Balance summary banner */}
-          <div className="grid grid-cols-3 divide-x divide-gray-200 rounded-xl border border-gray-200 bg-gray-50 text-center text-sm">
+          <div className="grid grid-cols-3 divide-x divide-slate-200 rounded-xl border border-slate-200 bg-slate-50 text-center text-sm">
             <div className="px-3 py-3">
-              <p className="text-xs text-gray-500 mb-0.5">Total Amount</p>
-              <p className="font-semibold text-gray-900">{formatCurrency(selectedFee?.amount ?? 0, '₹')}</p>
+              <p className="text-xs text-slate-500 mb-0.5">Total Amount</p>
+              <p className="font-semibold text-slate-900">{formatCurrency(selectedFee?.amount ?? 0, '₹')}</p>
             </div>
             <div className="px-3 py-3">
-              <p className="text-xs text-gray-500 mb-0.5">Already Paid</p>
+              <p className="text-xs text-slate-500 mb-0.5">Already Paid</p>
               <p className="font-semibold text-emerald-700">{formatCurrency(selectedFee?.paid_amount ?? 0, '₹')}</p>
             </div>
             <div className="px-3 py-3">
-              <p className="text-xs text-gray-500 mb-0.5">Remaining</p>
+              <p className="text-xs text-slate-500 mb-0.5">Remaining</p>
               <p className="font-bold text-red-600">{formatCurrency(selectedFee?.remaining_amount ?? 0, '₹')}</p>
             </div>
           </div>
@@ -936,7 +936,7 @@ export default function AdminFees() {
 
           {/* Active checkbox — full width */}
           <div className="sm:col-span-2">
-            <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
               <input type="checkbox" checked={structureForm.is_active}
                 onChange={(e) => setStructureForm({ ...structureForm, is_active: e.target.checked })}
                 className="rounded" />
@@ -958,7 +958,7 @@ export default function AdminFees() {
           </>
         }>
         {assigningStructure && (
-          <div className="space-y-3 text-sm text-gray-700">
+          <div className="space-y-3 text-sm text-slate-700">
             <p>
               This will create fee records of{' '}
               <strong>{formatCurrency(assigningStructure.amount, '₹')}</strong> ({assigningStructure.fee_type}) for:
@@ -969,16 +969,16 @@ export default function AdminFees() {
                 : 'All students in the school'}
             </p>
             {assigningStructure.frequency === 'monthly' && (
-              <p className="text-blue-700 bg-blue-50 rounded-lg px-3 py-2">
+              <p className="text-brand-700 bg-brand-50 rounded-lg px-3 py-2">
                 Monthly frequency: <strong>12 records per student</strong> will be created (April – March).
               </p>
             )}
             {assigningStructure.frequency === 'quarterly' && (
-              <p className="text-blue-700 bg-blue-50 rounded-lg px-3 py-2">
+              <p className="text-brand-700 bg-brand-50 rounded-lg px-3 py-2">
                 Quarterly frequency: <strong>4 records per student</strong> will be created (Q1–Q4).
               </p>
             )}
-            <p className="text-gray-500">Are you sure you want to proceed?</p>
+            <p className="text-slate-500">Are you sure you want to proceed?</p>
           </div>
         )}
       </Modal>

@@ -243,7 +243,7 @@ export default function AdminStudents() {
           <select
             value={classFilter}
             onChange={(e) => setClassFilter(e.target.value)}
-            className="h-10 w-full sm:w-52 rounded-[10px] border border-gray-200 bg-white px-3 pr-9 text-sm text-gray-700 transition-colors focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25 appearance-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2712%27%20height%3D%2712%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%239ca3af%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpolyline%20points%3D%276%209%2012%2015%2018%209%27%3E%3C/polyline%3E%3C/svg%3E')] bg-no-repeat bg-[right_12px_center]"
+            className="h-10 w-full sm:w-52 rounded-[10px] border border-slate-200 bg-white px-3 pr-9 text-sm text-slate-700 transition-colors focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25 appearance-none bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%27http%3A//www.w3.org/2000/svg%27%20width%3D%2712%27%20height%3D%2712%27%20viewBox%3D%270%200%2024%2024%27%20fill%3D%27none%27%20stroke%3D%27%239ca3af%27%20stroke-width%3D%272%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%3E%3Cpolyline%20points%3D%276%209%2012%2015%2018%209%27%3E%3C/polyline%3E%3C/svg%3E')] bg-no-repeat bg-[right_12px_center]"
           >
             <option value="">All Classes</option>
             {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -253,60 +253,60 @@ export default function AdminStudents() {
         {loading ? (
           <LoadingSpinner />
         ) : students.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-            <Users className="h-12 w-12 text-gray-300 mb-3" />
-            <p className="font-medium text-gray-600">No students found</p>
-            <p className="mt-1 text-sm text-gray-400">Add your first student to get started</p>
+          <div className="flex flex-col items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-white py-16 text-center">
+            <Users className="h-12 w-12 text-slate-300 mb-3" />
+            <p className="font-medium text-slate-600">No students found</p>
+            <p className="mt-1 text-sm text-slate-400">Add your first student to get started</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <div className="overflow-x-auto rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50/50">
+              <thead className="border-b border-slate-100 bg-[#F7F8FE]">
                 <tr>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Photo</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Admission No.</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Name</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Father's Name</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Class</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Section</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Status</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600 text-right">Actions</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Photo</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Admission No.</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Name</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Father's Name</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Class</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Section</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
+                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 {students.map((s) => (
-                  <tr key={s.id} className="hover:bg-gray-50/50 transition-colors">
+                  <tr key={s.id} className="hover:bg-[#F7F8FE] transition-colors">
                     <td className="px-4 py-3">
-                      <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-sm font-bold text-blue-700 flex-shrink-0">
+                      <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-brand-100 text-sm font-bold text-brand-700 flex-shrink-0">
                         {s.avatar_url
                           ? <img src={s.avatar_url} alt={s.full_name} className="h-full w-full rounded-full object-cover" />
                           : getInitials(s.full_name)
                         }
                       </div>
                     </td>
-                    <td className="px-4 py-3 font-medium text-gray-900">{s.admission_number}</td>
-                    <td className="px-4 py-3 text-gray-700">{s.full_name}</td>
-                    <td className="px-4 py-3 text-gray-700">{s.father_name || '—'}</td>
-                    <td className="px-4 py-3 text-gray-700">{s.class?.name || '—'}</td>
-                    <td className="px-4 py-3 text-gray-700">{s.section?.name || '—'}</td>
+                    <td className="px-4 py-3 font-medium text-slate-900">{s.admission_number}</td>
+                    <td className="px-4 py-3 text-slate-700">{s.full_name}</td>
+                    <td className="px-4 py-3 text-slate-700">{s.father_name || '—'}</td>
+                    <td className="px-4 py-3 text-slate-700">{s.class?.name || '—'}</td>
+                    <td className="px-4 py-3 text-slate-700">{s.section?.name || '—'}</td>
                     <td className="px-4 py-3"><StatusBadge status={s.status} /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1 whitespace-nowrap">
                         <button
                           onClick={() => openParentCredentials(s)}
-                          className="rounded-lg p-1.5 text-gray-400 hover:bg-cyan-50 hover:text-cyan-700 transition-colors disabled:opacity-50"
+                          className="rounded-lg p-1.5 text-slate-400 hover:bg-cyan-50 hover:text-cyan-700 transition-colors disabled:opacity-50"
                           title="View Parent Credentials"
                           disabled={loadingParentCred === s.id}
                         >
                           <KeyRound className="h-4 w-4" />
                         </button>
-                        <button onClick={() => navigate(`/admin/students/${s.id}`)} className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600 transition-colors" title="View">
+                        <button onClick={() => navigate(`/admin/students/${s.id}`)} className="rounded-lg p-1.5 text-slate-400 hover:bg-brand-50 hover:text-brand-600 transition-colors" title="View">
                           <Eye className="h-4 w-4" />
                         </button>
-                        <button onClick={() => openEdit(s)} className="rounded-lg p-1.5 text-gray-400 hover:bg-amber-50 hover:text-amber-600 transition-colors" title="Edit">
+                        <button onClick={() => openEdit(s)} className="rounded-lg p-1.5 text-slate-400 hover:bg-amber-50 hover:text-amber-600 transition-colors" title="Edit">
                           <Pencil className="h-4 w-4" />
                         </button>
-                        <button onClick={() => setDeleteId(s.id)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors" title="Delete">
+                        <button onClick={() => setDeleteId(s.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors" title="Delete">
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
@@ -360,11 +360,11 @@ export default function AdminStudents() {
             placeholder="Enter email address"
           />
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
               Mobile Number
             </label>
             <div className="flex rounded-[10px] overflow-hidden">
-              <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-gray-200 bg-gray-50 text-gray-600 text-sm font-medium select-none">
+              <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-slate-200 bg-slate-50 text-slate-600 text-sm font-medium select-none">
                 +91
               </span>
               <input
@@ -375,7 +375,7 @@ export default function AdminStudents() {
                   const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
                   setForm({ ...form, emergency_contact: digits });
                 }}
-                className="flex-1 rounded-r-[10px] border border-gray-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
+                className="flex-1 rounded-r-[10px] border border-slate-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
                 placeholder="10-digit mobile number"
               />
             </div>
@@ -405,10 +405,10 @@ export default function AdminStudents() {
       >
         {parentCredModal && (
           <div className="space-y-4">
-            <div className="rounded-xl border border-cyan-200 bg-gradient-to-br from-cyan-50/70 to-blue-50/50 p-4 space-y-3">
+            <div className="rounded-xl border border-cyan-200 bg-gradient-to-br from-cyan-50/70 to-brand-50/50 p-4 space-y-3">
               <div className="flex items-center justify-between pb-3 border-b border-cyan-100">
                 <div>
-                  <p className="text-xs font-medium text-gray-500 mb-0.5">Username / Email</p>
+                  <p className="text-xs font-medium text-slate-500 mb-0.5">Username / Email</p>
                   <p className="font-mono text-sm font-semibold text-cyan-900">{parentCredModal.username}</p>
                 </div>
                 <button
@@ -417,7 +417,7 @@ export default function AdminStudents() {
                     navigator.clipboard.writeText(parentCredModal.username);
                     toast('Username copied', 'success');
                   }}
-                  className="rounded-lg p-1.5 bg-white shadow-2xs border border-gray-200 text-gray-500 hover:text-cyan-700 hover:border-cyan-300 transition-all"
+                  className="rounded-lg p-1.5 bg-white shadow-2xs border border-slate-200 text-slate-500 hover:text-cyan-700 hover:border-cyan-300 transition-all"
                   title="Copy username"
                 >
                   <Copy className="h-4 w-4" />
@@ -426,8 +426,8 @@ export default function AdminStudents() {
 
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-gray-500 mb-0.5">Portal Password</p>
-                  <p className="font-mono text-sm font-semibold text-gray-900 tracking-wide">
+                  <p className="text-xs font-medium text-slate-500 mb-0.5">Portal Password</p>
+                  <p className="font-mono text-sm font-semibold text-slate-900 tracking-wide">
                     {parentCredVisible ? (parentCredModal.password || '(not stored)') : '••••••••'}
                   </p>
                 </div>
@@ -435,7 +435,7 @@ export default function AdminStudents() {
                   <button
                     type="button"
                     onClick={() => setParentCredVisible((v) => !v)}
-                    className="rounded-lg p-1.5 bg-white shadow-2xs border border-gray-200 text-gray-500 hover:text-gray-800 hover:border-gray-300 transition-all"
+                    className="rounded-lg p-1.5 bg-white shadow-2xs border border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300 transition-all"
                     title={parentCredVisible ? 'Hide' : 'Show'}
                   >
                     {parentCredVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -448,7 +448,7 @@ export default function AdminStudents() {
                       toast('Password copied', 'success');
                       setTimeout(() => setParentCredCopied(false), 1500);
                     }}
-                    className="rounded-lg p-1.5 bg-white shadow-2xs border border-gray-200 text-gray-500 hover:text-cyan-700 hover:border-cyan-300 transition-all"
+                    className="rounded-lg p-1.5 bg-white shadow-2xs border border-slate-200 text-slate-500 hover:text-cyan-700 hover:border-cyan-300 transition-all"
                     title="Copy password"
                   >
                     {parentCredCopied ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
@@ -459,7 +459,7 @@ export default function AdminStudents() {
 
             <Button
               variant="outline"
-              className="w-full flex items-center justify-center gap-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium shadow-2xs"
+              className="w-full flex items-center justify-center gap-2 border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium shadow-2xs"
               onClick={() => {
                 const text = `Parent Login Credentials\nStudent: ${parentCredModal.studentName}\nParent: ${parentCredModal.parentName}\nUsername: ${parentCredModal.username}\nPassword: ${parentCredModal.password}\nPortal: Veducore Parent App / Web`;
                 navigator.clipboard.writeText(text);

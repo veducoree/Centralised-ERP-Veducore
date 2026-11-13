@@ -44,7 +44,7 @@ export function CenteredLoader({
       className={cn(
         'flex flex-col items-center justify-center select-none',
         fullScreen
-          ? 'fixed inset-0 z-50 min-h-screen w-screen bg-gray-50/95 backdrop-blur-xs'
+          ? 'fixed inset-0 z-50 min-h-screen w-screen bg-slate-50/95 backdrop-blur-xs'
           : 'min-h-[calc(100vh-12rem)] w-full py-12',
         className
       )}
@@ -75,7 +75,7 @@ export function CenteredLoader({
       </div>
 
       {label && (
-        <p className="mt-2.5 text-xs font-medium text-gray-400 tracking-wide">
+        <p className="mt-2.5 text-xs font-medium text-slate-400 tracking-wide">
           {label}
         </p>
       )}
@@ -86,7 +86,7 @@ export function CenteredLoader({
 /** Skeleton for a single KPI/Stat card */
 export function StatCardSkeleton() {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-2xs">
+    <div className="rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)] p-5 shadow-2xs">
       <div className="flex items-center justify-between">
         <div className="space-y-2.5 flex-1">
           <Skeleton className="h-3.5 w-24 rounded-md" />
@@ -103,7 +103,7 @@ export function DashboardSkeleton({ cards = 8 }: { cards?: number }) {
   return (
     <div className="space-y-6">
       {/* Greeting Banner Skeleton */}
-      <div className="rounded-2xl border border-gray-100 bg-white px-5 py-4 shadow-2xs space-y-2">
+      <div className="rounded-2xl border border-slate-100 bg-white px-5 py-4 shadow-2xs space-y-2">
         <Skeleton className="h-5 w-56 rounded-md" />
         <Skeleton className="h-3.5 w-72 rounded-md" />
       </div>
@@ -122,7 +122,7 @@ export function DashboardSkeleton({ cards = 8 }: { cards?: number }) {
 
       {/* Charts / Content Row */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+        <div className="rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)] p-5 space-y-4">
           <div className="flex items-center justify-between">
             <Skeleton className="h-4 w-40 rounded-md" />
             <Skeleton className="h-3.5 w-24 rounded-md" />
@@ -136,7 +136,7 @@ export function DashboardSkeleton({ cards = 8 }: { cards?: number }) {
           </div>
         </div>
 
-        <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-4">
+        <div className="rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)] p-5 space-y-4">
           <Skeleton className="h-4 w-36 rounded-md" />
           <div className="flex items-center gap-6 py-2">
             <Skeleton className="h-28 w-28 rounded-full flex-shrink-0" />
@@ -161,9 +161,9 @@ export function TableSkeleton({
   columns?: number;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <div className="overflow-hidden rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
       {/* Table Header */}
-      <div className="grid grid-cols-12 gap-4 border-b border-gray-200 bg-gray-50/70 px-4 py-3.5">
+      <div className="grid grid-cols-12 gap-4 border-b border-slate-200 bg-slate-50/70 px-4 py-3.5">
         {Array.from({ length: columns }).map((_, i) => (
           <div
             key={i}
@@ -179,7 +179,7 @@ export function TableSkeleton({
       </div>
 
       {/* Table Rows */}
-      <div className="divide-y divide-gray-100">
+      <div className="divide-y divide-slate-100">
         {Array.from({ length: rows }).map((_, rowIdx) => (
           <div
             key={rowIdx}
@@ -223,7 +223,7 @@ export function CardGridSkeleton({ count = 6 }: { count?: number }) {
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="rounded-xl border border-gray-200 bg-white p-5 space-y-4"
+          className="rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)] p-5 space-y-4"
         >
           <div className="flex items-center gap-3">
             <Skeleton className="h-10 w-10 rounded-xl flex-shrink-0" />
@@ -236,7 +236,7 @@ export function CardGridSkeleton({ count = 6 }: { count?: number }) {
             <Skeleton className="h-3 w-full rounded-md" />
             <Skeleton className="h-3 w-4/5 rounded-md" />
           </div>
-          <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+          <div className="flex items-center justify-between pt-2 border-t border-slate-100">
             <Skeleton className="h-6 w-16 rounded-full" />
             <Skeleton className="h-7 w-20 rounded-lg" />
           </div>
@@ -250,7 +250,7 @@ export function CardGridSkeleton({ count = 6 }: { count?: number }) {
 export function ProfileSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-gray-200 bg-white p-6">
+      <div className="rounded-2xl border border-slate-200 bg-white p-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <Skeleton className="h-16 w-16 rounded-full flex-shrink-0" />
           <div className="space-y-2.5 flex-1">
@@ -265,7 +265,7 @@ export function ProfileSkeleton() {
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
-            className="rounded-xl border border-gray-200 bg-white p-5 space-y-3"
+            className="rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)] p-5 space-y-3"
           >
             <Skeleton className="h-4 w-36 rounded-md" />
             <div className="space-y-2.5 pt-2">

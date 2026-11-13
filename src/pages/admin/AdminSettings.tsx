@@ -155,79 +155,79 @@ export default function AdminSettings() {
         ) : (
           <div className="space-y-6">
             {/* ── SECTION 1: OFFICIAL INSTITUTIONAL PROFILE (READ-ONLY) ── */}
-            <Card className="p-6 border border-gray-200">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-gray-100">
+            <Card className="p-6 border border-slate-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-slate-100">
                 <div className="flex items-center gap-2.5">
-                  <div className="h-9 w-9 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center flex-shrink-0">
+                  <div className="h-9 w-9 rounded-lg bg-brand-50 text-brand-700 flex items-center justify-center flex-shrink-0">
                     <Building2 className="h-5 w-5" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-gray-900">
+                    <h3 className="text-sm font-bold text-slate-900">
                       Official Institutional Registration Record
                     </h3>
-                    <p className="text-xs text-gray-500">
+                    <p className="text-xs text-slate-500">
                       Core school identity parameters are managed centrally to protect institutional integrity.
                     </p>
                   </div>
                 </div>
 
-                <div className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700 border border-blue-200">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-700 border border-brand-200">
                   <ShieldCheck className="h-3.5 w-3.5" />
                   <span>Verified by Veducore Superadmin</span>
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 text-xs">
-                <div className="rounded-xl border border-gray-100 bg-gray-50/75 p-3.5">
-                  <span className="block font-semibold text-gray-400 uppercase tracking-wider text-[10px]">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/75 p-3.5">
+                  <span className="block font-semibold text-slate-400 uppercase tracking-wider text-[10px]">
                     School Name
                   </span>
-                  <span className="mt-1 block font-bold text-gray-900 text-sm">
+                  <span className="mt-1 block font-bold text-slate-900 text-sm">
                     {school?.name || 'N/A'}
                   </span>
                 </div>
 
-                <div className="rounded-xl border border-gray-100 bg-gray-50/75 p-3.5">
-                  <span className="block font-semibold text-gray-400 uppercase tracking-wider text-[10px]">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/75 p-3.5">
+                  <span className="block font-semibold text-slate-400 uppercase tracking-wider text-[10px]">
                     Registered Official Email
                   </span>
-                  <span className="mt-1 block font-mono font-medium text-gray-800 truncate">
+                  <span className="mt-1 block font-mono font-medium text-slate-800 truncate">
                     {school?.email || 'N/A'}
                   </span>
                 </div>
 
-                <div className="rounded-xl border border-gray-100 bg-gray-50/75 p-3.5">
-                  <span className="block font-semibold text-gray-400 uppercase tracking-wider text-[10px]">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/75 p-3.5">
+                  <span className="block font-semibold text-slate-400 uppercase tracking-wider text-[10px]">
                     Official Contact Number
                   </span>
-                  <span className="mt-1 block font-bold text-gray-900">
+                  <span className="mt-1 block font-bold text-slate-900">
                     {school?.contact_number || 'N/A'}
                   </span>
                 </div>
 
-                <div className="rounded-xl border border-gray-100 bg-gray-50/75 p-3.5">
-                  <span className="block font-semibold text-gray-400 uppercase tracking-wider text-[10px]">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/75 p-3.5">
+                  <span className="block font-semibold text-slate-400 uppercase tracking-wider text-[10px]">
                     Academic Session
                   </span>
-                  <span className="mt-1 block font-bold text-blue-700">
+                  <span className="mt-1 block font-bold text-brand-700">
                     {school?.academic_year || '2026-27'}
                   </span>
                 </div>
 
-                <div className="rounded-xl border border-gray-100 bg-gray-50/75 p-3.5">
-                  <span className="block font-semibold text-gray-400 uppercase tracking-wider text-[10px]">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/75 p-3.5">
+                  <span className="block font-semibold text-slate-400 uppercase tracking-wider text-[10px]">
                     Currency & Timezone
                   </span>
-                  <span className="mt-1 block font-bold text-gray-900">
+                  <span className="mt-1 block font-bold text-slate-900">
                     {school?.currency || 'INR'} ({school?.currency_symbol || '₹'}) • {school?.timezone || 'IST (UTC+5:30)'}
                   </span>
                 </div>
 
-                <div className="rounded-xl border border-gray-100 bg-gray-50/75 p-3.5">
-                  <span className="block font-semibold text-gray-400 uppercase tracking-wider text-[10px]">
+                <div className="rounded-xl border border-slate-100 bg-slate-50/75 p-3.5">
+                  <span className="block font-semibold text-slate-400 uppercase tracking-wider text-[10px]">
                     Campus Address
                   </span>
-                  <span className="mt-1 block font-medium text-gray-800 truncate">
+                  <span className="mt-1 block font-medium text-slate-800 truncate">
                     {school?.address || 'Main Campus'}
                   </span>
                 </div>
@@ -237,12 +237,12 @@ export default function AdminSettings() {
             {/* ── SECTION 2: SCHOOL BRANDING & CREST ── */}
             <Card className="p-6">
               <div className="flex items-center gap-2 mb-4">
-                <SchoolIcon className="h-5 w-5 text-blue-600" />
-                <h3 className="text-sm font-bold text-gray-900">Institutional Branding & Crest</h3>
+                <SchoolIcon className="h-5 w-5 text-brand-600" />
+                <h3 className="text-sm font-bold text-slate-900">Institutional Branding & Crest</h3>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-start gap-6 p-4 rounded-xl border border-gray-100 bg-gray-50/50 mb-5">
-                <div className="relative flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-white shadow-sm overflow-hidden">
+              <div className="flex flex-col sm:flex-row items-start gap-6 p-4 rounded-xl border border-slate-100 bg-slate-50/50 mb-5">
+                <div className="relative flex h-24 w-24 flex-shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-white shadow-sm overflow-hidden">
                   {logoPreview ? (
                     <>
                       <img
@@ -260,13 +260,13 @@ export default function AdminSettings() {
                       </button>
                     </>
                   ) : (
-                    <ImageIcon className="h-8 w-8 text-gray-300" />
+                    <ImageIcon className="h-8 w-8 text-slate-300" />
                   )}
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 mb-0.5">School Crest / Logo</p>
-                  <p className="text-xs text-gray-500 mb-3 leading-relaxed">
+                  <p className="text-sm font-semibold text-slate-900 mb-0.5">School Crest / Logo</p>
+                  <p className="text-xs text-slate-500 mb-3 leading-relaxed">
                     Appears on student ID cards, printable fee receipts, report cards, and top navigation header. Recommended transparent PNG or SVG format (max 2MB).
                   </p>
                   <input
@@ -323,8 +323,8 @@ export default function AdminSettings() {
             {/* ── SECTION 3: ACADEMIC & WORKING SCHEDULE POLICIES ── */}
             <Card className="p-6">
               <div className="flex items-center gap-2 mb-4">
-                <CalendarClock className="h-5 w-5 text-blue-600" />
-                <h3 className="text-sm font-bold text-gray-900">Academic & Working Schedule Policies</h3>
+                <CalendarClock className="h-5 w-5 text-brand-600" />
+                <h3 className="text-sm font-bold text-slate-900">Academic & Working Schedule Policies</h3>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -333,7 +333,7 @@ export default function AdminSettings() {
                     <option value="6">6 Working Days (Monday – Saturday)</option>
                     <option value="5">5 Working Days (Monday – Friday)</option>
                   </Select>
-                  <span className="text-[11px] text-gray-400 mt-1 block">Sets active attendance days across teacher portals.</span>
+                  <span className="text-[11px] text-slate-400 mt-1 block">Sets active attendance days across teacher portals.</span>
                 </div>
 
                 <div>
@@ -344,7 +344,7 @@ export default function AdminSettings() {
                     <option value="10:30 AM">10:30 AM</option>
                     <option value="11:00 AM">11:00 AM</option>
                   </Select>
-                  <span className="text-[11px] text-gray-400 mt-1 block">Alerts staff if class attendance is unsubmitted.</span>
+                  <span className="text-[11px] text-slate-400 mt-1 block">Alerts staff if class attendance is unsubmitted.</span>
                 </div>
 
                 <div>
@@ -354,7 +354,7 @@ export default function AdminSettings() {
                     <option value="40">40%</option>
                     <option value="50">50%</option>
                   </Select>
-                  <span className="text-[11px] text-gray-400 mt-1 block">Used for automatic student report card status calculations.</span>
+                  <span className="text-[11px] text-slate-400 mt-1 block">Used for automatic student report card status calculations.</span>
                 </div>
               </div>
             </Card>
@@ -364,8 +364,8 @@ export default function AdminSettings() {
               {/* Fee Rules */}
               <Card className="p-6 space-y-4">
                 <div className="flex items-center gap-2">
-                  <Award className="h-5 w-5 text-blue-600" />
-                  <h3 className="text-sm font-bold text-gray-900">Fee Billing & Collection Rules</h3>
+                  <Award className="h-5 w-5 text-brand-600" />
+                  <h3 className="text-sm font-bold text-slate-900">Fee Billing & Collection Rules</h3>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -389,17 +389,17 @@ export default function AdminSettings() {
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-gray-100">
+                <div className="pt-2 border-t border-slate-100">
                   <label className="flex items-center gap-3 cursor-pointer select-none">
                     <input
                       type="checkbox"
                       checked={settings.autoReceipts}
                       onChange={(e) => setSettings({ ...settings, autoReceipts: e.target.checked })}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
                     />
                     <div>
-                      <p className="text-xs font-semibold text-gray-800">Auto-Generate Printable Receipts</p>
-                      <p className="text-[11px] text-gray-400">Instantly generate verifiable payment receipts for parents upon fee submission.</p>
+                      <p className="text-xs font-semibold text-slate-800">Auto-Generate Printable Receipts</p>
+                      <p className="text-[11px] text-slate-400">Instantly generate verifiable payment receipts for parents upon fee submission.</p>
                     </div>
                   </label>
                 </div>
@@ -408,47 +408,47 @@ export default function AdminSettings() {
               {/* Communication Rules */}
               <Card className="p-6 space-y-4">
                 <div className="flex items-center gap-2">
-                  <Bell className="h-5 w-5 text-blue-600" />
-                  <h3 className="text-sm font-bold text-gray-900">Parent Communication Rules</h3>
+                  <Bell className="h-5 w-5 text-brand-600" />
+                  <h3 className="text-sm font-bold text-slate-900">Parent Communication Rules</h3>
                 </div>
 
                 <div className="space-y-3">
-                  <label className="flex items-start gap-3 cursor-pointer select-none p-2.5 rounded-lg border border-gray-100 hover:bg-gray-50/75 transition-colors">
+                  <label className="flex items-start gap-3 cursor-pointer select-none p-2.5 rounded-lg border border-slate-100 hover:bg-slate-50/75 transition-colors">
                     <input
                       type="checkbox"
                       checked={settings.absenteeAlerts}
                       onChange={(e) => setSettings({ ...settings, absenteeAlerts: e.target.checked })}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-0.5"
+                      className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 mt-0.5"
                     />
                     <div>
-                      <p className="text-xs font-semibold text-gray-800">Instant Daily Absentee Notification</p>
-                      <p className="text-[11px] text-gray-400">Notify parents via in-app alert when attendance is marked absent by the teacher.</p>
+                      <p className="text-xs font-semibold text-slate-800">Instant Daily Absentee Notification</p>
+                      <p className="text-[11px] text-slate-400">Notify parents via in-app alert when attendance is marked absent by the teacher.</p>
                     </div>
                   </label>
 
-                  <label className="flex items-start gap-3 cursor-pointer select-none p-2.5 rounded-lg border border-gray-100 hover:bg-gray-50/75 transition-colors">
+                  <label className="flex items-start gap-3 cursor-pointer select-none p-2.5 rounded-lg border border-slate-100 hover:bg-slate-50/75 transition-colors">
                     <input
                       type="checkbox"
                       checked={settings.feeReminders}
                       onChange={(e) => setSettings({ ...settings, feeReminders: e.target.checked })}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-0.5"
+                      className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 mt-0.5"
                     />
                     <div>
-                      <p className="text-xs font-semibold text-gray-800">Fee Due Reminder Notice</p>
-                      <p className="text-[11px] text-gray-400">Send reminder alerts to parents 3 days before monthly fee due dates.</p>
+                      <p className="text-xs font-semibold text-slate-800">Fee Due Reminder Notice</p>
+                      <p className="text-[11px] text-slate-400">Send reminder alerts to parents 3 days before monthly fee due dates.</p>
                     </div>
                   </label>
 
-                  <label className="flex items-start gap-3 cursor-pointer select-none p-2.5 rounded-lg border border-gray-100 hover:bg-gray-50/75 transition-colors">
+                  <label className="flex items-start gap-3 cursor-pointer select-none p-2.5 rounded-lg border border-slate-100 hover:bg-slate-50/75 transition-colors">
                     <input
                       type="checkbox"
                       checked={settings.remarksAlerts}
                       onChange={(e) => setSettings({ ...settings, remarksAlerts: e.target.checked })}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-0.5"
+                      className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500 mt-0.5"
                     />
                     <div>
-                      <p className="text-xs font-semibold text-gray-800">Teacher Remarks Alerts</p>
-                      <p className="text-[11px] text-gray-400">Instant parent notification when teachers submit academic/behavioral remarks.</p>
+                      <p className="text-xs font-semibold text-slate-800">Teacher Remarks Alerts</p>
+                      <p className="text-[11px] text-slate-400">Instant parent notification when teachers submit academic/behavioral remarks.</p>
                     </div>
                   </label>
                 </div>
@@ -457,14 +457,14 @@ export default function AdminSettings() {
 
             {/* ── SECTION 5: INTEGRATED ERP SERVICES SHORTCUTS ── */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card className="p-5 flex items-center justify-between border border-gray-200 hover:border-blue-300 transition-colors">
+              <Card className="p-5 flex items-center justify-between border border-slate-200 hover:border-brand-300 transition-colors">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+                  <div className="h-10 w-10 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center flex-shrink-0">
                     <CreditCard className="h-5 w-5" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-gray-900">Online Fee Payment Gateway</h4>
-                    <p className="text-[11px] text-gray-400">Razorpay API credentials & direct settlement bank account setup.</p>
+                    <h4 className="text-xs font-bold text-slate-900">Online Fee Payment Gateway</h4>
+                    <p className="text-[11px] text-slate-400">Razorpay API credentials & direct settlement bank account setup.</p>
                   </div>
                 </div>
                 <Button
@@ -478,14 +478,14 @@ export default function AdminSettings() {
                 </Button>
               </Card>
 
-              <Card className="p-5 flex items-center justify-between border border-gray-200 hover:border-blue-300 transition-colors">
+              <Card className="p-5 flex items-center justify-between border border-slate-200 hover:border-brand-300 transition-colors">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center flex-shrink-0">
                     <Contact2 className="h-5 w-5" />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-gray-900">Student ID Cards</h4>
-                    <p className="text-[11px] text-gray-400">Submit requests for student ID card generation & printing.</p>
+                    <h4 className="text-xs font-bold text-slate-900">Student ID Cards</h4>
+                    <p className="text-[11px] text-slate-400">Submit requests for student ID card generation & printing.</p>
                   </div>
                 </div>
                 <Button
@@ -501,8 +501,8 @@ export default function AdminSettings() {
             </div>
 
             {/* ── SAVE ACTION BAR ── */}
-            <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-              <div className="flex items-center gap-2 text-xs text-gray-500">
+            <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+              <div className="flex items-center gap-2 text-xs text-slate-500">
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
                 <span>All institutional configuration changes apply instantly across your school.</span>
               </div>

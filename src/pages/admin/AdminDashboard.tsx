@@ -50,10 +50,6 @@ export default function AdminDashboard() {
   const paidDash = paidPct * C;
   const outstandingDash = outstandingPct * C;
 
-  // Greeting
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-
   const currencySymbol = '₹';
 
   return (
@@ -78,12 +74,6 @@ export default function AdminDashboard() {
           <DashboardSkeleton cards={8} />
         ) : (
           <>
-            {/* Greeting */}
-            <div className="rounded-[20px] bg-white px-6 py-5 shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
-              <h2 className="text-lg font-semibold text-[#0F172A]">{greeting}, {profile?.full_name || 'Admin'} 👋</h2>
-              <p className="mt-1 text-sm text-slate-500">Here's what's happening at your school today.</p>
-            </div>
-
             {/* Row 1: 4 stat cards */}
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {[

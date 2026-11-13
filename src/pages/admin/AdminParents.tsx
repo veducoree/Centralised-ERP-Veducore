@@ -4,7 +4,8 @@ import {
   Copy, Eye, EyeOff, CheckCircle, GraduationCap, KeyRound,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card } from '@/components/ui/Card';
+import { UsersRound, ShieldCheck, Link2 } from 'lucide-react';
+import { Card, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Modal, ConfirmDialog } from '@/components/ui/Modal';
 import { SearchInput, PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
@@ -127,23 +128,20 @@ function AdminParentsView() {
       />
 
       {/* Stat counters */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card className="p-4">
-          <p className="text-sm font-medium text-gray-500">Total Parents</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">{parents.length}</p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm font-medium text-gray-500">Active Accounts</p>
-          <p className="mt-1 text-2xl font-bold text-emerald-600">
-            {parents.filter((p) => p.status === 'active').length}
-          </p>
-        </Card>
-        <Card className="p-4">
-          <p className="text-sm font-medium text-gray-500">Linked Students</p>
-          <p className="mt-1 text-2xl font-bold text-cyan-600">
-            {parents.reduce((acc, p) => acc + (p.parent_students?.length || 0), 0)}
-          </p>
-        </Card>
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+        <StatCard label="Total Parents" value={parents.length} icon={<UsersRound />} color="cyan" />
+        <StatCard
+          label="Active Accounts"
+          value={parents.filter((p) => p.status === 'active').length}
+          icon={<ShieldCheck />}
+          color="emerald"
+        />
+        <StatCard
+          label="Linked Students"
+          value={parents.reduce((acc, p) => acc + (p.parent_students?.length || 0), 0)}
+          icon={<Link2 />}
+          color="blue"
+        />
       </div>
 
       <div className="max-w-sm">
@@ -153,15 +151,15 @@ function AdminParentsView() {
       {loading ? (
         <LoadingSpinner />
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-          <User className="h-12 w-12 text-gray-300 mb-3" />
-          <p className="font-medium text-gray-600">No parents found</p>
-          <p className="mt-1 text-sm text-gray-400">Parent accounts appear automatically when students are enrolled</p>
+        <div className="flex flex-col items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-white py-16 text-center">
+          <User className="h-12 w-12 text-slate-300 mb-3" />
+          <p className="font-medium text-slate-600">No parents found</p>
+          <p className="mt-1 text-sm text-slate-400">Parent accounts appear automatically when students are enrolled</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-2xs">
+        <div className="overflow-x-auto rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)] shadow-2xs">
           <table className="w-full text-left text-sm">
-            <thead className="border-b border-gray-200 bg-gray-50/70 text-xs font-semibold uppercase tracking-wider text-gray-600">
+            <thead className="border-b border-slate-200 bg-slate-50/70 text-xs font-semibold uppercase tracking-wider text-slate-600">
               <tr>
                 <th className="px-4 py-3.5">Parent</th>
                 <th className="px-4 py-3.5">Linked Student(s)</th>
@@ -170,9 +168,9 @@ function AdminParentsView() {
                 <th className="px-4 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-slate-100">
               {filtered.map((p) => (
-                <tr key={p.id} className="hover:bg-gray-50/60 transition-colors">
+                <tr key={p.id} className="hover:bg-slate-50/60 transition-colors">
                   {/* Parent: Avatar + Name + Occupation */}
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-3">
@@ -180,8 +178,8 @@ function AdminParentsView() {
                         {getInitials(p.full_name)}
                       </div>
                       <div className="min-w-0">
-                        <p className="font-semibold text-gray-900 truncate">{p.full_name}</p>
-                        <p className="text-xs text-gray-400 truncate">Parent / Guardian</p>
+                        <p className="font-semibold text-slate-900 truncate">{p.full_name}</p>
+                        <p className="text-xs text-slate-400 truncate">Parent / Guardian</p>
                       </div>
                     </div>
                   </td>
@@ -193,32 +191,32 @@ function AdminParentsView() {
                         {p.parent_students.map((ps) => (
                           <span
                             key={ps.id}
-                            className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-100"
+                            className="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700 border border-brand-100"
                           >
-                            <GraduationCap className="h-3 w-3 text-blue-500" />
+                            <GraduationCap className="h-3 w-3 text-brand-500" />
                             {ps.student?.full_name || 'Student'}
                             {ps.student?.class?.name ? ` (${ps.student.class.name})` : ''}
-                            <span className="text-[10px] text-blue-400 capitalize">· {ps.relationship || 'Child'}</span>
+                            <span className="text-[10px] text-brand-400 capitalize">· {ps.relationship || 'Child'}</span>
                           </span>
                         ))}
                       </div>
                     ) : (
-                      <span className="text-xs text-gray-400 italic">No student linked</span>
+                      <span className="text-xs text-slate-400 italic">No student linked</span>
                     )}
                   </td>
 
                   {/* Contact: Phone, Email & Address */}
                   <td className="px-4 py-3.5">
-                    <p className="text-sm font-medium text-gray-800 flex items-center gap-1.5">
-                      <Phone className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                    <p className="text-sm font-medium text-slate-800 flex items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
                       {p.phone ? (p.phone.startsWith('+91') ? p.phone : `+91 ${p.phone}`) : '—'}
                     </p>
-                    <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5">
-                      <Mail className="h-3 w-3 text-gray-400 flex-shrink-0" /> {p.email}
+                    <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
+                      <Mail className="h-3 w-3 text-slate-400 flex-shrink-0" /> {p.email}
                     </p>
                     {p.address && (
-                      <p className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5 max-w-xs truncate" title={p.address}>
-                        <MapPin className="h-3 w-3 text-gray-400 flex-shrink-0" /> {p.address}
+                      <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5 max-w-xs truncate" title={p.address}>
+                        <MapPin className="h-3 w-3 text-slate-400 flex-shrink-0" /> {p.address}
                       </p>
                     )}
                   </td>
@@ -243,14 +241,14 @@ function AdminParentsView() {
                       </Button>
                       <button
                         onClick={() => openEdit(p)}
-                        className="rounded-lg p-1.5 text-gray-400 hover:bg-amber-50 hover:text-amber-600 transition-colors"
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-amber-50 hover:text-amber-600 transition-colors"
                         title="Edit Phone Number & Address"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => setDeleteId(p.id)}
-                        className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
                         title="Delete Parent"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -293,24 +291,24 @@ function AdminParentsView() {
         {editing && (
           <div className="space-y-4">
             {/* Readonly info header */}
-            <div className="rounded-xl bg-gray-50 border border-gray-200 p-3.5 flex items-center justify-between">
+            <div className="rounded-xl bg-slate-50 border border-slate-200 p-3.5 flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-500 font-medium">Parent Name</p>
-                <p className="text-sm font-semibold text-gray-900">{editing.full_name}</p>
+                <p className="text-xs text-slate-500 font-medium">Parent Name</p>
+                <p className="text-sm font-semibold text-slate-900">{editing.full_name}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-gray-500 font-medium">Login Username</p>
-                <p className="text-xs font-mono text-gray-700">{editing.email}</p>
+                <p className="text-xs text-slate-500 font-medium">Login Username</p>
+                <p className="text-xs font-mono text-slate-700">{editing.email}</p>
               </div>
             </div>
 
             {/* Phone Number Input */}
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">
                 Phone Number
               </label>
               <div className="flex rounded-[10px] overflow-hidden">
-                <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-gray-200 bg-gray-50 text-gray-600 text-sm font-medium select-none">
+                <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-slate-200 bg-slate-50 text-slate-600 text-sm font-medium select-none">
                   +91
                 </span>
                 <input
@@ -321,28 +319,28 @@ function AdminParentsView() {
                     const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
                     setEditPhone(digits);
                   }}
-                  className="flex-1 rounded-r-[10px] border border-gray-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
+                  className="flex-1 rounded-r-[10px] border border-slate-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
                   placeholder="10-digit mobile number"
                 />
               </div>
-              <p className="mt-1 text-xs text-gray-400">
+              <p className="mt-1 text-xs text-slate-400">
                 Used for SMS/WhatsApp updates and synced as emergency contact for linked student(s).
               </p>
             </div>
 
             {/* Residential Address Textarea */}
             <div>
-              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              <label className="mb-1.5 block text-sm font-medium text-slate-700">
                 Residential Address
               </label>
               <textarea
                 rows={3}
                 value={editAddress}
                 onChange={(e) => setEditAddress(e.target.value)}
-                className="w-full rounded-[10px] border border-gray-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
+                className="w-full rounded-[10px] border border-slate-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
                 placeholder="Enter complete residential address..."
               />
-              <p className="mt-1 text-xs text-gray-400">
+              <p className="mt-1 text-xs text-slate-400">
                 Directly updates residential address for this parent and linked student records in database.
               </p>
             </div>
@@ -376,15 +374,15 @@ function AdminParentsView() {
           <div className="space-y-4">
             {/* Linked Student(s) Preview */}
             {credParent.parent_students && credParent.parent_students.length > 0 && (
-              <div className="rounded-xl bg-blue-50/60 border border-blue-100 p-3">
-                <p className="text-xs font-semibold text-blue-900 mb-1.5 flex items-center gap-1.5">
-                  <GraduationCap className="h-3.5 w-3.5 text-blue-600" /> Linked Student(s)
+              <div className="rounded-xl bg-brand-50/60 border border-brand-100 p-3">
+                <p className="text-xs font-semibold text-brand-900 mb-1.5 flex items-center gap-1.5">
+                  <GraduationCap className="h-3.5 w-3.5 text-brand-600" /> Linked Student(s)
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {credParent.parent_students.map((ps) => (
                     <span
                       key={ps.id}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-blue-200 text-blue-800 text-xs font-medium shadow-2xs"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-brand-200 text-brand-800 text-xs font-medium shadow-2xs"
                     >
                       {ps.student?.full_name || 'Student'} ({ps.relationship || 'Child'})
                     </span>
@@ -393,10 +391,10 @@ function AdminParentsView() {
               </div>
             )}
 
-            <div className="rounded-xl border border-cyan-200 bg-gradient-to-br from-cyan-50/70 to-blue-50/50 p-4 space-y-3">
+            <div className="rounded-xl border border-cyan-200 bg-gradient-to-br from-cyan-50/70 to-brand-50/50 p-4 space-y-3">
               <div className="flex items-center justify-between pb-3 border-b border-cyan-100">
                 <div>
-                  <p className="text-xs font-medium text-gray-500 mb-0.5">Username / Email</p>
+                  <p className="text-xs font-medium text-slate-500 mb-0.5">Username / Email</p>
                   <p className="font-mono text-sm font-semibold text-cyan-900">{credParent.email}</p>
                 </div>
                 <button
@@ -405,7 +403,7 @@ function AdminParentsView() {
                     navigator.clipboard.writeText(credParent.email);
                     toast('Username copied', 'success');
                   }}
-                  className="rounded-lg p-1.5 bg-white shadow-2xs border border-gray-200 text-gray-500 hover:text-cyan-700 hover:border-cyan-300 transition-all"
+                  className="rounded-lg p-1.5 bg-white shadow-2xs border border-slate-200 text-slate-500 hover:text-cyan-700 hover:border-cyan-300 transition-all"
                   title="Copy username"
                 >
                   <Copy className="h-4 w-4" />
@@ -414,8 +412,8 @@ function AdminParentsView() {
 
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-gray-500 mb-0.5">Portal Password</p>
-                  <p className="font-mono text-sm font-semibold text-gray-900 tracking-wide">
+                  <p className="text-xs font-medium text-slate-500 mb-0.5">Portal Password</p>
+                  <p className="font-mono text-sm font-semibold text-slate-900 tracking-wide">
                     {credVisible ? (credParent.password || '(not stored)') : '••••••••'}
                   </p>
                 </div>
@@ -423,7 +421,7 @@ function AdminParentsView() {
                   <button
                     type="button"
                     onClick={() => setCredVisible((v) => !v)}
-                    className="rounded-lg p-1.5 bg-white shadow-2xs border border-gray-200 text-gray-500 hover:text-gray-800 hover:border-gray-300 transition-all"
+                    className="rounded-lg p-1.5 bg-white shadow-2xs border border-slate-200 text-slate-500 hover:text-slate-800 hover:border-slate-300 transition-all"
                     title={credVisible ? 'Hide' : 'Show'}
                   >
                     {credVisible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -437,7 +435,7 @@ function AdminParentsView() {
                       toast('Password copied', 'success');
                       setTimeout(() => setCredCopied(false), 1500);
                     }}
-                    className="rounded-lg p-1.5 bg-white shadow-2xs border border-gray-200 text-gray-500 hover:text-cyan-700 hover:border-cyan-300 transition-all"
+                    className="rounded-lg p-1.5 bg-white shadow-2xs border border-slate-200 text-slate-500 hover:text-cyan-700 hover:border-cyan-300 transition-all"
                     title="Copy password"
                   >
                     {credCopied ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
@@ -448,7 +446,7 @@ function AdminParentsView() {
 
             <Button
               variant="outline"
-              className="w-full flex items-center justify-center gap-2 border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium shadow-2xs"
+              className="w-full flex items-center justify-center gap-2 border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium shadow-2xs"
               onClick={() => {
                 const students = credParent.parent_students?.map((ps) => ps.student?.full_name).filter(Boolean).join(', ') || 'N/A';
                 const text = `Parent Login Credentials\nSchool: ${school?.name || 'Veducore School'}\nParent: ${credParent.full_name}\nStudent: ${students}\nUsername: ${credParent.email}\nPassword: ${credParent.password || ''}\nPortal: Veducore Parent App / Portal`;

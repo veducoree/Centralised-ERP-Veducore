@@ -78,25 +78,25 @@ export default function AdminReports() {
           <Card className="p-5">
             {reportType === 'student' && (
               <>
-                <h3 className="mb-3 text-sm font-semibold text-gray-900">Student Report</h3>
+                <h3 className="mb-3 text-sm font-semibold text-slate-900">Student Report</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
-                    <thead className="border-b border-gray-200">
+                    <thead className="border-b border-slate-200">
                       <tr>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Adm. No.</th>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Name</th>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Class</th>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Gender</th>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Status</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Adm. No.</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Name</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Class</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Gender</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-slate-100">
                       {students.map((s) => (
                         <tr key={s.id}>
-                          <td className="px-3 py-2 font-medium text-gray-900">{s.admission_number}</td>
-                          <td className="px-3 py-2 text-gray-700">{s.full_name}</td>
-                          <td className="px-3 py-2 text-gray-700">{s.class?.name} - {s.section?.name}</td>
-                          <td className="px-3 py-2 text-gray-700 capitalize">{s.gender || '—'}</td>
+                          <td className="px-3 py-2 font-medium text-slate-900">{s.admission_number}</td>
+                          <td className="px-3 py-2 text-slate-700">{s.full_name}</td>
+                          <td className="px-3 py-2 text-slate-700">{s.class?.name} - {s.section?.name}</td>
+                          <td className="px-3 py-2 text-slate-700 capitalize">{s.gender || '—'}</td>
                           <td className="px-3 py-2"><StatusBadge status={s.status} /></td>
                         </tr>
                       ))}
@@ -108,21 +108,21 @@ export default function AdminReports() {
 
             {reportType === 'attendance' && (
               <>
-                <h3 className="mb-3 text-sm font-semibold text-gray-900">Attendance Report</h3>
+                <h3 className="mb-3 text-sm font-semibold text-slate-900">Attendance Report</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
-                    <thead className="border-b border-gray-200">
+                    <thead className="border-b border-slate-200">
                       <tr>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Student</th>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Date</th>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Status</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Student</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Date</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-slate-100">
                       {attendance.slice(0, 50).map((a) => (
                         <tr key={a.id}>
-                          <td className="px-3 py-2 font-medium text-gray-900">{a.student?.full_name || '—'}</td>
-                          <td className="px-3 py-2 text-gray-700">{formatDate(a.attendance_date)}</td>
+                          <td className="px-3 py-2 font-medium text-slate-900">{a.student?.full_name || '—'}</td>
+                          <td className="px-3 py-2 text-slate-700">{formatDate(a.attendance_date)}</td>
                           <td className="px-3 py-2"><StatusBadge status={a.status} /></td>
                         </tr>
                       ))}
@@ -134,30 +134,30 @@ export default function AdminReports() {
 
             {reportType === 'fee' && (
               <>
-                <h3 className="mb-3 text-sm font-semibold text-gray-900">Fee Report</h3>
+                <h3 className="mb-3 text-sm font-semibold text-slate-900">Fee Report</h3>
                 <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <div className="rounded-lg bg-emerald-50 p-3"><p className="text-xs text-emerald-600">Collected</p><p className="text-base font-semibold text-emerald-700">{formatCurrency(totalCollected, '₹')}</p></div>
                   <div className="rounded-lg bg-red-50 p-3"><p className="text-xs text-red-600">Outstanding</p><p className="text-base font-semibold text-red-700">{formatCurrency(totalOutstanding, '₹')}</p></div>
-                  <div className="rounded-lg bg-blue-50 p-3"><p className="text-xs text-blue-600">Total Records</p><p className="text-base font-semibold text-blue-700">{fees.length}</p></div>
+                  <div className="rounded-lg bg-brand-50 p-3"><p className="text-xs text-brand-600">Total Records</p><p className="text-base font-semibold text-brand-700">{fees.length}</p></div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
-                    <thead className="border-b border-gray-200">
+                    <thead className="border-b border-slate-200">
                       <tr>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Student</th>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Fee Type</th>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Amount</th>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Paid</th>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Status</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Student</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Fee Type</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Amount</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Paid</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-slate-100">
                       {fees.slice(0, 50).map((f) => (
                         <tr key={f.id}>
-                          <td className="px-3 py-2 font-medium text-gray-900">{f.student?.full_name || '—'}</td>
-                          <td className="px-3 py-2 text-gray-700">{f.fee_type}</td>
-                          <td className="px-3 py-2 text-gray-700">{formatCurrency(f.amount, '₹')}</td>
-                          <td className="px-3 py-2 text-gray-700">{formatCurrency(f.paid_amount, '₹')}</td>
+                          <td className="px-3 py-2 font-medium text-slate-900">{f.student?.full_name || '—'}</td>
+                          <td className="px-3 py-2 text-slate-700">{f.fee_type}</td>
+                          <td className="px-3 py-2 text-slate-700">{formatCurrency(f.amount, '₹')}</td>
+                          <td className="px-3 py-2 text-slate-700">{formatCurrency(f.paid_amount, '₹')}</td>
                           <td className="px-3 py-2"><StatusBadge status={f.status} /></td>
                         </tr>
                       ))}
@@ -169,28 +169,28 @@ export default function AdminReports() {
 
             {reportType === 'academic' && (
               <>
-                <h3 className="mb-3 text-sm font-semibold text-gray-900">Academic Performance Report</h3>
+                <h3 className="mb-3 text-sm font-semibold text-slate-900">Academic Performance Report</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
-                    <thead className="border-b border-gray-200">
+                    <thead className="border-b border-slate-200">
                       <tr>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Student</th>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Subject</th>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Exam</th>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Marks</th>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Grade</th>
-                        <th className="px-3 py-2 font-semibold text-gray-600">Date</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Student</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Subject</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Exam</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Marks</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Grade</th>
+                        <th className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Date</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-slate-100">
                       {records.slice(0, 50).map((r) => (
                         <tr key={r.id}>
-                          <td className="px-3 py-2 font-medium text-gray-900">{r.student?.full_name || '—'}</td>
-                          <td className="px-3 py-2 text-gray-700">{r.subject_name}</td>
-                          <td className="px-3 py-2 text-gray-700 capitalize">{r.exam_name}</td>
-                          <td className="px-3 py-2 text-gray-700">{r.marks}/{r.max_marks}</td>
-                          <td className="px-3 py-2 text-gray-700">{r.grade || '—'}</td>
-                          <td className="px-3 py-2 text-gray-700">{formatDate(r.date)}</td>
+                          <td className="px-3 py-2 font-medium text-slate-900">{r.student?.full_name || '—'}</td>
+                          <td className="px-3 py-2 text-slate-700">{r.subject_name}</td>
+                          <td className="px-3 py-2 text-slate-700 capitalize">{r.exam_name}</td>
+                          <td className="px-3 py-2 text-slate-700">{r.marks}/{r.max_marks}</td>
+                          <td className="px-3 py-2 text-slate-700">{r.grade || '—'}</td>
+                          <td className="px-3 py-2 text-slate-700">{formatDate(r.date)}</td>
                         </tr>
                       ))}
                     </tbody>

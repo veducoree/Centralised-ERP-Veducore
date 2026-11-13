@@ -91,27 +91,27 @@ export default function AdminSchedule() {
         {loading ? (
           <LoadingSpinner variant="cards" />
         ) : schedules.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-            <CalendarDays className="h-12 w-12 text-gray-300 mb-3" />
-            <p className="font-medium text-gray-600">No schedules found</p>
+          <div className="flex flex-col items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-white py-16 text-center">
+            <CalendarDays className="h-12 w-12 text-slate-300 mb-3" />
+            <p className="font-medium text-slate-600">No schedules found</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
             {groupedByDay.map(({ day, items }) => (
               <Card key={day} className="p-4">
-                <h3 className="mb-3 text-sm font-semibold text-gray-900">{getDayName(day)}</h3>
+                <h3 className="mb-3 text-sm font-semibold text-slate-900">{getDayName(day)}</h3>
                 {items.length === 0 ? (
-                  <p className="text-sm text-gray-400">No classes scheduled</p>
+                  <p className="text-sm text-slate-400">No classes scheduled</p>
                 ) : (
                   <div className="space-y-2">
                     {items.map((s) => (
-                      <div key={s.id} className="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2">
+                      <div key={s.id} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
                         <div>
-                          <p className="text-sm font-medium text-gray-900">{formatTime(s.start_time)} - {formatTime(s.end_time)}</p>
-                          <p className="text-xs text-gray-500">{s.class?.name} - {s.section?.name} &middot; {s.subject?.name || '—'}</p>
-                          <p className="text-xs text-gray-400">{s.teacher?.full_name} &middot; Room {s.room_number || '—'}</p>
+                          <p className="text-sm font-medium text-slate-900">{formatTime(s.start_time)} - {formatTime(s.end_time)}</p>
+                          <p className="text-xs text-slate-500">{s.class?.name} - {s.section?.name} &middot; {s.subject?.name || '—'}</p>
+                          <p className="text-xs text-slate-400">{s.teacher?.full_name} &middot; Room {s.room_number || '—'}</p>
                         </div>
-                        <button onClick={() => setDeleteId(s.id)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600">
+                        <button onClick={() => setDeleteId(s.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600">
                           <Trash2 className="h-3.5 w-3.5" />
                         </button>
                       </div>
@@ -134,17 +134,17 @@ export default function AdminSchedule() {
           <Select label="Day" required value={form.day_of_week} onChange={(e) => setForm({ ...form, day_of_week: e.target.value })}>
             {days.map((d) => <option key={d} value={d}>{getDayName(d)}</option>)}
           </Select>
-          <Select label="Class" required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value, section_id: '' })}>
+          <Select label="Class" required value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value, section_id: '', subject_id: '' })}>
             <option value="">Select class...</option>
             {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
-          <Select label="Section" required value={form.section_id} onChange={(e) => setForm({ ...form, section_id: e.target.value })} disabled={!form.class_id}>
+          <Select label="Section" required value={form.section_id} onChange={(e) => setForm({ ...form, section_id: e.target.value, subject_id: '' })} disabled={!form.class_id}>
             <option value="">Select section...</option>
             {availableSections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </Select>
-          <Select label="Subject" value={form.subject_id} onChange={(e) => setForm({ ...form, subject_id: e.target.value })}>
-            <option value="">Select subject...</option>
-            {subjects.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          <Select label="Subject" value={form.subject_id} onChange={(e) => setForm({ ...form, subject_id: e.target.value })} disabled={!form.section_id}>
+            <option value="">{form.section_id ? 'Select subject...' : 'Select section first'}</option>
+            {subjects.filter((s) => s.section_ids.includes(form.section_id)).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </Select>
           <Input label="Room Number" value={form.room_number} onChange={(e) => setForm({ ...form, room_number: e.target.value })} placeholder="e.g. 101" />
           <Input label="Start Time" type="time" required value={form.start_time} onChange={(e) => setForm({ ...form, start_time: e.target.value })} />

@@ -17,21 +17,21 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
 
   return (
     <div className="flex items-center justify-between px-1 py-3">
-      <p className="text-sm text-gray-500">
+      <p className="text-sm text-slate-500">
         Page {page} of {totalPages}
       </p>
       <div className="flex items-center gap-1">
         <button
           onClick={() => onPageChange(page - 1)}
           disabled={page === 1}
-          className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+          className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
         {start > 1 && (
           <>
             <button onClick={() => onPageChange(1)} className={pageBtnClass(1 === page)}>1</button>
-            {start > 2 && <span className="px-1 text-gray-400">...</span>}
+            {start > 2 && <span className="px-1 text-slate-400">...</span>}
           </>
         )}
         {pages.map((p) => (
@@ -41,7 +41,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
         ))}
         {end < totalPages && (
           <>
-            {end < totalPages - 1 && <span className="px-1 text-gray-400">...</span>}
+            {end < totalPages - 1 && <span className="px-1 text-slate-400">...</span>}
             <button onClick={() => onPageChange(totalPages)} className={pageBtnClass(totalPages === page)}>
               {totalPages}
             </button>
@@ -50,7 +50,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
         <button
           onClick={() => onPageChange(page + 1)}
           disabled={page === totalPages}
-          className="rounded-lg p-1.5 text-gray-500 hover:bg-gray-100 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
+          className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-transparent transition-colors"
         >
           <ChevronRight className="h-5 w-5" />
         </button>
@@ -62,6 +62,6 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
 function pageBtnClass(active: boolean) {
   return cn(
     'min-w-[2rem] h-8 rounded-lg px-2 text-sm font-medium transition-colors',
-    active ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+    active ? 'bg-brand-600 text-white' : 'text-slate-600 hover:bg-slate-100'
   );
 }

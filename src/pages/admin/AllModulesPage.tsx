@@ -1,7 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Pin, PinOff } from 'lucide-react';
 import { DashboardLayout, adminNav } from '@/components/layout/DashboardLayout';
-import { useSidebarPref } from '@/context/SidebarPrefContext';
 import { cn } from '@/lib/utils';
 
 // ── Color config ──────────────────────────────────────────────────────────────
@@ -13,6 +11,7 @@ const MODULE_COLORS: Record<string, TileColor> = {
   '/admin/teachers':      'emerald',
   '/admin/parents':       'cyan',
   '/admin/classes':       'amber',
+  '/admin/subjects':      'cyan',
   '/admin/attendance':    'emerald',
   '/admin/fees':          'emerald',
   '/admin/transport':     'amber',
@@ -53,7 +52,6 @@ const circleClasses: Record<TileColor, string> = {
 
 export default function AllModulesPage() {
   const navigate = useNavigate();
-  const { isPinned, isFixed, togglePin } = useSidebarPref();
 
   // Strip "All Modules" itself from the grid
   const modules = adminNav.filter((item) => item.path !== '/admin/all-modules');
@@ -63,14 +61,12 @@ export default function AllModulesPage() {
       <div className="grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5">
         {modules.map((item) => {
           const color: TileColor = MODULE_COLORS[item.path] ?? 'blue';
-          const pinned = isPinned(item.path);
-          const fixed = isFixed(item.path);
 
           return (
             <div
               key={item.path}
               className={cn(
-                'group relative min-h-[120px] w-full overflow-hidden rounded-[20px] bg-white p-5',
+                'relative min-h-[120px] w-full overflow-hidden rounded-[20px] bg-white p-5',
                 'shadow-[0_4px_20px_rgba(91,110,232,0.08)]',
                 'transition-all duration-150',
                 'hover:-translate-y-0.5 hover:shadow-[0_8px_28px_rgba(91,110,232,0.14)]',
@@ -78,24 +74,6 @@ export default function AllModulesPage() {
             >
               {/* Decorative circle */}
               <div className={cn('absolute -right-10 -top-10 h-28 w-28 rounded-full', circleClasses[color])} />
-
-              {/* Pin/unpin button — top-right, inside card */}
-              {!fixed && (
-                <button
-                  onClick={(e) => { e.stopPropagation(); togglePin(item.path); }}
-                  title={pinned ? 'Remove from sidebar' : 'Pin to sidebar'}
-                  className={cn(
-                    'absolute right-3 top-3 z-10 rounded-lg p-1.5 transition-colors',
-                    pinned
-                      ? 'text-[#5B6EE8] opacity-100'
-                      : 'text-slate-300 opacity-0 group-hover:opacity-100 hover:text-[#5B6EE8]',
-                  )}
-                >
-                  {pinned
-                    ? <Pin className="h-3.5 w-3.5 fill-current" />
-                    : <PinOff className="h-3.5 w-3.5" />}
-                </button>
-              )}
 
               {/* Main clickable area */}
               <button

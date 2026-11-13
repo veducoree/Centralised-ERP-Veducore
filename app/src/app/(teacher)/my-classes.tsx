@@ -28,7 +28,6 @@ import { Badge } from '@/components/ui/Badge';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { MobileListSkeleton } from '@/components/ui/Skeleton';
 import { StudentDetailModal } from '@/components/ui/StudentDetailModal';
-import { AddSubjectModal } from '@/components/ui/AddSubjectModal';
 import { useAuth } from '@/context/AuthContext';
 import type { ClassAssignment, Student } from '@/types';
 
@@ -59,8 +58,6 @@ export default function TeacherClasses() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
-  const [addSubjectModalVisible, setAddSubjectModalVisible] = useState(false);
-  const [targetClassForSubject, setTargetClassForSubject] = useState<GroupedClassCard | null>(null);
 
   const loadData = useCallback(async () => {
     if (!user?.id) return;
@@ -289,17 +286,6 @@ export default function TeacherClasses() {
                   <View style={styles.subjectsSection}>
                     <View style={styles.subjectsHeaderRow}>
                       <Text style={styles.subjectsHeader}>Assigned Subjects</Text>
-                      <TouchableOpacity
-                        style={styles.addSubjectBtn}
-                        onPress={() => {
-                          setTargetClassForSubject(card);
-                          setAddSubjectModalVisible(true);
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <Ionicons name="add" size={13} color={COLORS.primary} />
-                        <Text style={styles.addSubjectBtnText}>Add Subject</Text>
-                      </TouchableOpacity>
                     </View>
                     {card.subjects.length === 0 ? (
                       <Text style={styles.noSubjectsText}>
@@ -390,22 +376,6 @@ export default function TeacherClasses() {
           onClose={() => setDetailModalVisible(false)}
         />
 
-        {/* Add Subject Modal */}
-        {targetClassForSubject && (
-          <AddSubjectModal
-            visible={addSubjectModalVisible}
-            onClose={() => {
-              setAddSubjectModalVisible(false);
-              setTargetClassForSubject(null);
-            }}
-            onSuccess={loadData}
-            classId={targetClassForSubject.classId}
-            sectionId={targetClassForSubject.sectionId}
-            className={targetClassForSubject.className}
-            sectionName={targetClassForSubject.sectionName}
-            existingSubjectIds={targetClassForSubject.subjects.map(s => s.id)}
-          />
-        )}
       </View>
     </View>
   );

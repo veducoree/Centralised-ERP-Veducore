@@ -71,21 +71,21 @@ function DayCell({ entry, isToday }: { entry: HolidayEntry; isToday: boolean }) 
       ? 'bg-amber-50 border-amber-200'
       : entry.type === 'holiday'
       ? 'bg-red-50 border-red-200'
-      : 'bg-white border-gray-100';
+      : 'bg-white border-slate-100';
 
   const dateColor =
     entry.type === 'festival'
       ? 'text-amber-700'
       : entry.type === 'holiday'
       ? 'text-red-500'
-      : 'text-gray-800';
+      : 'text-slate-800';
 
   const dayColor =
     entry.type === 'festival'
       ? 'text-amber-500'
       : entry.type === 'holiday'
       ? 'text-red-400'
-      : 'text-gray-400';
+      : 'text-slate-400';
 
   const icon =
     entry.type === 'festival' ? (
@@ -95,7 +95,7 @@ function DayCell({ entry, isToday }: { entry: HolidayEntry; isToday: boolean }) 
     ) : null;
 
   return (
-    <div className={`rounded-xl border p-2 flex flex-col min-h-[72px] relative ${bg} ${isToday ? 'ring-2 ring-blue-500 ring-offset-1' : ''}`}>
+    <div className={`rounded-xl border p-2 flex flex-col min-h-[72px] relative ${bg} ${isToday ? 'ring-2 ring-brand-500 ring-offset-1' : ''}`}>
       {/* Date number */}
       <span className={`text-base font-bold leading-none ${dateColor}`}>{day}</span>
       {/* Day name */}
@@ -111,7 +111,7 @@ function DayCell({ entry, isToday }: { entry: HolidayEntry; isToday: boolean }) 
       )}
       {/* Today dot */}
       {isToday && (
-        <div className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-blue-500" />
+        <div className="absolute top-1.5 right-1.5 h-1.5 w-1.5 rounded-full bg-brand-500" />
       )}
     </div>
   );
@@ -199,10 +199,10 @@ export default function AdminHolidays() {
     <DashboardLayout title="Holidays">
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[20px] bg-white px-6 py-5 shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">Monthly Holiday Planner</h2>
-            <p className="text-sm text-gray-500 mt-0.5">Upload a CSV to mark holidays and festivals for any month.</p>
+            <h2 className="text-lg font-semibold text-[#0F172A]">Monthly Holiday Planner</h2>
+            <p className="text-sm text-slate-500 mt-0.5">Upload a CSV to mark holidays and festivals for any month.</p>
           </div>
           <div className="flex items-end gap-2 flex-wrap">
             <div className="w-36">
@@ -220,7 +220,7 @@ export default function AdminHolidays() {
 
         {/* Today's message */}
         {todayMsg && selectedYear === today.getFullYear() && selectedMonth === today.getMonth() && (
-          <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-medium text-blue-800">
+          <div className="rounded-xl border border-brand-100 bg-brand-50 px-4 py-3 text-sm font-medium text-brand-800">
             {todayMsg}
           </div>
         )}
@@ -229,12 +229,12 @@ export default function AdminHolidays() {
         <Card className="p-5">
           <div className="flex flex-wrap items-start gap-4">
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900 mb-1">Upload Holiday CSV</p>
-              <p className="text-xs text-gray-500 mb-3">
-                CSV format: <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-700">date,type,label</code>
-                &nbsp;— type can be <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-700">working</code>,{' '}
-                <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-700">holiday</code>, or{' '}
-                <code className="bg-gray-100 px-1 py-0.5 rounded text-gray-700">festival</code>.
+              <p className="text-sm font-semibold text-slate-900 mb-1">Upload Holiday CSV</p>
+              <p className="text-xs text-slate-500 mb-3">
+                CSV format: <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700">date,type,label</code>
+                &nbsp;— type can be <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700">working</code>,{' '}
+                <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700">holiday</code>, or{' '}
+                <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-700">festival</code>.
                 Label is the name (e.g. "Diwali").
               </p>
               <div className="flex gap-2 flex-wrap">
@@ -264,16 +264,16 @@ export default function AdminHolidays() {
 
             {/* Legend */}
             <div className="flex flex-col gap-1.5 flex-shrink-0">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Legend</p>
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <div className="h-3 w-3 rounded bg-white border border-gray-300" />
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Legend</p>
+              <div className="flex items-center gap-2 text-xs text-slate-600">
+                <div className="h-3 w-3 rounded bg-white border border-slate-300" />
                 Working Day
               </div>
-              <div className="flex items-center gap-2 text-xs text-gray-600">
+              <div className="flex items-center gap-2 text-xs text-slate-600">
                 <div className="h-3 w-3 rounded bg-red-100 border border-red-200" />
                 Holiday
               </div>
-              <div className="flex items-center gap-2 text-xs text-gray-600">
+              <div className="flex items-center gap-2 text-xs text-slate-600">
                 <div className="h-3 w-3 rounded bg-amber-100 border border-amber-200" />
                 Festival
               </div>
@@ -283,9 +283,9 @@ export default function AdminHolidays() {
 
         {/* Stats strip */}
         <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-xl border border-gray-100 bg-white p-3 text-center shadow-sm">
-            <p className="text-2xl font-bold text-gray-900">{workingDays}</p>
-            <p className="text-xs text-gray-500 mt-0.5">Working Days</p>
+          <div className="rounded-xl border border-slate-100 bg-white p-3 text-center shadow-sm">
+            <p className="text-2xl font-bold text-slate-900">{workingDays}</p>
+            <p className="text-xs text-slate-500 mt-0.5">Working Days</p>
           </div>
           <div className="rounded-xl border border-red-100 bg-red-50 p-3 text-center">
             <p className="text-2xl font-bold text-red-600">{holidays}</p>
@@ -300,8 +300,8 @@ export default function AdminHolidays() {
         {/* Calendar grid */}
         <Card className="p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Calendar className="h-4 w-4 text-blue-600" />
-            <h3 className="text-sm font-semibold text-gray-900">
+            <Calendar className="h-4 w-4 text-brand-600" />
+            <h3 className="text-sm font-semibold text-slate-900">
               {MONTH_NAMES[selectedMonth]} {selectedYear}
             </h3>
           </div>
@@ -309,7 +309,7 @@ export default function AdminHolidays() {
           {/* Day-of-week headers */}
           <div className="grid grid-cols-7 gap-1.5 mb-1.5">
             {DAY_ABBR.map((d) => (
-              <div key={d} className="text-center text-[10px] font-semibold text-gray-400 uppercase py-1">
+              <div key={d} className="text-center text-[10px] font-semibold text-slate-400 uppercase py-1">
                 {d}
               </div>
             ))}

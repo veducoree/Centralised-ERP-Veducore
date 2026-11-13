@@ -651,39 +651,211 @@ export async function deleteSection(id: string) {
   invalidateCache('classes:');
 }
 
+// ── Subjects (class-wise) ─────────────────────────────────────────────────────
+// Every subject belongs to one class; section_subjects says which sections of
+// that class study it.
+
+/** All subjects of the school, each with the section ids it is taught in. */
 export async function fetchSubjects(schoolId: string) {
   return cachedFetch(`subjects:${schoolId}`, async () => {
     const { data, error } = await supabase
       .from('subjects')
-      .select('*')
+      .select('*, section_subjects(section_id)')
       .eq('school_id', schoolId)
       .order('name');
     if (error) throw error;
-    return data as Subject[];
+    type Row = Omit<Subject, 'section_ids'> & { section_subjects: { section_id: string }[] | null };
+    return ((data || []) as Row[]).map(({ section_subjects, ...s }) => ({
+      ...s,
+      section_ids: (section_subjects || []).map((x) => x.section_id),
+    })) as Subject[];
   });
 }
 
-export async function createSubject(schoolId: string, name: string, code?: string) {
-  let finalCode = (code || '').trim().toUpperCase();
-  if (!finalCode) {
-    const existing = await fetchSubjects(schoolId);
-    finalCode = generateSubjectCode(name, existing.map(s => s.code));
+/** Subjects taught in a given section, from an already-fetched list. */
+export function subjectsForSection(subjects: Subject[], sectionId: string): Subject[] {
+  return subjects.filter((s) => s.section_ids.includes(sectionId));
+}
+
+/**
+ * Create subjects for a class and link them to the chosen sections.
+ * A name that already exists in the class is not duplicated; its sections are
+ * extended instead.
+ */
+export async function createClassSubjects(params: {
+  schoolId: string;
+  classId: string;
+  sectionIds: string[];
+  subjects: { name: string; code?: string }[];
+}) {
+  const { schoolId, classId, sectionIds } = params;
+  if (!sectionIds.length) throw new Error('Select at least one section');
+
+  invalidateCache(`subjects:${schoolId}`);
+  const existing = await fetchSubjects(schoolId);
+  const usedCodes = existing.map((s) => s.code);
+  const inClass = existing.filter((s) => s.class_id === classId);
+
+  const toInsert: { school_id: string; class_id: string; name: string; code: string }[] = [];
+  const reusedIds: string[] = [];
+  const seen = new Set<string>();
+
+  for (const row of params.subjects) {
+    const name = row.name.trim();
+    const key = name.toLowerCase();
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+
+    const match = inClass.find((s) => s.name.trim().toLowerCase() === key);
+    if (match) { reusedIds.push(match.id); continue; }
+
+    let code = (row.code || '').trim().toUpperCase();
+    if (!code || usedCodes.some((c) => (c || '').toUpperCase() === code)) {
+      code = generateSubjectCode(name, usedCodes);
+    }
+    usedCodes.push(code);
+    toInsert.push({ school_id: schoolId, class_id: classId, name, code });
   }
 
-  const { data, error } = await supabase
-    .from('subjects')
-    .insert({ school_id: schoolId, name: name.trim(), code: finalCode })
-    .select()
-    .maybeSingle();
-  if (error) throw error;
+  let created: Subject[] = [];
+  if (toInsert.length) {
+    const { data, error } = await supabase.from('subjects').insert(toInsert).select();
+    if (error) throw error;
+    created = (data || []) as Subject[];
+  }
+
+  const links = [...created.map((s) => s.id), ...reusedIds].flatMap((subject_id) =>
+    sectionIds.map((section_id) => ({ school_id: schoolId, section_id, subject_id }))
+  );
+  if (links.length) {
+    const { error } = await supabase
+      .from('section_subjects')
+      .upsert(links, { onConflict: 'section_id,subject_id', ignoreDuplicates: true });
+    if (error) throw error;
+  }
+
   invalidateCache(`subjects:${schoolId}`);
-  return data as Subject | null;
+  return { created: created.length, reused: reusedIds.length };
+}
+
+export async function updateSubject(id: string, updates: { name?: string; code?: string | null }) {
+  const { error } = await supabase.from('subjects').update(updates).eq('id', id);
+  if (error) throw error;
+  invalidateCache('subjects:');
+}
+
+/** Replace the set of sections a subject is taught in. */
+export async function setSubjectSections(schoolId: string, subjectId: string, sectionIds: string[]) {
+  if (!sectionIds.length) throw new Error('Select at least one section');
+  const { error: delErr } = await supabase
+    .from('section_subjects')
+    .delete()
+    .eq('subject_id', subjectId)
+    .not('section_id', 'in', `(${sectionIds.join(',')})`);
+  if (delErr) throw delErr;
+
+  const { error } = await supabase
+    .from('section_subjects')
+    .upsert(
+      sectionIds.map((section_id) => ({ school_id: schoolId, section_id, subject_id: subjectId })),
+      { onConflict: 'section_id,subject_id', ignoreDuplicates: true },
+    );
+  if (error) throw error;
+
+  // Teacher allotments for sections that no longer have this subject are stale.
+  const { error: caErr } = await supabase
+    .from('class_assignments')
+    .delete()
+    .eq('subject_id', subjectId)
+    .not('section_id', 'in', `(${sectionIds.join(',')})`);
+  if (caErr) throw caErr;
+
+  invalidateCache(`subjects:${schoolId}`);
+  invalidateCache('teacherAssignments:');
 }
 
 export async function deleteSubject(id: string) {
   const { error } = await supabase.from('subjects').delete().eq('id', id);
   if (error) throw error;
   invalidateCache('subjects:');
+  invalidateCache('teacherAssignments:');
+}
+
+/** Subject-teacher allotments of one teacher (class-teacher rows excluded). */
+export async function fetchTeacherSubjectAllotments(teacherId: string) {
+  const { data, error } = await supabase
+    .from('class_assignments')
+    .select('*, teacher:teachers(*), class:classes(*), section:sections(*), subject:subjects(*)')
+    .eq('teacher_id', teacherId)
+    .not('subject_id', 'is', null);
+  if (error) throw error;
+  return data as ClassAssignment[];
+}
+
+/** All subject-teacher allotments in the school (to show who already teaches what). */
+export async function fetchSubjectAllotments(schoolId: string) {
+  const { data, error } = await supabase
+    .from('class_assignments')
+    .select('id, teacher_id, class_id, section_id, subject_id, teacher:teachers(id, full_name)')
+    .eq('school_id', schoolId)
+    .not('subject_id', 'is', null);
+  if (error) throw error;
+  return (data || []) as unknown as {
+    id: string; teacher_id: string; class_id: string; section_id: string; subject_id: string;
+    teacher: { id: string; full_name: string } | null;
+  }[];
+}
+
+/**
+ * Make a teacher's subject allotments exactly match `rows`.
+ * Each (section, subject) has one teacher, so allotting a pair that another
+ * teacher holds moves it to this teacher. Also refreshes teachers.subject
+ * (comma-separated names) for places that still show that text.
+ */
+export async function setTeacherSubjectAllotments(params: {
+  schoolId: string;
+  teacherId: string;
+  rows: { class_id: string; section_id: string; subject_id: string }[];
+  subjectNames: string[];
+}) {
+  const { schoolId, teacherId, rows } = params;
+  const key = (r: { section_id: string; subject_id: string }) => `${r.section_id}:${r.subject_id}`;
+  const wanted = new Map(rows.map((r) => [key(r), r]));
+
+  const current = await fetchTeacherSubjectAllotments(teacherId);
+  const toRemove = current.filter((c) => !wanted.has(key({ section_id: c.section_id, subject_id: c.subject_id! })));
+  const currentKeys = new Set(current.map((c) => key({ section_id: c.section_id, subject_id: c.subject_id! })));
+  const toAdd = rows.filter((r) => !currentKeys.has(key(r)));
+
+  if (toRemove.length) {
+    const { error } = await supabase.from('class_assignments').delete().in('id', toRemove.map((c) => c.id));
+    if (error) throw error;
+  }
+  for (const r of toAdd) {
+    // Free the (section, subject) pair from any other teacher first.
+    const { error: delErr } = await supabase
+      .from('class_assignments')
+      .delete()
+      .eq('section_id', r.section_id)
+      .eq('subject_id', r.subject_id);
+    if (delErr) throw delErr;
+  }
+  if (toAdd.length) {
+    const { error } = await supabase
+      .from('class_assignments')
+      .insert(toAdd.map((r) => ({ ...r, school_id: schoolId, teacher_id: teacherId })));
+    if (error) throw error;
+  }
+
+  const names = Array.from(new Set(params.subjectNames.map((n) => n.trim()).filter(Boolean)));
+  const { error: tErr } = await supabase
+    .from('teachers')
+    .update({ subject: names.length ? names.join(', ') : null })
+    .eq('id', teacherId);
+  if (tErr) throw tErr;
+
+  invalidateCache('teacherAssignments:');
+  invalidateCache(`teachers:${schoolId}`);
 }
 
 export async function fetchClassAssignments(schoolId: string) {
@@ -1244,7 +1416,8 @@ export async function assignClassTeacher(params: {
 
   const { data, error } = await supabase
     .from('class_assignments')
-    .insert({ ...params, subject_id: null, is_class_teacher: true })
+    // Class teacher = row with no subject (there is no is_class_teacher column in the DB).
+    .insert({ ...params, subject_id: null })
     .select()
     .maybeSingle();
   if (error) throw error;

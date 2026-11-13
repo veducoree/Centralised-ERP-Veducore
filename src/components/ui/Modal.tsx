@@ -14,9 +14,9 @@ interface ModalProps {
 
 const sizeClasses = {
   sm: 'max-w-md',
-  md: 'max-w-lg',
-  lg: 'max-w-2xl',
-  xl: 'max-w-4xl',
+  md: 'max-w-xl',
+  lg: 'max-w-3xl',
+  xl: 'max-w-5xl',
 };
 
 const FOCUSABLE = [
@@ -109,35 +109,37 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
       aria-labelledby="modal-title"
     >
       <div
-        className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm transition-opacity"
+        className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm transition-opacity"
         onClick={onClose}
         aria-hidden="true"
       />
       <div
         ref={panelRef}
         className={cn(
-          'relative z-10 w-full rounded-[20px] bg-white shadow-xl transition-all duration-200',
+          // Column layout: header and footer stay put, only the body scrolls,
+          // and the whole panel can use almost the full screen height.
+          'relative z-10 flex max-h-[calc(100dvh-2rem)] w-full flex-col overflow-hidden rounded-[20px] bg-white shadow-xl transition-all duration-200',
           sizeClasses[size]
         )}
       >
-        <div className="flex items-start justify-between border-b border-gray-100 px-6 py-4">
+        <div className="flex flex-shrink-0 items-start justify-between border-b border-slate-100 px-6 py-4">
           <div>
-            <h2 id="modal-title" className="text-[15px] font-semibold tracking-tight text-gray-900">{title}</h2>
-            {description && <p className="mt-1 text-sm text-gray-500">{description}</p>}
+            <h2 id="modal-title" className="text-[15px] font-semibold tracking-tight text-slate-900">{title}</h2>
+            {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
           </div>
           <button
             onClick={onClose}
-            className="rounded-[10px] p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+            className="rounded-[10px] p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
             aria-label="Close"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="max-h-[calc(80vh-144px)] overflow-y-auto px-6 py-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">{children}</div>
 
         {footer && (
-          <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
+          <div className="flex flex-shrink-0 items-center justify-end gap-3 border-t border-slate-100 bg-[#F7F8FE] px-6 py-4">
             {footer}
           </div>
         )}
@@ -176,7 +178,7 @@ export function ConfirmDialog({
           <button
             onClick={onClose}
             disabled={loading}
-            className="rounded-[10px] border border-gray-200 bg-white px-4 h-9 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+            className="rounded-[10px] border border-slate-200 bg-white px-4 h-9 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors disabled:opacity-50"
           >
             {cancelText}
           </button>
@@ -196,7 +198,7 @@ export function ConfirmDialog({
         </>
       }
     >
-      <p className="text-sm text-gray-600">{message}</p>
+      <p className="text-sm text-slate-600">{message}</p>
     </Modal>
   );
 }

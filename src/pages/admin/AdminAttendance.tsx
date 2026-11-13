@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { Card } from '@/components/ui/Card';
+import { UserCheck, UserX, Clock, CalendarOff } from 'lucide-react';
+import { Card, StatCard } from '@/components/ui/Card';
 import { Input, Select } from '@/components/ui/Form';
 import { PageHeader, LoadingSpinner, SearchInput } from '@/components/ui/Primitives';
 import { useAuth } from '@/auth/AuthContext';
@@ -72,39 +73,39 @@ export default function AdminAttendance() {
         {loading ? (
           <LoadingSpinner />
         ) : !selectedSection ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-            <p className="font-medium text-gray-600">Select a class and date</p>
-            <p className="mt-1 text-sm text-gray-400">Choose a section to view attendance</p>
+          <div className="flex flex-col items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-white py-16 text-center">
+            <p className="font-medium text-slate-600">Select a class and date</p>
+            <p className="mt-1 text-sm text-slate-400">Choose a section to view attendance</p>
           </div>
         ) : records.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-            <p className="font-medium text-gray-600">No attendance recorded</p>
-            <p className="mt-1 text-sm text-gray-400">No attendance for {formatDate(selectedDate)}</p>
+          <div className="flex flex-col items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-white py-16 text-center">
+            <p className="font-medium text-slate-600">No attendance recorded</p>
+            <p className="mt-1 text-sm text-slate-400">No attendance for {formatDate(selectedDate)}</p>
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-              <Card className="p-4"><p className="text-sm text-gray-500">Present</p><p className="text-2xl font-bold text-emerald-600">{stats.present}</p></Card>
-              <Card className="p-4"><p className="text-sm text-gray-500">Absent</p><p className="text-2xl font-bold text-red-600">{stats.absent}</p></Card>
-              <Card className="p-4"><p className="text-sm text-gray-500">Late</p><p className="text-2xl font-bold text-amber-600">{stats.late}</p></Card>
-              <Card className="p-4"><p className="text-sm text-gray-500">Leave</p><p className="text-2xl font-bold text-cyan-600">{stats.leave}</p></Card>
+            <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
+              <StatCard label="Present" value={stats.present} icon={<UserCheck />} color="emerald" />
+              <StatCard label="Absent" value={stats.absent} icon={<UserX />} color="red" />
+              <StatCard label="Late" value={stats.late} icon={<Clock />} color="amber" />
+              <StatCard label="Leave" value={stats.leave} icon={<CalendarOff />} color="cyan" />
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+            <div className="overflow-x-auto rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
               <table className="w-full text-left text-sm">
-                <thead className="border-b border-gray-200 bg-gray-50/50">
+                <thead className="border-b border-slate-100 bg-[#F7F8FE]">
                   <tr>
-                    <th className="px-4 py-3 font-semibold text-gray-600">Student</th>
-                    <th className="px-4 py-3 font-semibold text-gray-600">Status</th>
-                    <th className="px-4 py-3 font-semibold text-gray-600">Notes</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Student</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Notes</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-slate-100">
                   {records.filter((r) => !search || (r.student?.full_name ?? '').toLowerCase().includes(search.toLowerCase())).map((r) => (
-                    <tr key={r.id} className="hover:bg-gray-50/50">
-                      <td className="px-4 py-3 font-medium text-gray-900">{r.student?.full_name || '—'}</td>
+                    <tr key={r.id} className="hover:bg-[#F7F8FE]">
+                      <td className="px-4 py-3 font-medium text-slate-900">{r.student?.full_name || '—'}</td>
                       <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
-                      <td className="px-4 py-3 text-gray-500">{r.notes || '—'}</td>
+                      <td className="px-4 py-3 text-slate-500">{r.notes || '—'}</td>
                     </tr>
                   ))}
                 </tbody>

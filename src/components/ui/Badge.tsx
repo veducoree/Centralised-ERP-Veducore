@@ -20,7 +20,7 @@ const variantClasses: Record<BadgeVariant, string> = {
   warning: 'bg-amber-50 text-amber-700 ring-amber-200',
   danger:  'bg-red-50 text-red-700 ring-red-200',
   info:    'bg-cyan-50 text-cyan-700 ring-cyan-200',
-  neutral: 'bg-gray-100 text-gray-500 ring-gray-200',
+  neutral: 'bg-slate-100 text-slate-500 ring-slate-200',
 };
 
 // Map legacy color → variant
