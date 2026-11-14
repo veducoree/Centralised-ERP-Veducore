@@ -9,6 +9,8 @@ import {
   Alert,
   Modal,
   Share,
+  Linking,
+  AppState,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -18,7 +20,10 @@ import {
   fetchParentByUserId,
   fetchParentStudents,
   fetchFees,
-  updateFee,
+  fetchGatewayActive,
+  createPaymentLink,
+  checkOnlinePayment,
+  onlineCharges,
   fetchSchool,
 } from '@/services/api';
 import { SPACING, RADIUS, formatDate, formatCurrency } from '@/lib/utils';
@@ -220,7 +225,10 @@ export default function ParentFees() {
 
   // Pay modal state
   const [selectedFeeToPay, setSelectedFeeToPay] = useState<Fee | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'netbanking'>('upi');
+  const [onlineEnabled, setOnlineEnabled] = useState<boolean | null>(null);
+  // Payment opened in the browser; checked when the parent comes back to the app.
+  const [pendingPayment, setPendingPayment] = useState<{ id: string; fee: Fee; installment: number } | null>(null);
+  const [checkingPayment, setCheckingPayment] = useState(false);
   const [processingPayment, setProcessingPayment] = useState(false);
 
   // Official Receipt modal state
@@ -365,61 +373,67 @@ export default function ParentFees() {
     setStructureMode(mode);
   };
 
+  useEffect(() => { fetchGatewayActive().then(setOnlineEnabled).catch(() => setOnlineEnabled(false)); }, []);
+
+  const finishPaid = useCallback(async (fee: Fee, installment: number, receipt?: string) => {
+    setPendingPayment(null);
+    setLastPaidInstallmentAmount(installment);
+    if (children[selectedIndex]) await loadFees(children[selectedIndex]);
+    const paidSoFar = Math.min(Number(fee.amount), Number(fee.paid_amount) + installment);
+    setReceiptFee({
+      ...fee,
+      paid_amount: paidSoFar,
+      remaining_amount: Math.max(0, Number(fee.amount) - paidSoFar),
+      status: paidSoFar >= Number(fee.amount) ? 'paid' : 'partially_paid',
+      payment_date: new Date().toISOString().split('T')[0],
+      payment_method: 'Online (Razorpay)',
+      receipt_number: receipt ?? fee.receipt_number,
+    });
+  }, [children, selectedIndex, loadFees]);
+
+  const checkPending = useCallback(async (silent = false) => {
+    if (!pendingPayment) return;
+    setCheckingPayment(true);
+    try {
+      const r = await checkOnlinePayment(pendingPayment.id);
+      if (r.status === 'paid') await finishPaid(pendingPayment.fee, pendingPayment.installment, r.receipt_number);
+      else if (r.status === 'expired') { setPendingPayment(null); Alert.alert('Payment link expired', 'Please start the payment again.'); }
+      else if (!silent) Alert.alert('Not received yet', 'We have not received the payment yet. If money was deducted, it is confirmed within a few minutes.');
+    } catch (e) {
+      if (!silent) Alert.alert('Could not check', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setCheckingPayment(false);
+    }
+  }, [pendingPayment, finishPaid]);
+
+  // Coming back from the Razorpay page → check automatically.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => { if (st === 'active' && pendingPayment) checkPending(true); });
+    return () => sub.remove();
+  }, [pendingPayment, checkPending]);
+
   const handleConfirmPay = async () => {
     if (!selectedFeeToPay || !activeModalPlan) return;
+    if (!onlineEnabled) {
+      Alert.alert('Online payment not available', 'The school has not enabled online payment yet. Please pay at the school office.');
+      return;
+    }
     setProcessingPayment(true);
     try {
-      const today = new Date().toISOString().split('T')[0];
-      const receiptNo = `RCP-${Math.floor(100000 + Math.random() * 900000)}`;
-
-      const payNowAmount = activeModalPlan.installmentAmount;
-      const newPaidAmount = Math.min(
-        Number(selectedFeeToPay.amount),
-        Number(selectedFeeToPay.paid_amount) + payNowAmount
-      );
-      const newRemaining = Math.max(0, Number(selectedFeeToPay.amount) - newPaidAmount);
-      const newStatus = newRemaining <= 0 ? 'paid' : 'partially_paid';
-      const nextDueDate =
-        newRemaining > 0
-          ? addMonthsToDate(selectedFeeToPay.due_date, activeModalPlan.monthsToAdvance)
-          : selectedFeeToPay.due_date;
-      const methodLabel = `Online (${paymentMethod.toUpperCase()})`;
-
-      await updateFee(selectedFeeToPay.id, {
-        paid_amount: newPaidAmount,
-        remaining_amount: newRemaining,
-        status: newStatus,
-        due_date: nextDueDate,
-        payment_date: today,
-        payment_method: methodLabel,
-        receipt_number: receiptNo,
+      const fee = selectedFeeToPay;
+      const installment = activeModalPlan.installmentAmount;
+      const remainingAfter = Number(fee.amount) - Number(fee.paid_amount) - installment;
+      const nextDue = remainingAfter > 0 ? addMonthsToDate(fee.due_date, activeModalPlan.monthsToAdvance) : null;
+      const link = await createPaymentLink({
+        allocations: [{ fee_id: fee.id, amount: installment }],
+        next_due_dates: nextDue ? { [fee.id]: nextDue } : {},
       });
-
-      setSessionPaidCounts((prev) => ({
-        ...prev,
-        [selectedFeeToPay.id]: (prev[selectedFeeToPay.id] || 0) + 1,
-      }));
-
-      const updatedFeeObj: Fee = {
-        ...selectedFeeToPay,
-        paid_amount: newPaidAmount,
-        remaining_amount: newRemaining,
-        status: newStatus,
-        due_date: nextDueDate,
-        payment_date: today,
-        payment_method: methodLabel,
-        receipt_number: receiptNo,
-      };
-
+      setSessionPaidCounts((prev) => ({ ...prev, [fee.id]: (prev[fee.id] || 0) + 1 }));
+      setPendingPayment({ id: link.online_payment_id, fee, installment });
       setSelectedFeeToPay(null);
-      setLastPaidInstallmentAmount(payNowAmount);
-      setReceiptFee(updatedFeeObj);
-
-      if (children[selectedIndex]) {
-        await loadFees(children[selectedIndex]);
-      }
-    } catch {
-      Alert.alert('Payment Failed', 'Could not process payment.');
+      await Linking.openURL(link.link_url);
+    } catch (e) {
+      Alert.alert('Payment could not start', e instanceof Error ? e.message : 'Please try again.');
     } finally {
       setProcessingPayment(false);
     }
@@ -496,6 +510,19 @@ export default function ParentFees() {
             />
           }
         >
+          {pendingPayment && (
+            <View style={styles.pendingCard}>
+              <Text style={styles.pendingTitle}>Waiting for payment</Text>
+              <Text style={styles.pendingText}>
+                {pendingPayment.fee.fee_type} · {formatCurrency(onlineCharges(pendingPayment.installment).total)}. Finish paying on the Razorpay page, then come back here.
+              </Text>
+              <View style={styles.pendingActions}>
+                <Button label="I've paid — check" variant="primary" size="sm" loading={checkingPayment} onPress={() => checkPending(false)} style={{ flex: 1.4 }} />
+                <Button label="Dismiss" variant="ghost" size="sm" onPress={() => setPendingPayment(null)} style={{ flex: 1 }} />
+              </View>
+            </View>
+          )}
+
           {/* Child selector if multiple children */}
           {children.length > 1 && (
             <View style={styles.childSelectSection}>
@@ -1060,44 +1087,20 @@ export default function ParentFees() {
                     )}
                   </View>
 
-                  <Text style={styles.modalSelectPayTitle}>Select Payment Method</Text>
-
-                  <View style={styles.payMethodsWrap}>
-                    {[
-                      { id: 'upi', label: 'UPI / Google Pay / PhonePe', icon: 'phone-portrait-outline' },
-                      { id: 'card', label: 'Debit / Credit Card', icon: 'card-outline' },
-                      { id: 'netbanking', label: 'Net Banking', icon: 'business-outline' },
-                    ].map((pm) => {
-                      const active = paymentMethod === pm.id;
-                      return (
-                        <TouchableOpacity
-                          key={pm.id}
-                          onPress={() => setPaymentMethod(pm.id as typeof paymentMethod)}
-                          style={[styles.payMethodOption, active && styles.payMethodOptionActive]}
-                        >
-                          <Ionicons
-                            name={pm.icon as keyof typeof Ionicons.glyphMap}
-                            size={18}
-                            color={active ? '#5B6EE8' : '#64748B'}
-                            style={{ marginRight: 10 }}
-                          />
-                          <Text
-                            style={[styles.payMethodText, active && styles.payMethodTextActive]}
-                          >
-                            {pm.label}
-                          </Text>
-                          {active && (
-                            <Ionicons
-                              name="checkmark-circle"
-                              size={18}
-                              color="#5B6EE8"
-                              style={{ marginLeft: 'auto' }}
-                            />
-                          )}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
+                  {(() => {
+                    const c = onlineCharges(activeModalPlan.installmentAmount);
+                    return (
+                      <View style={styles.breakdownBox}>
+                        <View style={styles.breakdownRow}><Text style={styles.breakdownLabel}>Fee</Text><Text style={styles.breakdownValue}>{formatCurrency(c.fee)}</Text></View>
+                        <View style={styles.breakdownRow}><Text style={styles.breakdownLabel}>Convenience fee (incl. GST)</Text><Text style={styles.breakdownValue}>{formatCurrency(c.extra)}</Text></View>
+                        <View style={[styles.breakdownRow, styles.breakdownTotalRow]}><Text style={styles.breakdownTotal}>Total</Text><Text style={styles.breakdownTotal}>{formatCurrency(c.total)}</Text></View>
+                        <Text style={styles.breakdownHint}>Pay by UPI, card or net banking on the secure Razorpay page. No extra charge at the school office.</Text>
+                      </View>
+                    );
+                  })()}
+                  {onlineEnabled === false && (
+                    <Text style={styles.breakdownWarn}>Online payment isn't enabled by the school yet. Please pay at the school office.</Text>
+                  )}
 
                   <View style={styles.modalActionsRow}>
                     <Button
@@ -1110,7 +1113,7 @@ export default function ParentFees() {
                       label={
                         processingPayment
                           ? 'Processing...'
-                          : `Pay ${formatCurrency(activeModalPlan.installmentAmount)}`
+                          : `Pay ${formatCurrency(onlineCharges(activeModalPlan.installmentAmount).total)}`
                       }
                       variant="primary"
                       loading={processingPayment}
@@ -1587,6 +1590,18 @@ const styles = StyleSheet.create({
   },
   modalPeriodBadgeText: { fontSize: 10, fontWeight: '700', color: '#5B6EE8', letterSpacing: 0.4 },
   modalFeeType: { fontSize: 13, color: '#334155', fontWeight: '700' },
+  breakdownBox: { borderWidth: 1, borderColor: '#E8EAF3', borderRadius: 14, padding: 12, marginBottom: 12 },
+  breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, gap: 8 },
+  breakdownLabel: { flexShrink: 1, fontSize: 13, color: '#64748B' },
+  breakdownValue: { fontSize: 13, color: '#0F172A', fontWeight: '600' },
+  breakdownTotalRow: { borderTopWidth: 1, borderTopColor: '#F1F2F8', marginTop: 4, paddingTop: 8 },
+  breakdownTotal: { fontSize: 14, color: '#0F172A', fontWeight: '700' },
+  breakdownHint: { fontSize: 11, color: '#94A3B8', marginTop: 6 },
+  breakdownWarn: { fontSize: 12, color: '#B45309', backgroundColor: '#FEF3E0', borderRadius: 10, padding: 10, marginBottom: 12 },
+  pendingCard: { backgroundColor: '#FEF3E0', borderRadius: 14, padding: 12, marginBottom: 12 },
+  pendingTitle: { fontSize: 14, fontWeight: '700', color: '#B45309' },
+  pendingText: { fontSize: 12, color: '#92400E', marginTop: 2 },
+  pendingActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
   modalFeeAmount: { fontSize: 22, fontWeight: '700', color: '#5B6EE8', marginTop: 4 },
   modalNextPeriodText: {
     fontSize: 11,

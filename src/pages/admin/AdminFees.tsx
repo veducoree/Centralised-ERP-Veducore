@@ -10,8 +10,8 @@ import { required, positiveNumber, paymentAmount, range } from '@/lib/validators
 import { SearchInput, PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
-import { fetchFees, fetchStudents, fetchFeeTypes, fetchClasses, createFee, recordFeePayment, deleteFee, fetchSchool, updateSchool } from '@/services/api';
-import type { Fee, Student, FeeType, FeeStructure, PaymentSetup, Class } from '@/types';
+import { fetchFees, fetchStudents, fetchFeeTypes, fetchClasses, createFee, recordFeePayment, deleteFee, fetchSchool, updateSchool, fetchGatewayStatus, saveGateway, disableGateway, onlineCharges, type GatewayStatus } from '@/services/api';
+import type { Fee, Student, FeeType, FeeStructure, Class } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { StatusBadge, Badge } from '@/components/ui/Badge';
 
@@ -64,17 +64,13 @@ export default function AdminFees() {
   const [assigningStructure, setAssigningStructure] = useState<FeeStructure | null>(null);
   const [assignLoading, setAssignLoading] = useState(false);
 
-  // ── Tab 3: Payment Setup ──
-  // NOTE (Finding 2): Only razorpay_key_id (a publishable key) is stored in localStorage.
-  // account_number and ifsc_code have no role in the client-side Razorpay checkout flow
-  // and are kept in-memory only — they are NOT persisted to localStorage.
-  const [setupForm, setSetupForm] = useState<Omit<PaymentSetup, 'id' | 'school_id' | 'is_verified' | 'created_at' | 'updated_at'>>({
-    razorpay_key_id: '', account_holder_name: '',
-    bank_name: '', account_number: '', ifsc_code: '',
-  });
-  const [setupSaved, setSetupSaved] = useState(false);
-  const [showAccountNo, setShowAccountNo] = useState(false);
-  const [setupErrors, setSetupErrors] = useState<Record<string, string>>({});
+  // ── Tab 3: Payment Setup (keys live on the server; the secret never comes back) ──
+  const [gateway, setGateway] = useState<GatewayStatus>({ active: false });
+  const [keyId, setKeyId] = useState('');
+  const [keySecret, setKeySecret] = useState('');
+  const [showSecret, setShowSecret] = useState(false);
+  const [gatewaySaving, setGatewaySaving] = useState(false);
+  const [disableOpen, setDisableOpen] = useState(false);
 
   // ── Load data ──
   const loadData = useCallback(async () => {
@@ -106,24 +102,8 @@ export default function AdminFees() {
     }
   }, [profile?.school_id]);
 
-  // Load payment setup from localStorage on mount.
-  // NOTE (Finding 2): Only razorpay_key_id is persisted to localStorage.
-  // account_number and ifsc_code are sensitive banking credentials that have no
-  // role in the client-side Razorpay flow and are intentionally NOT stored in
-  // localStorage where any XSS payload or browser extension could read them.
   useEffect(() => {
-    if (!profile?.school_id) return;
-    const stored = localStorage.getItem(`veducore_payment_setup_${profile.school_id}`);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as { razorpay_key_id?: string };
-        setSetupForm((prev) => ({
-          ...prev,
-          razorpay_key_id: parsed.razorpay_key_id || '',
-        }));
-        setSetupSaved(true);
-      } catch { /* ignore */ }
-    }
+    if (profile?.school_id) fetchGatewayStatus().then(setGateway).catch(() => {});
   }, [profile?.school_id]);
 
   // Load fee structures from school.settings or localStorage
@@ -433,35 +413,29 @@ export default function AdminFees() {
   }
 
   // ── Tab 3: Setup Handlers ──
-  function handleSaveSetup() {
-    if (!profile?.school_id) return;
-    const errors: Record<string, string> = {};
-    if (!setupForm.razorpay_key_id.startsWith('rzp_')) errors.razorpay_key_id = 'Key must start with rzp_';
-    // NOTE (Finding 2): IFSC and account number are validated for the admin's reference
-    // but are NOT persisted to localStorage — only razorpay_key_id is stored there.
-    if (setupForm.ifsc_code && setupForm.ifsc_code.length !== 11) errors.ifsc_code = 'IFSC must be exactly 11 characters';
-    setSetupErrors(errors);
-    if (Object.keys(errors).length > 0) {
-      toast('Please fix the errors before saving', 'error');
-      return;
-    }
-    // Only store the publishable Key ID in localStorage — no sensitive banking credentials.
-    const data: Pick<PaymentSetup, 'id' | 'school_id' | 'razorpay_key_id' | 'is_verified' | 'created_at' | 'updated_at'> = {
-      id: `setup-${profile.school_id}`,
-      school_id: profile.school_id,
-      razorpay_key_id: setupForm.razorpay_key_id,
-      is_verified: true,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-    localStorage.setItem(`veducore_payment_setup_${profile.school_id}`, JSON.stringify(data));
-    setSetupSaved(true);
-    toast('Payment setup saved successfully', 'success');
+  async function handleSaveGateway() {
+    if (!/^rzp_(test|live)_[A-Za-z0-9]+$/.test(keyId.trim())) { toast('Key ID must look like rzp_live_… or rzp_test_…', 'error'); return; }
+    if (keySecret.trim().length < 10) { toast('Enter the Key Secret', 'error'); return; }
+    setGatewaySaving(true);
+    try {
+      await saveGateway(keyId.trim(), keySecret.trim());
+      setKeySecret('');
+      setGateway(await fetchGatewayStatus());
+      toast('Razorpay connected — parents can now pay online', 'success');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Could not save keys', 'error');
+    } finally { setGatewaySaving(false); }
   }
 
-  const maskedKey = setupForm.razorpay_key_id.length > 4
-    ? 'rzp_****' + setupForm.razorpay_key_id.slice(-4)
-    : setupForm.razorpay_key_id;
+  async function handleDisableGateway() {
+    try {
+      await disableGateway();
+      setGateway(await fetchGatewayStatus());
+      toast('Online payments turned off', 'success');
+    } catch (e) { toast(e instanceof Error ? e.message : 'Failed', 'error'); }
+  }
+
+  const sample = onlineCharges(10000);
 
   const TAB_CLASSES = {
     active: 'border-b-2 border-brand-600 text-brand-600 font-semibold bg-white px-4 py-2.5 text-sm',
@@ -652,142 +626,62 @@ export default function AdminFees() {
         {/* ══════════════ TAB 3: PAYMENT SETUP ══════════════ */}
         {activeTab === 'setup' && (
           <div className="space-y-5">
-            {/* Razorpay Key ID guide */}
-            <Card className="p-6">
-              <h3 className="text-sm font-semibold text-slate-900 mb-4">How to Get Your Razorpay Key ID</h3>
-              <ol className="space-y-4">
-                {[
-                  {
-                    step: 1,
-                    title: 'Create a Razorpay Account',
-                    body: "Go to razorpay.com → Sign Up → Complete KYC with your school's business details (PAN, bank account, GST if applicable).",
-                  },
-                  {
-                    step: 2,
-                    title: 'Activate Your Account',
-                    body: 'After KYC approval (usually 1–2 business days), your account will be activated for live payments.',
-                  },
-                  {
-                    step: 3,
-                    title: 'Get Your Key ID',
-                    body: 'In Razorpay Dashboard → Settings → API Keys → Generate Live Key → Copy the Key ID (starts with rzp_live_...).',
-                  },
-                  {
-                    step: 4,
-                    title: 'Enter Key ID Below',
-                    body: 'Paste your Key ID in the "Razorpay Key ID" field below and click Save.',
-                  },
-                ].map(({ step, title, body }) => (
-                  <li key={step} className="flex gap-3">
-                    <span className="flex-shrink-0 h-6 w-6 rounded-full bg-brand-600 text-white text-xs font-bold flex items-center justify-center">
-                      {step}
-                    </span>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800">{title}</p>
-                      <p className="text-sm text-slate-600 mt-0.5">{body}</p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-              <div className="mt-5 flex flex-col gap-2">
-                <a
-                  href="https://dashboard.razorpay.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)] px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 transition-colors w-fit"
-                >
-                  Open Razorpay Dashboard →
-                </a>
-                <p className="text-xs text-slate-400">
-                  For test mode during development, use a key starting with <code className="font-mono bg-slate-100 px-1 rounded">rzp_test_</code>
+            {/* Status */}
+            <Card className={`flex flex-col gap-3 p-5 sm:flex-row sm:items-center ${gateway.active ? '' : ''}`}>
+              <span className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${gateway.active ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                <CreditCard className="h-5 w-5" />
+              </span>
+              <div className="flex-1">
+                <p className="font-semibold text-slate-900">
+                  {gateway.active ? 'Online payments are active' : 'Online payments are off'}
+                </p>
+                <p className="text-sm text-slate-500">
+                  {gateway.active
+                    ? <>Razorpay {gateway.mode === 'live' ? 'Live' : 'Test'} · key {gateway.key_hint}{gateway.mode === 'test' && ' · test mode: no real money is charged'}</>
+                    : 'Add your Razorpay keys below. Until then parents pay at the school office.'}
                 </p>
               </div>
+              {gateway.active && <Button variant="outline" onClick={() => setDisableOpen(true)}>Turn off</Button>}
             </Card>
 
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold text-slate-900">Razorpay & Bank Details</h3>
-                {setupSaved && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700 ring-1 ring-inset ring-emerald-200">
-                    <CheckCircle className="h-3.5 w-3.5" />
-                    Payment Setup Complete ✓ ({maskedKey})
-                  </span>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <Input
-                    label="Razorpay Key ID"
-                    value={setupForm.razorpay_key_id}
-                    onChange={(e) => setSetupForm({ ...setupForm, razorpay_key_id: e.target.value })}
-                    placeholder="rzp_live_..."
-                  />
-                  {setupErrors.razorpay_key_id && <p className="mt-1 text-xs text-red-600">{setupErrors.razorpay_key_id}</p>}
-                </div>
-                <div className="flex items-start gap-2 rounded-xl bg-brand-50 border border-brand-100 p-3 sm:col-span-2">
-                  <Info className="h-4 w-4 text-brand-500 mt-0.5 flex-shrink-0" />
-                  <p className="text-xs text-brand-700">
-                    Only your Razorpay <strong>Key ID</strong> (publishable key) is stored here. Your <strong>Key Secret</strong> should never be entered into a browser — keep it only on your server or Razorpay dashboard.
-                  </p>
-                </div>
-                <div>
-                  <Input
-                    label="Account Holder Name"
-                    value={setupForm.account_holder_name}
-                    onChange={(e) => setSetupForm({ ...setupForm, account_holder_name: e.target.value })}
-                  />
-                  {setupErrors.account_holder_name && <p className="mt-1 text-xs text-red-600">{setupErrors.account_holder_name}</p>}
-                </div>
-                <div>
-                  <Input
-                    label="Bank Name"
-                    value={setupForm.bank_name}
-                    onChange={(e) => setSetupForm({ ...setupForm, bank_name: e.target.value })}
-                  />
-                  {setupErrors.bank_name && <p className="mt-1 text-xs text-red-600">{setupErrors.bank_name}</p>}
-                </div>
-                <div>
-                  <label className="mb-1 block text-[13px] font-medium text-slate-700">Account Number</label>
+            <div className="grid gap-5 lg:grid-cols-2">
+              {/* Keys */}
+              <Card className="p-6">
+                <h3 className="mb-1 text-sm font-semibold text-slate-900">{gateway.active ? 'Replace Razorpay keys' : 'Connect Razorpay'}</h3>
+                <p className="mb-4 text-xs text-slate-500">Razorpay Dashboard → Account &amp; Settings → API Keys. The keys are checked with Razorpay before they are activated. The secret is stored on the server only and never shown again.</p>
+                <div className="space-y-4">
+                  <Input label="Key ID" placeholder="rzp_live_XXXXXXXXXXXX" value={keyId} onChange={(e) => setKeyId(e.target.value)} />
                   <div className="relative">
-                    <input
-                      type={showAccountNo ? 'text' : 'password'}
-                      value={setupForm.account_number}
-                      onChange={(e) => setSetupForm({ ...setupForm, account_number: e.target.value })}
-                      className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 pr-10 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
-                      placeholder="Account number"
-                    />
-                    <button type="button" onClick={() => setShowAccountNo((v) => !v)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600">
-                      {showAccountNo ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    <Input label="Key Secret" type={showSecret ? 'text' : 'password'} placeholder="••••••••••••••••" value={keySecret}
+                      onChange={(e) => setKeySecret(e.target.value)} autoComplete="off" />
+                    <button type="button" onClick={() => setShowSecret((v) => !v)} aria-label={showSecret ? 'Hide secret' : 'Show secret'}
+                      className="absolute right-3 top-8 text-slate-400 hover:text-slate-600">
+                      {showSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
-                  {setupErrors.account_number && <p className="mt-1 text-xs text-red-500">{setupErrors.account_number}</p>}
+                  <Button onClick={handleSaveGateway} loading={gatewaySaving} icon={<CheckCircle className="h-4 w-4" />}>
+                    Verify &amp; activate
+                  </Button>
                 </div>
-                <div>
-                  <Input
-                    label="IFSC Code"
-                    value={setupForm.ifsc_code}
-                    onChange={(e) => setSetupForm({ ...setupForm, ifsc_code: e.target.value.toUpperCase() })}
-                    placeholder="e.g. HDFC0001234"
-                  />
-                  {setupErrors.ifsc_code && <p className="mt-1 text-xs text-red-600">{setupErrors.ifsc_code}</p>}
+              </Card>
+
+              {/* How charges work */}
+              <Card className="p-6">
+                <h3 className="mb-3 text-sm font-semibold text-slate-900">What parents pay online</h3>
+                <div className="rounded-xl bg-slate-50 p-4 text-sm">
+                  <div className="flex justify-between py-1"><span className="text-slate-500">Fee (example)</span><span className="tabular-nums">{formatCurrency(sample.fee, '₹')}</span></div>
+                  <div className="flex justify-between py-1"><span className="text-slate-500">Convenience fee (incl. GST)</span><span className="tabular-nums">{formatCurrency(sample.extra, '₹')}</span></div>
+                  <div className="mt-1 flex justify-between border-t border-slate-200 pt-2 font-semibold"><span>Parent pays</span><span className="tabular-nums">{formatCurrency(sample.total, '₹')}</span></div>
                 </div>
-              </div>
-
-              <div className="mt-6 flex justify-end">
-                <Button onClick={handleSaveSetup}>Save & Verify</Button>
-              </div>
-            </Card>
-
-            {/* How it works */}
-            <Card className="p-4 bg-brand-50 border-brand-100">
-              <h3 className="text-sm font-semibold text-slate-900 mb-3">How Online Payments Work</h3>
-              <ul className="space-y-2 text-sm text-slate-700">
-                <li>• Parent clicks "Pay Now" on their fee and selects a payment plan (full, quarterly, or EMI).</li>
-                <li>• Payment is processed securely via Razorpay.</li>
-                <li>• On success, the fee record is updated automatically and an invoice is generated for the parent to download or print.</li>
-              </ul>
-            </Card>
+                <ul className="mt-4 space-y-2 text-xs text-slate-500">
+                  <li className="flex gap-2"><Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-brand-500" /> The full fee amount is credited to the student's account; the convenience fee covers online processing.</li>
+                  <li className="flex gap-2"><Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-brand-500" /> Payments made at the office (cash, cheque) have no extra charge.</li>
+                  <li className="flex gap-2"><Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-brand-500" /> A fee is marked paid only after Razorpay confirms the payment.</li>
+                </ul>
+              </Card>
+            </div>
+            <ConfirmDialog open={disableOpen} onClose={() => setDisableOpen(false)} onConfirm={handleDisableGateway}
+              title="Turn off online payments?" message="Parents won't be able to pay in the app until you turn it back on. Your keys stay saved." />
           </div>
         )}
       </div>

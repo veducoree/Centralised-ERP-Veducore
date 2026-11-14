@@ -14,6 +14,12 @@ import {
   fetchClasses, fetchSchool,
   fetchFeeStructuresForClass,
   createAdmissionWithFees,
+  fetchFees,
+  fetchGatewayStatus,
+  createOnlinePayment,
+  payWithCheckout,
+  checkOnlinePayment,
+  onlineCharges,
 } from '@/services/api';
 import type {
   Class, Section, School,
@@ -550,6 +556,8 @@ interface Step5FeesProps extends StepProps {
 }
 
 function Step5Fees({ formData, errors, update, schoolId, academicYear, canCollectPayment }: Step5FeesProps) {
+  const [onlineEnabled, setOnlineEnabled] = useState<boolean | null>(null);
+  useEffect(() => { fetchGatewayStatus().then((g) => setOnlineEnabled(!!g.active)).catch(() => setOnlineEnabled(false)); }, []);
   const fees = formData.fees;
   const [loadingStructures, setLoadingStructures] = useState(false);
 
@@ -622,7 +630,9 @@ function Step5Fees({ formData, errors, update, schoolId, academicYear, canCollec
 
   const needsRef =
     fees.payment_option !== 'later' &&
-    fees.payment_mode !== 'Cash';
+    fees.payment_mode !== 'Cash' &&
+    fees.payment_mode !== 'Online (Razorpay)';
+  const isRazorpay = fees.payment_option !== 'later' && fees.payment_mode === 'Online (Razorpay)';
 
   return (
     <div className="space-y-6">
@@ -846,12 +856,20 @@ function Step5Fees({ formData, errors, update, schoolId, academicYear, canCollec
                 onChange={(e) => updateFees({ payment_mode: e.target.value as AdmissionPaymentMode })}
                 className="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 appearance-none">
                 <option>Cash</option>
+                <option value="Online (Razorpay)" disabled={onlineEnabled === false}>Online (Razorpay){onlineEnabled === false ? ' — not set up' : ''}</option>
                 <option>UPI</option>
                 <option>Card</option>
                 <option>Cheque</option>
                 <option>Online/Bank Transfer</option>
               </select>
             </div>
+            {isRazorpay && (
+              <div className="sm:col-span-2 rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-800">
+                After you confirm the admission, the Razorpay window opens for the parent to pay by UPI / card.
+                They pay {formatCurrency(onlineCharges(parseFloat(fees.amount_paying) || 0).total, '₹')} (incl. convenience fee & GST);
+                {' '}{formatCurrency(parseFloat(fees.amount_paying) || 0, '₹')} is credited to the fees.
+              </div>
+            )}
             {needsRef && (
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-slate-700">
@@ -1018,6 +1036,8 @@ export default function NewAdmissionPage() {
   const [resultReceiptId, setResultReceiptId] = useState<string | null>(null);
   const [resultStudentName, setResultStudentName] = useState('');
   const [resultParentCredentials, setResultParentCredentials] = useState<{ username: string; password: string } | null>(null);
+  // Online (Razorpay) at admission: null = not used, true = paid, false = not completed
+  const [onlinePaid, setOnlinePaid] = useState<boolean | null>(null);
 
   // Idempotency key — generated once per wizard session, persists across refresh
   const idempotencyKeyRef = useRef<string>('');
@@ -1145,7 +1165,7 @@ export default function NewAdmissionPage() {
           e.amount_paying = `Cannot exceed net payable (₹${netPayable.toFixed(2)})`;
         }
         if (!fees.payment_mode) e.payment_mode = 'Payment mode is required';
-        if (fees.payment_mode !== 'Cash' && !fees.transaction_ref.trim()) {
+        if (fees.payment_mode !== 'Cash' && fees.payment_mode !== 'Online (Razorpay)' && !fees.transaction_ref.trim()) {
           e.transaction_ref = 'Transaction / Reference No. is required for non-cash payments';
         }
       }
@@ -1199,6 +1219,9 @@ export default function NewAdmissionPage() {
         formData.fees.payment_option === 'later'
           ? 0
           : parseFloat(formData.fees.amount_paying) || 0;
+      // Online payments are recorded only after Razorpay confirms them, so the
+      // admission is saved with the amount still due.
+      const payOnline = formData.fees.payment_option !== 'later' && formData.fees.payment_mode === 'Online (Razorpay)' && paidAmount > 0;
 
       const result = await createAdmissionWithFees({
         school_id: schoolId,
@@ -1216,8 +1239,8 @@ export default function NewAdmissionPage() {
         academic_year: academicYear,
         fee_lines: formData.fees.line_items,
         discount: formData.fees.discount,
-        payment_option: formData.fees.payment_option,
-        amount_paying: paidAmount,
+        payment_option: payOnline ? 'later' : formData.fees.payment_option,
+        amount_paying: payOnline ? 0 : paidAmount,
         payment_mode: formData.fees.payment_mode,
         transaction_ref: formData.fees.transaction_ref,
         payment_date: formData.fees.payment_date || new Date().toISOString().split('T')[0],
@@ -1226,6 +1249,36 @@ export default function NewAdmissionPage() {
         collected_by_name: profile?.full_name ?? '',
         idempotency_key: idempotencyKeyRef.current,
       });
+
+      if (payOnline) {
+        setOnlinePaid(false);
+        try {
+          // Split the amount across the new fee rows in proportion, like cash.
+          const created = (await fetchFees({ studentId: result.student.id })).filter((f) => Number(f.amount) > Number(f.paid_amount));
+          const total = created.reduce((s, f) => s + Number(f.amount) - Number(f.paid_amount), 0);
+          let left = Math.round(paidAmount * 100);
+          const allocations = created.map((f, i) => {
+            const due = Math.round((Number(f.amount) - Number(f.paid_amount)) * 100);
+            const share = i === created.length - 1 ? left : Math.min(left, Math.round((due / Math.round(total * 100)) * paidAmount * 100));
+            left -= share;
+            return { fee_id: f.id, amount: Math.min(share, due) / 100 };
+          }).filter((a) => a.amount > 0);
+          const payment = await createOnlinePayment({ channel: 'checkout', allocations, admission_receipt_id: result.receiptId });
+          try {
+            await payWithCheckout(payment, { name: school?.name || 'Admission fees', prefill: { name: formData.father_name, email: formData.parent_email || undefined } });
+            setOnlinePaid(true);
+            toast('Payment received', 'success');
+          } catch (payErr) {
+            const c = await checkOnlinePayment(payment.online_payment_id).catch(() => null);
+            if (c?.status === 'paid') { setOnlinePaid(true); }
+            else toast(payErr instanceof Error && payErr.message === 'cancelled'
+              ? 'Admission saved. Online payment was not completed — the amount is pending in Fees.'
+              : `Admission saved, but payment failed: ${payErr instanceof Error ? payErr.message : ''}`, 'error');
+          }
+        } catch (startErr) {
+          toast(`Admission saved, but online payment couldn't start: ${startErr instanceof Error ? startErr.message : ''}`, 'error');
+        }
+      }
 
       // Store results for success screen
       setResultAdmissionNumber(formData.admission_number);
@@ -1252,7 +1305,10 @@ export default function NewAdmissionPage() {
     : null;
   const credentials = parentCreds ? { username: parentCreds.username, password: parentCreds.password } : null;
 
-  const { paidNow: resultPaidNow, balanceDue: resultBalanceDue } = computeFeeSummary(formData.fees);
+  const summaryNow = computeFeeSummary(formData.fees);
+  // If the online payment didn't go through, nothing was collected.
+  const resultPaidNow = onlinePaid === false ? 0 : summaryNow.paidNow;
+  const resultBalanceDue = onlinePaid === false ? summaryNow.balanceDue + summaryNow.paidNow : summaryNow.balanceDue;
 
   // ── Render ──────────────────────────────────────────────────────────────────
 

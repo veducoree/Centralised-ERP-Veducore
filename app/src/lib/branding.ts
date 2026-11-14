@@ -7,7 +7,7 @@ export function schoolInitials(name: string | null | undefined): string {
   if (!name) return '';
   return name
     .split(/[\s\-_.]+/)
-    .map((w) => w.replace(/[^A-Za-z0-9ऀ-ॿ]/g, ''))
+    .map((w) => w.replace(/[^\p{L}\p{N}]/gu, ''))
     .filter(Boolean)
     .map((w) => w[0].toUpperCase())
     .join('')

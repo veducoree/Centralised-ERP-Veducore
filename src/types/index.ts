@@ -523,7 +523,7 @@ export interface AdmissionDiscount {
 export type AdmissionPaymentOption = 'full' | 'partial' | 'later';
 
 /** Payment mode options */
-export type AdmissionPaymentMode = 'Cash' | 'UPI' | 'Card' | 'Cheque' | 'Online/Bank Transfer';
+export type AdmissionPaymentMode = 'Cash' | 'Online (Razorpay)' | 'UPI' | 'Card' | 'Cheque' | 'Online/Bank Transfer';
 
 /** Full fees step data stored inside FormData */
 export interface AdmissionFeesData {

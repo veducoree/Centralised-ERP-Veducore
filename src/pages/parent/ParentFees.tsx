@@ -23,9 +23,13 @@ import {
   fetchParentStudents,
   fetchFees,
   fetchSchool,
-  recordFeePayment,
+  fetchGatewayStatus,
+  createOnlinePayment,
+  payWithCheckout,
+  checkOnlinePayment,
+  onlineCharges,
 } from '@/services/api';
-import type { Parent, Student, Fee, School, PaymentSetup } from '@/types';
+import type { Parent, Student, Fee, School } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/Badge';
 
@@ -177,8 +181,8 @@ export default function ParentFees() {
   // Payment modal
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [selectedFee, setSelectedFee] = useState<Fee | null>(null);
-  const [paymentMethodChoice, setPaymentMethodChoice] = useState<'UPI' | 'CARD' | 'NETBANKING'>('UPI');
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [onlineEnabled, setOnlineEnabled] = useState<boolean | null>(null);
 
   // Invoice modal
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
@@ -188,6 +192,8 @@ export default function ParentFees() {
   const [invoiceFee, setInvoiceFee] = useState<Fee | null>(null);
   const [invoiceSessionAmount, setInvoiceSessionAmount] = useState<number>(0);
   const [invoiceIsFeeSummary, setInvoiceIsFeeSummary] = useState<boolean>(false);
+
+  useEffect(() => { fetchGatewayStatus().then((g) => setOnlineEnabled(!!g.active)).catch(() => setOnlineEnabled(false)); }, []);
 
   const loadData = useCallback(async () => {
     if (!profile?.id) return;
@@ -249,102 +255,60 @@ export default function ParentFees() {
     ? computeInstallmentPlan(selectedFee, structureMode)
     : null;
 
-  async function handlePaymentSuccess(
-    paymentId: string,
-    method: string,
-    fee: Fee,
-    planInfo: InstallmentPlanInfo
-  ) {
+  function onOnlinePaid(fee: Fee, planInfo: InstallmentPlanInfo, receipt: string) {
     const today = new Date().toISOString().split('T')[0];
-    const sessionAmount = planInfo.installmentAmount;
-    const newPaid = Math.min(Number(fee.amount), Number(fee.paid_amount) + sessionAmount);
-    const newRem = Math.max(0, Number(fee.amount) - newPaid);
-    const nextDueDate =
-      newRem > 0 ? addMonthsToDate(fee.due_date, planInfo.monthsToAdvance) : fee.due_date;
-
-    try {
-      await recordFeePayment(fee.id, {
-        school_id: fee.school_id,
-        student_id: fee.student_id,
-        amount: sessionAmount,
-        payment_date: today,
-        payment_method: method,
-        receipt_number: paymentId,
-        recorded_by: profile?.id,
-        next_due_date: nextDueDate,
-      });
-
-      if (newRem > 0 && planInfo.nextPeriodLabel) {
-        toast(
-          `${planInfo.currentPeriodLabel} Paid! Next up: ${planInfo.nextPeriodLabel}`,
-          'success'
-        );
-      } else {
-        toast('Full Annual Fee Paid Successfully!', 'success');
-      }
-
-      setLastPaymentId(paymentId);
-      setLastPaymentMethod(method);
-      setLastPaymentDate(today);
-      setInvoiceFee(fee);
-      setInvoiceSessionAmount(sessionAmount);
-      setInvoiceIsFeeSummary(false);
-      setPaymentModalOpen(false);
-      setPaymentLoading(false);
-      setInvoiceModalOpen(true);
-      await loadFees();
-    } catch {
-      toast('Payment recorded but failed to update record. Contact admin.', 'error');
-      setPaymentLoading(false);
-    }
+    const newPaid = Math.min(Number(fee.amount), Number(fee.paid_amount) + planInfo.installmentAmount);
+    const fullyPaid = newPaid >= Number(fee.amount);
+    toast(fullyPaid ? 'Payment successful — fee fully paid' : `${planInfo.currentPeriodLabel} paid${planInfo.nextPeriodLabel ? `. Next: ${planInfo.nextPeriodLabel}` : ''}`, 'success');
+    setLastPaymentId(receipt);
+    setLastPaymentMethod('Online (Razorpay)');
+    setLastPaymentDate(today);
+    setInvoiceFee(fee);
+    setInvoiceSessionAmount(planInfo.installmentAmount);
+    setInvoiceIsFeeSummary(false);
+    setPaymentModalOpen(false);
+    setInvoiceModalOpen(true);
+    loadFees();
   }
 
   async function handleProceedToPay() {
     if (!selectedFee || !activeModalPlan) return;
-    const isMock = import.meta.env.VITE_MOCK_AUTH === 'true';
-    const schoolId = selectedFee.school_id;
-    const stored = localStorage.getItem(`veducore_payment_setup_${schoolId}`);
-    const payAmount = activeModalPlan.installmentAmount;
-
-    // If Razorpay is configured and loaded on window, use Razorpay; otherwise process directly via instant online checkout
-    if (!stored || isMock || typeof window.Razorpay === 'undefined') {
-      setPaymentLoading(true);
-      const receiptId = `RCP-${Math.floor(1000 + Math.random() * 9000)}`;
-      await handlePaymentSuccess(
-        receiptId,
-        `Online (${paymentMethodChoice})`,
-        selectedFee,
-        activeModalPlan
-      );
+    if (!onlineEnabled) {
+      toast('Online payment is not enabled by the school yet. Please pay at the school office.', 'error');
       return;
     }
-
-    const setup = JSON.parse(stored) as Pick<PaymentSetup, 'razorpay_key_id'>;
+    const fee = selectedFee;
+    const plan = activeModalPlan;
+    const remainingAfter = Number(fee.amount) - Number(fee.paid_amount) - plan.installmentAmount;
+    const nextDue = remainingAfter > 0 ? addMonthsToDate(fee.due_date, plan.monthsToAdvance) : null;
     setPaymentLoading(true);
-
-    const rzp = new window.Razorpay({
-      key: setup.razorpay_key_id,
-      amount: payAmount * 100,
-      currency: 'INR',
-      name: school?.name || 'School Fees',
-      description: `${selectedFee.fee_type} (${activeModalPlan.currentPeriodLabel})`,
-      handler: (response: RazorpayResponse) => {
-        handlePaymentSuccess(
-          response.razorpay_payment_id,
-          'Online (Razorpay)',
-          selectedFee,
-          activeModalPlan
-        );
-      },
-      prefill: {
-        name: parent?.full_name,
-        email: parent?.email,
-        contact: parent?.phone ?? '',
-      },
-      theme: { color: '#2563eb' },
-      modal: { ondismiss: () => setPaymentLoading(false) },
-    });
-    rzp.open();
+    let created: Awaited<ReturnType<typeof createOnlinePayment>> | null = null;
+    try {
+      created = await createOnlinePayment({
+        channel: 'checkout',
+        allocations: [{ fee_id: fee.id, amount: plan.installmentAmount }],
+        next_due_dates: nextDue ? { [fee.id]: nextDue } : {},
+      });
+      const r = await payWithCheckout(created, {
+        name: school?.name || 'School Fees',
+        prefill: { name: parent?.full_name, email: parent?.email, contact: parent?.phone ?? '' },
+      });
+      onOnlinePaid(fee, plan, r.receipt_number);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Payment failed';
+      if (msg === 'cancelled' && created) {
+        // The payer may have paid and closed the window before the callback.
+        try {
+          const c = await checkOnlinePayment(created.online_payment_id);
+          if (c.status === 'paid') { onOnlinePaid(fee, plan, c.receipt_number ?? ''); return; }
+        } catch { /* ignore */ }
+        toast('Payment cancelled', 'info');
+      } else {
+        toast(msg, 'error');
+      }
+    } finally {
+      setPaymentLoading(false);
+    }
   }
 
   function openPayModal(fee: Fee) {
@@ -714,9 +678,10 @@ export default function ParentFees() {
               <Button
                 onClick={handleProceedToPay}
                 loading={paymentLoading}
+                disabled={onlineEnabled === false}
                 icon={<CreditCard className="h-4 w-4" />}
               >
-                Pay {formatCurrency(activeModalPlan.installmentAmount, '₹')} Now
+                Pay {formatCurrency(onlineCharges(activeModalPlan.installmentAmount).total, '₹')}
               </Button>
             </>
           }
@@ -736,32 +701,22 @@ export default function ParentFees() {
               )}
             </div>
 
-            <div className="space-y-2">
-              <p className="text-xs font-bold text-slate-500 uppercase">Select Payment Method</p>
-              {(
-                [
-                  { id: 'UPI', label: 'UPI / Google Pay / PhonePe' },
-                  { id: 'CARD', label: 'Debit / Credit Card' },
-                  { id: 'NETBANKING', label: 'Net Banking' },
-                ] as const
-              ).map((pm) => (
-                <button
-                  key={pm.id}
-                  type="button"
-                  onClick={() => setPaymentMethodChoice(pm.id)}
-                  className={`w-full rounded-xl border p-3 text-left text-sm font-medium transition-all flex items-center justify-between ${
-                    paymentMethodChoice === pm.id
-                      ? 'border-brand-600 bg-brand-50 text-brand-700'
-                      : 'border-slate-200 text-slate-700 hover:border-slate-300'
-                  }`}
-                >
-                  <span>{pm.label}</span>
-                  {paymentMethodChoice === pm.id && (
-                    <CheckCircle2 className="h-4 w-4 text-brand-600" />
-                  )}
-                </button>
-              ))}
-            </div>
+            {(() => {
+              const c = onlineCharges(activeModalPlan.installmentAmount);
+              return (
+                <div className="rounded-xl border border-slate-100 p-4 text-sm">
+                  <div className="flex justify-between py-1"><span className="text-slate-500">Fee</span><span className="tabular-nums">{formatCurrency(c.fee, '₹')}</span></div>
+                  <div className="flex justify-between py-1"><span className="text-slate-500">Convenience fee (incl. GST)</span><span className="tabular-nums">{formatCurrency(c.extra, '₹')}</span></div>
+                  <div className="mt-1 flex justify-between border-t border-slate-100 pt-2 font-semibold text-slate-900"><span>Total</span><span className="tabular-nums">{formatCurrency(c.total, '₹')}</span></div>
+                  <p className="mt-2 text-[11px] text-slate-400">Pay by UPI, card or net banking in the secure Razorpay window. No extra charge when you pay at the school office.</p>
+                </div>
+              );
+            })()}
+            {onlineEnabled === false && (
+              <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                Online payment isn't enabled by the school yet. Please pay at the school office.
+              </div>
+            )}
           </div>
         </Modal>
       )}

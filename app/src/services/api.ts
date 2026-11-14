@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/supabase';
 import { generateSubjectCode } from '@/lib/subjectUtils';
 import { generateParentCredentials } from '@/lib/parentUtils';
 import type {
@@ -755,6 +755,41 @@ export async function fetchExamScheduleFor(examIds: string[]) {
 }
 
 // ==========================================
+// Online payments (Razorpay payment links via the `payments` edge function)
+// ==========================================
+export function onlineCharges(feeRupees: number) {
+  const fee = Math.round(feeRupees * 100);
+  const convenience = Math.round(fee * 0.02);
+  const gst = Math.round(convenience * 0.18);
+  const extra = convenience + gst + 500;
+  return { fee: fee / 100, extra: extra / 100, total: (fee + extra) / 100 };
+}
+
+async function paymentsCall<T>(payload: Record<string, unknown>): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not signed in');
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/payments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}`, apikey: SUPABASE_ANON_KEY },
+    body: JSON.stringify(payload),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || 'Payment service is unavailable. Please try again.');
+  return body as T;
+}
+
+export async function fetchGatewayActive() {
+  const { data } = await supabase.rpc('payment_gateway_status');
+  return !!(data as { active?: boolean } | null)?.active;
+}
+
+export const createPaymentLink = (params: { allocations: { fee_id: string; amount: number }[]; next_due_dates?: Record<string, string> }) =>
+  paymentsCall<{ online_payment_id: string; link_url: string; amount: number }>({ action: 'create', channel: 'link', ...params });
+
+export const checkOnlinePayment = (onlinePaymentId: string) =>
+  paymentsCall<{ status: 'paid' | 'pending' | 'expired'; receipt_number?: string }>({ action: 'check', online_payment_id: onlinePaymentId });
+
+// ==========================================
 // Exam Definitions API
 // ==========================================
 export async function fetchExamDefs(filters?: { sectionId?: string; schoolId?: string }) {
@@ -832,7 +867,6 @@ export async function deleteRemark(id: string) {
 // ==========================================
 // Fees API
 // ==========================================
-const mobileFeeOverrides = new Map<string, Partial<Fee>>();
 
 export async function fetchFees(filters: {
   schoolId?: string;
@@ -850,21 +884,8 @@ export async function fetchFees(filters: {
 
   const { data, error } = await query;
   if (error) throw error;
-  return ((data || []) as Fee[]).map((f) => {
-    const ov = mobileFeeOverrides.get(f.id);
-    if (ov && Number(ov.paid_amount ?? 0) > Number(f.paid_amount ?? 0)) {
-      const mergedPaid = Math.min(Number(f.amount), Number(ov.paid_amount));
-      const mergedRem = Math.max(0, Number(f.amount) - mergedPaid);
-      return {
-        ...f,
-        ...ov,
-        paid_amount: mergedPaid,
-        remaining_amount: mergedRem,
-        status: (mergedRem <= 0 ? 'paid' : 'partially_paid') as Fee['status'],
-      };
-    }
-    return f;
-  });
+  // Always the database's values.
+  return (data || []) as Fee[];
 }
 
 export async function fetchFeeTypes(schoolId: string) {
@@ -880,10 +901,6 @@ export async function fetchFeeTypes(schoolId: string) {
 export async function updateFee(id: string, updates: Partial<Fee>) {
   // Never pass remaining_amount to Postgres UPDATE because remaining_amount is GENERATED ALWAYS AS (amount - paid_amount)
   const { remaining_amount, student, ...dbUpdates } = updates as Partial<Fee> & { student?: unknown };
-  mobileFeeOverrides.set(id, {
-    ...(mobileFeeOverrides.get(id) || {}),
-    ...updates,
-  });
   try {
     const { data, error } = await supabase
       .from('fees')

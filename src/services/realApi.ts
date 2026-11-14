@@ -1261,26 +1261,7 @@ export async function createFeeType(schoolId: string, name: string, description:
   return data as FeeType | null;
 }
 
-const LOCAL_FEE_OVERRIDES_KEY = 'veducore_local_fee_overrides';
-
-function getLocalFeeOverrides(): Record<string, Partial<Fee>> {
-  try {
-    const raw = localStorage.getItem(LOCAL_FEE_OVERRIDES_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function setLocalFeeOverride(feeId: string, override: Partial<Fee>) {
-  try {
-    const all = getLocalFeeOverrides();
-    all[feeId] = { ...(all[feeId] || {}), ...override };
-    localStorage.setItem(LOCAL_FEE_OVERRIDES_KEY, JSON.stringify(all));
-  } catch {
-    // ignore
-  }
-}
+const LOCAL_FEE_OVERRIDES_KEY = 'veducore_local_fee_overrides'; // legacy key, cleared on load
 
 export async function fetchFees(filters: {
   schoolId?: string;
@@ -1298,22 +1279,9 @@ export async function fetchFees(filters: {
 
   const { data, error } = await query;
   if (error) throw error;
-  const overrides = getLocalFeeOverrides();
-  return ((data || []) as Fee[]).map((f) => {
-    const ov = overrides[f.id];
-    if (ov && Number(ov.paid_amount ?? 0) > Number(f.paid_amount ?? 0)) {
-      const mergedPaid = Math.min(Number(f.amount), Number(ov.paid_amount));
-      const mergedRem = Math.max(0, Number(f.amount) - mergedPaid);
-      return {
-        ...f,
-        ...ov,
-        paid_amount: mergedPaid,
-        remaining_amount: mergedRem,
-        status: (mergedRem <= 0 ? 'paid' : 'partially_paid') as Fee['status'],
-      };
-    }
-    return f;
-  });
+  // Always the database's values — never a locally cached "paid" state.
+  try { localStorage.removeItem(LOCAL_FEE_OVERRIDES_KEY); } catch { /* ignore */ }
+  return (data || []) as Fee[];
 }
 
 export async function createFee(fee: {
@@ -1334,6 +1302,10 @@ export async function createFee(fee: {
   return data as Fee | null;
 }
 
+/**
+ * Records an office (cash / cheque / bank) payment. Staff only — parents pay
+ * online through the payments edge function. Errors are thrown, never hidden.
+ */
 export async function recordFeePayment(feeId: string, payment: {
   school_id: string;
   student_id: string;
@@ -1344,66 +1316,41 @@ export async function recordFeePayment(feeId: string, payment: {
   recorded_by?: string;
   next_due_date?: string;
 }) {
-  const effectiveReceipt =
-    payment.receipt_number?.trim() ||
-    `RCP-${Math.floor(100000 + Math.random() * 900000)}`;
-  const effectiveMethod = payment.payment_method?.trim() || 'Cash';
-  const { next_due_date, ...paymentRow } = {
-    ...payment,
-    receipt_number: effectiveReceipt,
-    payment_method: effectiveMethod,
-  };
-  let insertedPayment: FeePayment | null = null;
-  try {
-    const { data } = await supabase
-      .from('fee_payments')
-      .insert({ ...paymentRow, fee_id: feeId })
-      .select()
-      .maybeSingle();
-    insertedPayment = data as FeePayment | null;
-  } catch {
-    // fallback if parent RLS on fee_payments is not yet applied
-  }
+  const receipt = payment.receipt_number?.trim()
+    || `RCP-${Date.now().toString(36).toUpperCase()}-${Math.floor(Math.random() * 1296).toString(36).toUpperCase()}`;
+  const method = payment.payment_method?.trim() || 'Cash';
+  const { next_due_date, ...row } = { ...payment, receipt_number: receipt, payment_method: method };
 
-  // Update fee record
-  const { data: fee } = await supabase.from('fees').select('*').eq('id', feeId).maybeSingle();
-  const overrides = getLocalFeeOverrides();
-  const basePaid = Math.max(
-    Number((fee as Fee | null)?.paid_amount ?? 0),
-    Number(overrides[feeId]?.paid_amount ?? 0)
-  );
-  const totalAmt = Number((fee as Fee | null)?.amount ?? payment.amount);
-  const newPaid = Math.min(totalAmt, basePaid + Number(payment.amount));
-  const newRemaining = Math.max(0, totalAmt - newPaid);
-  const newStatus = newPaid >= totalAmt ? 'paid' : newPaid > 0 ? 'partially_paid' : 'pending';
-  const updatedDueDate = next_due_date && newStatus !== 'paid'
-    ? next_due_date
-    : (fee as Fee | null)?.due_date;
+  const { data: fee, error: feeErr } = await supabase.from('fees').select('*').eq('id', feeId).maybeSingle();
+  if (feeErr) throw feeErr;
+  if (!fee) throw new Error('Fee not found');
+  const f = fee as Fee;
+  const remaining = Number(f.amount) - Number(f.paid_amount);
+  if (Number(payment.amount) <= 0) throw new Error('Amount must be more than zero');
+  if (Number(payment.amount) > remaining + 0.001) throw new Error('Amount is more than the balance due');
 
-  setLocalFeeOverride(feeId, {
+  const { data: inserted, error: insErr } = await supabase
+    .from('fee_payments').insert({ ...row, fee_id: feeId }).select().maybeSingle();
+  if (insErr) throw insErr;
+
+  const newPaid = Math.min(Number(f.amount), Number(f.paid_amount) + Number(payment.amount));
+  const newStatus = newPaid >= Number(f.amount) ? 'paid' : newPaid > 0 ? 'partially_paid' : 'pending';
+  const dueDate = next_due_date && newStatus !== 'paid' ? next_due_date : f.due_date;
+  const { error: updErr } = await supabase.from('fees').update({
     paid_amount: newPaid,
-    remaining_amount: newRemaining,
     status: newStatus,
     payment_date: payment.payment_date,
-    payment_method: effectiveMethod,
-    receipt_number: effectiveReceipt,
-    ...(updatedDueDate ? { due_date: updatedDueDate } : {}),
-  });
-
-  try {
-    await supabase.from('fees').update({
-      paid_amount: newPaid,
-      status: newStatus,
-      payment_date: payment.payment_date,
-      payment_method: effectiveMethod,
-      receipt_number: effectiveReceipt,
-      ...(updatedDueDate ? { due_date: updatedDueDate } : {}),
-    }).eq('id', feeId);
-  } catch {
-    // local override already saved
+    payment_method: method,
+    receipt_number: receipt,
+    due_date: dueDate,
+  }).eq('id', feeId);
+  if (updErr) {
+    // Keep the ledger consistent: undo the payment row if the fee couldn't be updated.
+    if (inserted?.id) await supabase.from('fee_payments').delete().eq('id', (inserted as FeePayment).id);
+    throw updErr;
   }
-
-  return insertedPayment;
+  invalidateCache(`fees:`);
+  return inserted as FeePayment | null;
 }
 
 export async function deleteFee(id: string) {
@@ -3567,4 +3514,116 @@ export async function fetchExamScheduleFor(examIds: string[]) {
   const { data, error } = await supabase.from('exam_schedule').select('*').in('exam_id', examIds);
   if (error) throw error;
   return (data ?? []) as ExamScheduleRow[];
+}
+
+// ==========================================
+// Online payments (Razorpay via the `payments` edge function)
+// ==========================================
+export interface GatewayStatus { active: boolean; key_id?: string; mode?: 'live' | 'test'; route_linked?: boolean; verified_at?: string; key_hint?: string }
+
+export interface CreatedPayment {
+  online_payment_id: string;
+  key_id: string;
+  order_id: string | null;
+  link_url: string | null;
+  amount: number; // paise
+  breakdown: { fee: number; convenience_with_gst: number; total: number }; // paise
+  description: string;
+}
+
+/** Same formula as the server (display only; the server decides the real amount). */
+export function onlineCharges(feeRupees: number) {
+  const fee = Math.round(feeRupees * 100);
+  const convenience = Math.round(fee * 0.02);
+  const gst = Math.round(convenience * 0.18);
+  const extra = convenience + gst + 500;
+  return { fee: fee / 100, extra: extra / 100, total: (fee + extra) / 100 };
+}
+
+async function paymentsCall<T>(payload: Record<string, unknown>): Promise<T> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not signed in');
+  const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/payments`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_ANON_KEY },
+    body: JSON.stringify(payload),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || 'Payment service is unavailable. Please try again.');
+  return body as T;
+}
+
+export async function fetchGatewayStatus(): Promise<GatewayStatus> {
+  const { data, error } = await supabase.rpc('payment_gateway_status');
+  if (error) return { active: false };
+  return (data as GatewayStatus) ?? { active: false };
+}
+
+export const saveGateway = (keyId: string, keySecret: string) =>
+  paymentsCall<GatewayStatus>({ action: 'gateway_save', key_id: keyId, key_secret: keySecret });
+export const disableGateway = () => paymentsCall<GatewayStatus>({ action: 'gateway_disable' });
+
+export const createOnlinePayment = (params: {
+  channel: 'checkout' | 'link';
+  allocations: { fee_id: string; amount: number }[];
+  next_due_dates?: Record<string, string>;
+  admission_receipt_id?: string | null;
+}) => paymentsCall<CreatedPayment>({ action: 'create', ...params });
+
+export const verifyOnlinePayment = (p: { online_payment_id: string; razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) =>
+  paymentsCall<{ status: 'paid'; receipt_number: string }>({ action: 'verify', ...p });
+
+export const checkOnlinePayment = (onlinePaymentId: string) =>
+  paymentsCall<{ status: 'paid' | 'pending' | 'expired'; receipt_number?: string }>({ action: 'check', online_payment_id: onlinePaymentId });
+
+let rzpScript: Promise<void> | null = null;
+/** Loads Razorpay Checkout once. */
+export function loadRazorpayCheckout(): Promise<void> {
+  if (typeof window !== 'undefined' && (window as unknown as { Razorpay?: unknown }).Razorpay) return Promise.resolve();
+  rzpScript ??= new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    s.onload = () => resolve();
+    s.onerror = () => { rzpScript = null; reject(new Error('Could not load Razorpay. Check your internet connection.')); };
+    document.body.appendChild(s);
+  });
+  return rzpScript;
+}
+
+/**
+ * Opens Razorpay Checkout for a created payment and resolves once the
+ * payment is verified and recorded on the server. Rejects with
+ * "cancelled" when the payer closes the window.
+ */
+export async function payWithCheckout(p: CreatedPayment, opts: { name: string; prefill?: { name?: string; email?: string; contact?: string } }) {
+  await loadRazorpayCheckout();
+  return new Promise<{ receipt_number: string }>((resolve, reject) => {
+    const Rzp = (window as unknown as { Razorpay: new (o: Record<string, unknown>) => { open: () => void; on: (e: string, cb: (r: unknown) => void) => void } }).Razorpay;
+    const rzp = new Rzp({
+      key: p.key_id,
+      order_id: p.order_id,
+      amount: p.amount,
+      currency: 'INR',
+      name: opts.name,
+      description: p.description,
+      prefill: opts.prefill,
+      theme: { color: '#5B6EE8' },
+      handler: async (r: { razorpay_order_id: string; razorpay_payment_id: string; razorpay_signature: string }) => {
+        try {
+          const v = await verifyOnlinePayment({ online_payment_id: p.online_payment_id, ...r });
+          resolve({ receipt_number: v.receipt_number });
+        } catch (e) {
+          // Signature path failed (e.g. network) — ask Razorpay directly.
+          try {
+            const c = await checkOnlinePayment(p.online_payment_id);
+            if (c.status === 'paid') resolve({ receipt_number: c.receipt_number ?? '' });
+            else reject(e);
+          } catch { reject(e); }
+        }
+      },
+      modal: { ondismiss: () => reject(new Error('cancelled')) },
+    });
+    rzp.on('payment.failed', () => { /* Razorpay shows the error; the payer can retry in the same window */ });
+    rzp.open();
+  });
 }
