@@ -9,8 +9,7 @@ import {
   fetchTeacherByUserId,
   fetchTeacherAssignments,
   fetchStudentsBySection,
-  createStudentRecord,
-  deleteStudentRecord,
+  replaceStudentRecords,
   fetchSubjects,
   fetchExamDefs,
   fetchExamScheduleFor,
@@ -169,15 +168,13 @@ export default function TeacherExamMarks() {
       // Only this section's marks for this exam + subject are replaced.
       const existing = await fetchRecordsForExamSubject(
         selectedExamDef.exam_name, selectedSubject.id, sectionStudents.map((s) => s.id));
-      for (const r of existing) {
-        await deleteStudentRecord(r.id);
-      }
+      const rows = [];
       for (const student of sectionStudents) {
         const marksVal = marksInput[student.id];
         if (marksVal === undefined || marksVal === '') continue;
         const parsed = parseFloat(marksVal);
         if (isNaN(parsed)) continue;
-        await createStudentRecord({
+        rows.push({
           school_id: profile.school_id,
           student_id: student.id,
           teacher_id: teacher.id,
@@ -191,6 +188,7 @@ export default function TeacherExamMarks() {
           teacher_comment: commentInput[student.id] || undefined,
         });
       }
+      await replaceStudentRecords(existing, rows);
       toast('Marks saved successfully', 'success');
       await loadData();
       setView('list');

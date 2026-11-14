@@ -838,15 +838,14 @@ export async function setTeacherSubjectAllotments(params: {
     const { error } = await supabase.from('class_assignments').delete().in('id', toRemove.map((c) => c.id));
     if (error) throw error;
   }
-  for (const r of toAdd) {
-    // Free the (section, subject) pair from any other teacher first.
-    const { error: delErr } = await supabase
-      .from('class_assignments')
-      .delete()
-      .eq('section_id', r.section_id)
-      .eq('subject_id', r.subject_id);
-    if (delErr) throw delErr;
-  }
+  // Free each (section, subject) pair from any other teacher first.
+  const freed = await Promise.all(toAdd.map((r) => supabase
+    .from('class_assignments')
+    .delete()
+    .eq('section_id', r.section_id)
+    .eq('subject_id', r.subject_id)));
+  const delErr = freed.find((r) => r.error)?.error;
+  if (delErr) throw delErr;
   if (toAdd.length) {
     const { error } = await supabase
       .from('class_assignments')
@@ -1198,6 +1197,33 @@ export async function createStudentRecord(record: {
 export async function deleteStudentRecord(id: string) {
   const { error } = await supabase.from('student_records').delete().eq('id', id);
   if (error) throw error;
+}
+
+/**
+ * Replace a set of student_records in two requests instead of one per row.
+ * If the insert fails, the deleted rows are put back so marks are never lost.
+ */
+export async function replaceStudentRecords(
+  previous: StudentRecord[],
+  rows: Parameters<typeof createStudentRecord>[0][],
+) {
+  if (previous.length) {
+    const { error } = await supabase.from('student_records').delete().in('id', previous.map((r) => r.id));
+    if (error) throw error;
+  }
+  if (!rows.length) return;
+  const { error } = await supabase.from('student_records').insert(rows);
+  if (error) {
+    if (previous.length) {
+      const restore = previous.map((r) => {
+        const copy: Record<string, unknown> = { ...r };
+        for (const k of Object.keys(copy)) if (copy[k] !== null && typeof copy[k] === 'object') delete copy[k];
+        return copy;
+      });
+      await supabase.from('student_records').insert(restore);
+    }
+    throw error;
+  }
 }
 
 export async function fetchRemarks(filters: {
@@ -3279,9 +3305,13 @@ export async function saveExamMarks(params: {
     const { error } = await supabase.from('student_records').delete().in('id', toDelete);
     if (error) throw error;
   }
-  for (const e of toUpdate) {
-    const { error } = await supabase.from('student_records').update({ marks: e.marks, max_marks }).eq('id', e.record_id as string);
-    if (error) throw error;
+  // Each row has its own value, so updates can't be one statement; send
+  // them in parallel batches instead of one round trip per student.
+  for (let i = 0; i < toUpdate.length; i += 10) {
+    const results = await Promise.all(toUpdate.slice(i, i + 10).map((e) =>
+      supabase.from('student_records').update({ marks: e.marks, max_marks }).eq('id', e.record_id as string)));
+    const failed = results.find((r) => r.error);
+    if (failed?.error) throw failed.error;
   }
   if (toInsert.length) {
     const { error } = await supabase.from('student_records').insert(toInsert.map((e) => ({

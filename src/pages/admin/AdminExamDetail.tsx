@@ -231,16 +231,16 @@ function DatesheetTab({ exam, classes, subjects, schedule, canEdit, onSaved }: {
     setCopying(true);
     try {
       const byName = Object.fromEntries(classSubjects.map((s) => [s.id, s.name.toLowerCase()]));
-      let copied = 0;
-      for (const c of classes) {
-        if (c.id === classId) continue;
-        const theirs = subjects.filter((s) => s.class_id === c.id);
-        const map = (sid: string) => theirs.find((t) => t.name.toLowerCase() === byName[sid])?.id ?? null;
-        const rows = toRows(c.id, draft, map);
-        if (!rows.length) continue;
-        await saveExamScheduleForClass(exam.id, c.id, rows);
-        copied++;
-      }
+      const jobs = classes
+        .filter((c) => c.id !== classId)
+        .map((c) => {
+          const theirs = subjects.filter((s) => s.class_id === c.id);
+          const map = (sid: string) => theirs.find((t) => t.name.toLowerCase() === byName[sid])?.id ?? null;
+          return { classId: c.id, rows: toRows(c.id, draft, map) };
+        })
+        .filter((j) => j.rows.length);
+      await Promise.all(jobs.map((j) => saveExamScheduleForClass(exam.id, j.classId, j.rows)));
+      const copied = jobs.length;
       await saveExamScheduleForClass(exam.id, classId, toRows(classId, draft, (s) => s));
       await onSaved();
       toast(`Copied to ${copied} class${copied === 1 ? '' : 'es'} (matching subject names)`, 'success');

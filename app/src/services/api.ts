@@ -678,6 +678,33 @@ export async function deleteStudentRecord(id: string) {
   if (error) throw error;
 }
 
+/**
+ * Replace a set of student_records in two requests instead of one per row.
+ * If the insert fails, the deleted rows are put back so marks are never lost.
+ */
+export async function replaceStudentRecords(
+  previous: StudentRecord[],
+  rows: Parameters<typeof createStudentRecord>[0][],
+) {
+  if (previous.length) {
+    const { error } = await supabase.from('student_records').delete().in('id', previous.map((r) => r.id));
+    if (error) throw error;
+  }
+  if (!rows.length) return;
+  const { error } = await supabase.from('student_records').insert(rows);
+  if (error) {
+    if (previous.length) {
+      const restore = previous.map((r) => {
+        const copy: Record<string, unknown> = { ...r };
+        for (const k of Object.keys(copy)) if (copy[k] !== null && typeof copy[k] === 'object') delete copy[k];
+        return copy;
+      });
+      await supabase.from('student_records').insert(restore);
+    }
+    throw error;
+  }
+}
+
 /** Existing marks for one exam name + subject among the given students. */
 export async function fetchRecordsForExamSubject(examName: string, subjectId: string, studentIds: string[]) {
   if (!studentIds.length) return [] as StudentRecord[];

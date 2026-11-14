@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const isMock = import.meta.env.VITE_MOCK_AUTH === 'true';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL ?? '';
@@ -16,7 +16,10 @@ if (!isMock && (!supabaseUrl || !supabaseAnonKey)) {
   );
 }
 
-export const supabase =
+// Typed as always present: it is null only in mock mode or when the env
+// vars are missing, both of which are already reported above and guarded
+// by `if (!supabase)` checks in AuthContext.
+export const supabase = (
   isMock || !supabaseUrl || !supabaseAnonKey
     ? null
     : createClient(supabaseUrl, supabaseAnonKey, {
@@ -25,4 +28,5 @@ export const supabase =
           autoRefreshToken: true,
           detectSessionInUrl: true,
         },
-      });
+      })
+) as SupabaseClient;

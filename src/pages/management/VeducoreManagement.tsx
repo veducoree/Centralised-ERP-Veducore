@@ -1,5 +1,5 @@
 // Veducore superadmin portal: auth gate, layout and section routing.
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import {
   AlertCircle, BarChart3, Building2, Contact2, CreditCard, Eye, EyeOff, History, LifeBuoy, Loader2, LogOut,
   Megaphone, Menu, Plus, Settings, ShieldCheck, Users, Wallet, X,
@@ -8,20 +8,21 @@ import veducoreLogo from '@/assets/veducore-logo.png';
 import {
   SESSION_EXPIRED_EVENT, callManageSchools, callMgmtAuth, errMsg, mgmtSupabase, type Me, type SchoolRecord,
 } from './api';
-import { Badge, Toaster, cx, inputCls } from './ui';
-import { ROLES } from './sections/Team';
+import { Badge, LoadingBlock, ROLES, Toaster, cx, inputCls } from './ui';
 import DashboardSection from './sections/Dashboard';
 import SchoolsSection from './sections/Schools';
-import SchoolDrawer from './sections/SchoolDrawer';
-import AddSchoolSection from './sections/AddSchool';
-import BillingSection from './sections/Billing';
-import PaymentsSection from './sections/Payments';
-import AnnouncementsSection from './sections/Announcements';
-import SupportSection from './sections/Support';
-import TeamSection from './sections/Team';
-import AuditLogSection from './sections/AuditLog';
-import SettingsSection from './sections/Settings';
-import IdCardsSection from './sections/IdCards';
+
+// Sections load on first open so the portal starts fast.
+const SchoolDrawer = lazy(() => import('./sections/SchoolDrawer'));
+const AddSchoolSection = lazy(() => import('./sections/AddSchool'));
+const BillingSection = lazy(() => import('./sections/Billing'));
+const PaymentsSection = lazy(() => import('./sections/Payments'));
+const AnnouncementsSection = lazy(() => import('./sections/Announcements'));
+const SupportSection = lazy(() => import('./sections/Support'));
+const TeamSection = lazy(() => import('./sections/Team'));
+const AuditLogSection = lazy(() => import('./sections/AuditLog'));
+const SettingsSection = lazy(() => import('./sections/Settings'));
+const IdCardsSection = lazy(() => import('./sections/IdCards'));
 
 type Section =
   | 'dashboard' | 'schools' | 'add-school' | 'id-cards' | 'billing' | 'payments'
@@ -220,6 +221,7 @@ export default function VeducoreManagement() {
         </header>
 
         <div className="flex-1 px-4 py-6 sm:px-8">
+          <Suspense fallback={<LoadingBlock rows={6} />}>
           {current === 'dashboard' && <DashboardSection onOpenSchool={setOpenSchool} onNavigate={setSection} />}
           {current === 'schools' && (
             <SchoolsSection schools={schools} loading={schoolsLoading} error={schoolsError} onReload={loadSchools}
@@ -238,11 +240,14 @@ export default function VeducoreManagement() {
           {current === 'team' && <TeamSection me={me} />}
           {current === 'audit' && <AuditLogSection />}
           {current === 'settings' && <SettingsSection me={me} onSignOutEverywhere={signOut} />}
+          </Suspense>
         </div>
       </main>
 
+      <Suspense fallback={null}>
       <SchoolDrawer schoolId={openSchool} me={me} onClose={() => setOpenSchool(null)} onChanged={loadSchools}
         onDeleted={() => { setSchools((cur) => cur.filter((s) => s.id !== openSchool)); loadSchools(); }} />
+      </Suspense>
       <Toaster />
     </div>
   );

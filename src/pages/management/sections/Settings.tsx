@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { KeyRound, LogOut, UserRound } from 'lucide-react';
 import { errMsg, mgmtSupabase, type Me } from '../api';
-import { Badge, Button, Card, Field, KV, inputCls, toast } from '../ui';
-import { ROLES } from './Team';
+import { Badge, Button, Card, Field, KV, ROLES, inputCls, toast } from '../ui';
 
 export default function SettingsSection({ me, onSignOutEverywhere }: { me: Me; onSignOutEverywhere: () => void }) {
   const [current, setCurrent] = useState('');

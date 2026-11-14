@@ -1,18 +1,13 @@
 import { useEffect, useState } from 'react';
 import { KeyRound, Plus, ShieldCheck, Sparkles, Trash2, UserPlus, Users } from 'lucide-react';
 import { callManageSchools, errMsg, fmtDate, generatePassword, timeAgo, type Me, type TeamRole } from '../api';
-import { Badge, Button, Card, EmptyState, ErrorBanner, Field, LoadingBlock, Modal, cx, inputCls, toast, type BadgeTone } from '../ui';
+import { Badge, Button, Card, EmptyState, ErrorBanner, Field, LoadingBlock, Modal, ROLES, cx, inputCls, toast } from '../ui';
 
 interface Member {
   id: string; email: string; full_name: string; role: TeamRole; status: 'active' | 'disabled';
   last_login_at: string | null; created_at: string;
 }
 
-export const ROLES: Record<TeamRole, { label: string; tone: BadgeTone; text: string }> = {
-  owner: { label: 'Owner', tone: 'indigo', text: 'Everything, including team management and deleting schools' },
-  admin: { label: 'Admin', tone: 'blue', text: 'Manage schools, billing, announcements and support — cannot delete schools or manage the team' },
-  support: { label: 'Support', tone: 'gray', text: 'Read-only view of schools (no passwords) and full access to the support desk' },
-};
 
 export default function TeamSection({ me }: { me: Me }) {
   const [team, setTeam] = useState<Member[]>([]);

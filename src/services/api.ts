@@ -69,6 +69,7 @@ export {
   fetchStudentRecords,
   createStudentRecord,
   deleteStudentRecord,
+  replaceStudentRecords,
   fetchRemarks,
   createRemark,
   deleteRemark,

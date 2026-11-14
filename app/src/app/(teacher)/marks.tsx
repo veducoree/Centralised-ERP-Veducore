@@ -27,9 +27,8 @@ import {
   fetchSubjects,
   fetchStudentsBySection,
   fetchStudentRecords,
-  createStudentRecord,
+  replaceStudentRecords,
   fetchRecordsForExamSubject,
-  deleteStudentRecord,
 } from '@/services/api';
 import { COLORS, SPACING, RADIUS, SHADOW, formatDate } from '@/lib/utils';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -240,18 +239,13 @@ export default function TeacherMarks() {
       const existing = await fetchRecordsForExamSubject(
         selectedExam.exam_name, selectedSubject.id, sectionStudents.map(s => s.id));
 
-      for (const r of existing) {
-        await deleteStudentRecord(r.id);
-      }
-
+      const rows = [];
       for (const st of sectionStudents) {
         const val = marksInput[st.id];
         if (val === undefined || val === '') continue;
         const num = parseFloat(val);
         if (isNaN(num)) continue;
-
-        const grade = computeGrade(num, selectedMax);
-        await createStudentRecord({
+        rows.push({
           school_id: schoolId,
           student_id: st.id,
           teacher_id: teacher?.id,
@@ -261,11 +255,12 @@ export default function TeacherMarks() {
           exam_name: selectedExam.exam_name,
           marks: num,
           max_marks: selectedMax,
-          grade,
+          grade: computeGrade(num, selectedMax),
           date: selectedExam.date,
           teacher_comment: commentInput[st.id] || null,
         });
       }
+      await replaceStudentRecords(existing, rows);
 
       Alert.alert('Marks Saved', 'Marks and comments have been recorded successfully.');
       await loadData();

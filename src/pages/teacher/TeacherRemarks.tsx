@@ -34,10 +34,9 @@ export default function TeacherRemarks() {
       const t = await fetchTeacherByUserId(profile.id);
       if (t) {
         setTeacher(t);
-        const a = await fetchTeacherAssignments(t.id);
+        const [a, r] = await Promise.all([fetchTeacherAssignments(t.id), fetchRemarks({ teacherId: t.id })]);
         setAssignments(a);
         if (a.length > 0) setSelectedSection(a[0].section_id);
-        const r = await fetchRemarks({ teacherId: t.id });
         setRemarks(r);
       }
     } catch { /* handled */ }

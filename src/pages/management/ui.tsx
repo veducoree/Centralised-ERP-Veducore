@@ -1,7 +1,7 @@
 // Shared building blocks for the Veducore management portal.
 import React, { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle2, Info, Loader2, X } from 'lucide-react';
-import type { SchoolHealth, Subscription } from './api';
+import type { SchoolHealth, Subscription, TeamRole } from './api';
 
 export function cx(...c: (string | false | null | undefined)[]) {
   return c.filter(Boolean).join(' ');
@@ -160,6 +160,12 @@ export const SUB_STATUS: Record<Subscription['status'], { label: string; tone: B
   past_due: { label: 'Past due', tone: 'amber' },
   cancelled: { label: 'Cancelled', tone: 'gray' },
   expired: { label: 'Expired', tone: 'red' },
+};
+
+export const ROLES: Record<TeamRole, { label: string; tone: BadgeTone; text: string }> = {
+  owner: { label: 'Owner', tone: 'indigo', text: 'Everything, including team management and deleting schools' },
+  admin: { label: 'Admin', tone: 'blue', text: 'Manage schools, billing, announcements and support — cannot delete schools or manage the team' },
+  support: { label: 'Support', tone: 'gray', text: 'Read-only view of schools (no passwords) and full access to the support desk' },
 };
 
 export const HEALTH: Record<SchoolHealth, { label: string; tone: BadgeTone; hint: string }> = {
