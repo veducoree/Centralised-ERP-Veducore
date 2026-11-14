@@ -506,7 +506,7 @@ const styles = StyleSheet.create({
   },
   heroName: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '700',
     color: COLORS.text,
     marginBottom: 2,
   },
@@ -582,7 +582,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     color: COLORS.text,
     marginBottom: 4,
   },
@@ -681,7 +681,7 @@ const styles = StyleSheet.create({
   },
   gradeText: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     color: COLORS.primary,
   },
   recordFooter: {
@@ -728,7 +728,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
     marginBottom: 2,
   },
   statLabel: {
@@ -789,7 +789,7 @@ const styles = StyleSheet.create({
   },
   feeAmount: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '700',
     color: COLORS.text,
   },
   feeDue: {

@@ -190,7 +190,7 @@ export default function ParentDashboard() {
             {child && (
               <View style={styles.hero}>
                 <View style={styles.rowCenter}>
-                  <Avatar name={child.full_name} uri={child.avatar_url ?? undefined} size={52} color="#7B8CF7" />
+                  <Avatar name={child.full_name} uri={child.avatar_url ?? undefined} size={52} />
                   <View style={styles.flex1}>
                     <Text style={styles.heroName} numberOfLines={1}>{child.full_name}</Text>
                     <Text style={styles.heroMeta}>

@@ -706,7 +706,7 @@ const styles = StyleSheet.create({
   },
   remarkStudentName: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: COLORS.text,
   },
   classSubtitle: {
@@ -806,7 +806,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '700',
     color: COLORS.text,
   },
   modalSubtitle: {
@@ -981,7 +981,7 @@ const styles = StyleSheet.create({
   },
   saveBtnText: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#FFFFFF',
   },
 });

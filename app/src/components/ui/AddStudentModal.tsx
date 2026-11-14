@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '700',
     color: COLORS.text,
   },
   headerSubtitle: {
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
   },
   sectionHeading: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     color: COLORS.text,
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',

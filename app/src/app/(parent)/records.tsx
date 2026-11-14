@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
   },
   summaryRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
   summaryItem: { flex: 1, alignItems: 'center' },
-  summaryVal: { fontSize: 18, fontWeight: '800', color: '#0F172A' },
+  summaryVal: { fontSize: 18, fontWeight: '700', color: '#0F172A' },
   summaryLabel: { fontSize: 11, color: '#64748B', marginTop: 2, fontWeight: '600' },
   summaryDivider: { width: 1, backgroundColor: '#F1F5F9', height: 28 },
 
@@ -440,7 +440,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   recCardHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  recSubjectName: { fontSize: 16, fontWeight: '800', color: '#0F172A' },
+  recSubjectName: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
   recExamName: { fontSize: 12, color: '#64748B', marginTop: 2 },
   gradeBadge: {
     paddingHorizontal: 10,
@@ -448,13 +448,13 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
     borderWidth: 1,
   },
-  gradeBadgeText: { fontSize: 11, fontWeight: '800' },
+  gradeBadgeText: { fontSize: 11, fontWeight: '700' },
 
   scoreRow: { marginTop: SPACING.sm },
   scoreTextWrap: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 },
-  scoreValueText: { fontSize: 15, fontWeight: '800', color: '#0F172A' },
+  scoreValueText: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
   scoreMaxText: { fontSize: 12, color: '#94A3B8', fontWeight: '600' },
-  scorePctText: { fontSize: 13, fontWeight: '800' },
+  scorePctText: { fontSize: 13, fontWeight: '700' },
   progressBarTrack: {
     height: 6,
     borderRadius: 3,

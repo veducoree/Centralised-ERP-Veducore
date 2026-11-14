@@ -304,7 +304,7 @@ const styles = StyleSheet.create({
 
   hero: { backgroundColor: '#5B6EE8', borderRadius: RADIUS.lg, padding: SPACING.md + 2, marginBottom: SPACING.md },
   heroDate: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
-  heroTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700', marginTop: 2 },
+  heroTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', marginTop: 2 },
   heroChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   heroChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
   heroChipText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
@@ -338,7 +338,7 @@ const styles = StyleSheet.create({
   slotSubject: { fontSize: 14, fontWeight: '600', color: COLORS.text },
   slotMeta: { fontSize: 12, color: COLORS.textMuted, marginTop: 1 },
   livePill: { backgroundColor: '#5B6EE8', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
-  livePillText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
+  livePillText: { color: '#FFFFFF', fontSize: 10, fontWeight: '700' },
 
   noticeRow: { flexDirection: 'row', gap: 10, paddingHorizontal: SPACING.md, paddingVertical: 12 },
   dot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },

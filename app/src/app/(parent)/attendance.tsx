@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
   },
   statsRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
   statItem: { flex: 1, alignItems: 'center' },
-  statVal: { fontSize: 19, fontWeight: '800' },
+  statVal: { fontSize: 18, fontWeight: '700' },
   statLabel: { fontSize: 11, color: '#64748B', marginTop: 2, fontWeight: '600' },
   statDivider: { width: 1, backgroundColor: '#F1F5F9', height: 28 },
 
@@ -466,7 +466,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
     borderWidth: 1,
   },
-  statusBadgeText: { fontSize: 11, fontWeight: '800' },
+  statusBadgeText: { fontSize: 11, fontWeight: '700' },
   recNotesBox: {
     marginTop: 10,
     paddingTop: 8,

@@ -831,7 +831,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingRight: 6,
   },
-  pageTitle: { fontSize: 16, fontWeight: '800', color: COLORS.text },
+  pageTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text },
   pageSubtitle: { fontSize: 11, color: COLORS.textMuted, marginTop: 1 },
   addExamBtn: {
     flexDirection: 'row',
@@ -885,7 +885,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 2,
   },
-  examTypePillText: { fontSize: 10, fontWeight: '800', color: '#0369A1' },
+  examTypePillText: { fontSize: 10, fontWeight: '700', color: '#0369A1' },
   examSectionSub: { fontSize: 12, color: COLORS.textMuted, marginTop: 2 },
   deleteExamBtn: {
     padding: 7,
@@ -924,7 +924,7 @@ const styles = StyleSheet.create({
   markedStatusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.sm },
   markedStatusActive: { backgroundColor: '#ECFDF5' },
   markedStatusEmpty: { backgroundColor: '#F1F5F9' },
-  markedStatusText: { fontSize: 10, fontWeight: '800' },
+  markedStatusText: { fontSize: 10, fontWeight: '700' },
   enterMarksBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -938,7 +938,7 @@ const styles = StyleSheet.create({
   // Enter Marks Banner
   marksBannerCard: { marginBottom: SPACING.md, borderRadius: RADIUS.lg },
   bannerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  bannerExamName: { fontSize: 18, fontWeight: '800', color: COLORS.text },
+  bannerExamName: { fontSize: 18, fontWeight: '700', color: COLORS.text },
   bannerSubTitle: { fontSize: 13, color: COLORS.textMuted, marginTop: 2 },
   bannerMaxMarksPill: {
     backgroundColor: '#EEF0FD',
@@ -948,7 +948,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  bannerMaxMarksVal: { fontSize: 12, fontWeight: '800', color: COLORS.primary },
+  bannerMaxMarksVal: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
   bannerMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: SPACING.sm, flexWrap: 'wrap' },
   metaBadge: {
     flexDirection: 'row',
@@ -986,7 +986,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 3,
   },
-  gradeText: { fontSize: 13, fontWeight: '800', color: '#047857' },
+  gradeText: { fontSize: 13, fontWeight: '700', color: '#047857' },
 
   entryInputsRow: {
     flexDirection: 'row',
@@ -1005,7 +1005,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     color: COLORS.text,
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
     textAlign: 'center',
   },
   inputError: { borderColor: '#EF4444', backgroundColor: '#FEF2F2' },
@@ -1053,7 +1053,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.md,
   },
-  modalTitle: { fontSize: 18, fontWeight: '800', color: COLORS.text },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
   modalLabel: { fontSize: 12, fontWeight: '700', color: COLORS.textMuted, marginBottom: 5, marginTop: 10 },
   modalInput: {
     height: 44,

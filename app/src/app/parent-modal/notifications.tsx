@@ -432,7 +432,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   notifTitleUnread: {
-    fontWeight: '800',
+    fontWeight: '700',
     color: COLORS.text,
   },
   unreadDot: {

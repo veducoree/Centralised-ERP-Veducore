@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
   },
   dayTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
     color: COLORS.text,
   },
   todayPill: {
@@ -531,7 +531,7 @@ const styles = StyleSheet.create({
   },
   timeStart: {
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '700',
     color: COLORS.primary,
     marginTop: 2,
   },
@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
   },
   subjectTitle: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: COLORS.text,
     flex: 1,
   },

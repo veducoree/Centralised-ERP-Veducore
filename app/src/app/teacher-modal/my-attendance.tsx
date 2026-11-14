@@ -235,7 +235,7 @@ const styles = StyleSheet.create({
   content: { padding: SPACING.md },
   muted: { color: COLORS.textMuted, fontSize: 13 },
   hint: { color: COLORS.textLight, fontSize: 12, marginTop: 4 },
-  todayStatus: { fontSize: 20, fontWeight: '700', color: COLORS.text, marginTop: 4 },
+  todayStatus: { fontSize: 18, fontWeight: '700', color: COLORS.text, marginTop: 4 },
   todayTime: { fontSize: 13, fontWeight: '400', color: COLORS.textMuted },
   primaryBtn: { marginTop: SPACING.md, backgroundColor: COLORS.primary, borderRadius: RADIUS.md, paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
   primaryBtnText: { color: '#fff', fontWeight: '600', fontSize: 15 },

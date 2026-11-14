@@ -589,7 +589,7 @@ export default function TeacherAttendance() {
                             <Text
                               style={[
                                 styles.statusBtnText,
-                                isSelected && { color: cfg.color, fontWeight: '800' },
+                                isSelected && { color: cfg.color, fontWeight: '700' },
                               ]}>
                               {cfg.label}
                             </Text>
@@ -757,7 +757,7 @@ const styles = StyleSheet.create({
   statsCard: { marginBottom: SPACING.md, borderRadius: RADIUS.lg },
   statsRow: { flexDirection: 'row', alignItems: 'center' },
   statPill: { flex: 1, alignItems: 'center' },
-  statVal: { fontSize: 18, fontWeight: '800' },
+  statVal: { fontSize: 18, fontWeight: '700' },
   statLabel: { fontSize: 11, color: COLORS.textMuted, marginTop: 1, fontWeight: '600' },
   statDivider: { width: 1, backgroundColor: COLORS.borderLight, height: 26 },
 

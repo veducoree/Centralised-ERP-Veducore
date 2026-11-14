@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: SPACING.sm,
   },
-  value:    { fontSize: 28, fontWeight: '800', color: '#fff', marginBottom: 2 },
+  value:    { fontSize: 22, fontWeight: '700', color: '#fff', marginBottom: 2 },
   title:    { fontSize: 13, color: 'rgba(255,255,255,0.85)', fontWeight: '500' },
   subtitle: { fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 },
 });

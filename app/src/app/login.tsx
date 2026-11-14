@@ -196,8 +196,8 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   brandTitle: {
-    fontSize: 26,
-    fontWeight: '900',
+    fontSize: 22,
+    fontWeight: '700',
     color: '#0F172A',
     letterSpacing: -0.5,
     textAlign: 'center',
@@ -245,8 +245,8 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   cardTitle: {
-    fontSize: 20,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#0F172A',
     letterSpacing: -0.3,
   },

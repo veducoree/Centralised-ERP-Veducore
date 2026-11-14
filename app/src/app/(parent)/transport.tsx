@@ -492,7 +492,7 @@ const styles = StyleSheet.create({
   childSelectSection: { marginBottom: SPACING.sm },
   sectionTitle: {
     fontSize: 15,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#0F172A',
     letterSpacing: -0.2,
     marginBottom: 8,
@@ -534,7 +534,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  assignedTitle: { fontSize: 15, fontWeight: '800', color: '#0F172A' },
+  assignedTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
   assignedSub: { fontSize: 11, color: '#64748B', marginTop: 1 },
   statusBadge: {
     flexDirection: 'row',
@@ -573,8 +573,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  assignedLabel: { fontSize: 9, fontWeight: '800', color: '#2563EB', letterSpacing: 0.5 },
-  assignedStopName: { fontSize: 16, fontWeight: '800', color: '#0F172A', marginTop: 2 },
+  assignedLabel: { fontSize: 9, fontWeight: '700', color: '#2563EB', letterSpacing: 0.5 },
+  assignedStopName: { fontSize: 16, fontWeight: '700', color: '#0F172A', marginTop: 2 },
   assignedLandmark: { fontSize: 11, color: '#475569', marginTop: 2 },
   assignedAmountBox: {
     backgroundColor: '#ECFDF5',
@@ -585,8 +585,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'flex-end',
   },
-  assignedAmountLabel: { fontSize: 9, fontWeight: '800', color: '#059669' },
-  assignedAmountVal: { fontSize: 15, fontWeight: '900', color: '#065F46', marginTop: 1 },
+  assignedAmountLabel: { fontSize: 9, fontWeight: '700', color: '#059669' },
+  assignedAmountVal: { fontSize: 15, fontWeight: '700', color: '#065F46', marginTop: 1 },
   assignedMetaGrid: {
     marginTop: 10,
     paddingTop: 10,
@@ -606,7 +606,7 @@ const styles = StyleSheet.create({
   },
   applyCardTitle: {
     fontSize: 16,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#0F172A',
   },
   applyCardSub: {
@@ -675,7 +675,7 @@ const styles = StyleSheet.create({
   },
   stopOptionName: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#0F172A',
   },
   currentStopBadge: {
@@ -686,7 +686,7 @@ const styles = StyleSheet.create({
   },
   currentStopBadgeText: {
     fontSize: 9,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#1D4ED8',
   },
   stopOptionMeta: {
@@ -711,7 +711,7 @@ const styles = StyleSheet.create({
   },
   stopFareText: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#059669',
   },
   selectedSummaryBar: {
@@ -734,13 +734,13 @@ const styles = StyleSheet.create({
   },
   selectedSummaryValue: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#0F172A',
     marginTop: 1,
   },
   selectedSummaryFare: {
     fontSize: 16,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#2563EB',
   },
   emptySmall: { fontSize: 12, color: '#64748B', marginTop: 4, lineHeight: 17 },

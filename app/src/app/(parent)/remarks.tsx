@@ -355,7 +355,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
     borderWidth: 1,
   },
-  categoryBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  categoryBadgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5 },
   parentsOnlyBadge: {
     paddingHorizontal: 8,
     paddingVertical: 3,

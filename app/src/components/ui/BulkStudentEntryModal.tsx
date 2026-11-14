@@ -591,7 +591,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '700',
     color: COLORS.text,
   },
   subtitle: {
@@ -654,7 +654,7 @@ const styles = StyleSheet.create({
   },
   sampleTitle: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     color: COLORS.text,
   },
   sampleSubtitle: {

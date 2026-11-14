@@ -1295,7 +1295,7 @@ const styles = StyleSheet.create({
   childSelectSection: { marginBottom: SPACING.sm },
   sectionTitle: {
     fontSize: 14,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#0F172A',
     letterSpacing: -0.2,
     marginBottom: 8,
@@ -1339,7 +1339,7 @@ const styles = StyleSheet.create({
   },
   statsRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
   statItem: { flex: 1, alignItems: 'center' },
-  statVal: { fontSize: 16, fontWeight: '800', color: '#0F172A' },
+  statVal: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
   statLabel: { fontSize: 11, color: '#64748B', marginTop: 2, fontWeight: '600' },
   statDivider: { width: 1, backgroundColor: '#F1F5F9', height: 28 },
 
@@ -1352,7 +1352,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.md,
   },
   structureHeaderRow: { marginBottom: 12 },
-  structureTitle: { fontSize: 15, fontWeight: '800', color: '#0F172A' },
+  structureTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
   structureSub: { fontSize: 11, color: '#64748B', marginTop: 2, lineHeight: 16 },
   modeTabsRow: { flexDirection: 'row', gap: 8 },
   modeTab: {
@@ -1374,7 +1374,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
     opacity: 0.65,
   },
-  modeTabTitle: { fontSize: 12.5, fontWeight: '800', color: '#0F172A', marginTop: 4 },
+  modeTabTitle: { fontSize: 12.5, fontWeight: '700', color: '#0F172A', marginTop: 4 },
   modeTabTitleActive: { color: '#FFFFFF' },
   modeTabTitleDisabled: { color: '#64748B' },
   modeTabSub: { fontSize: 9, fontWeight: '600', color: '#64748B', marginTop: 1, textAlign: 'center' },
@@ -1390,7 +1390,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   feeHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  feeTypeTitle: { fontSize: 15, fontWeight: '800', color: '#0F172A' },
+  feeTypeTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
   feeDueSub: { fontSize: 11, color: '#475569', fontWeight: '600', marginTop: 2 },
   statusBadge: {
     paddingHorizontal: 9,
@@ -1398,7 +1398,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
     borderWidth: 1,
   },
-  statusBadgeText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.3 },
+  statusBadgeText: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
 
   amountBreakdownRow: {
     flexDirection: 'row',
@@ -1414,7 +1414,7 @@ const styles = StyleSheet.create({
   },
   amountCol: { alignItems: 'center' },
   amountColLabel: { fontSize: 10, color: '#94A3B8', fontWeight: '700', marginBottom: 2 },
-  amountColVal: { fontSize: 14, fontWeight: '800', color: '#0F172A' },
+  amountColVal: { fontSize: 14, fontWeight: '700', color: '#0F172A' },
 
   scheduleBox: {
     backgroundColor: '#F4F5FB',
@@ -1430,7 +1430,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  scheduleTitle: { fontSize: 11, fontWeight: '800', color: '#334155' },
+  scheduleTitle: { fontSize: 11, fontWeight: '700', color: '#334155' },
   windowPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1445,7 +1445,7 @@ const styles = StyleSheet.create({
   },
   windowPillText: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#5B6EE8',
   },
   monthChipsRow: { flexDirection: 'row', gap: 6, paddingBottom: 4 },
@@ -1473,7 +1473,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderColor: '#E2E8F0',
   },
-  monthChipText: { fontSize: 11, fontWeight: '800' },
+  monthChipText: { fontSize: 11, fontWeight: '700' },
   monthChipTextPaid: { color: '#065F46' },
   monthChipTextCurrent: { color: '#FFFFFF' },
   monthChipTextUpcoming: { color: '#94A3B8' },
@@ -1496,7 +1496,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderWidth: 1.5,
   },
-  quarterChipTitle: { fontSize: 11, fontWeight: '800' },
+  quarterChipTitle: { fontSize: 11, fontWeight: '700' },
 
   progressBarWrap: {
     height: 6,
@@ -1526,7 +1526,7 @@ const styles = StyleSheet.create({
   payNowBtnDisabled: {
     backgroundColor: '#94A3B8',
   },
-  payNowBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800' },
+  payNowBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
 
   receiptBtn: {
     flexDirection: 'row',
@@ -1542,7 +1542,7 @@ const styles = StyleSheet.create({
   receiptBtnText: {
     color: '#5B6EE8',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
   },
 
   modalBackdrop: {
@@ -1564,7 +1564,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.md,
   },
-  modalTitle: { fontSize: 17, fontWeight: '800', color: '#0F172A' },
+  modalTitle: { fontSize: 17, fontWeight: '700', color: '#0F172A' },
   modalSummaryBox: {
     alignItems: 'center',
     backgroundColor: '#F4F5FB',
@@ -1584,9 +1584,9 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
     marginBottom: 6,
   },
-  modalPeriodBadgeText: { fontSize: 10, fontWeight: '800', color: '#5B6EE8', letterSpacing: 0.4 },
+  modalPeriodBadgeText: { fontSize: 10, fontWeight: '700', color: '#5B6EE8', letterSpacing: 0.4 },
   modalFeeType: { fontSize: 13, color: '#334155', fontWeight: '700' },
-  modalFeeAmount: { fontSize: 26, fontWeight: '900', color: '#5B6EE8', marginTop: 4 },
+  modalFeeAmount: { fontSize: 22, fontWeight: '700', color: '#5B6EE8', marginTop: 4 },
   modalNextPeriodText: {
     fontSize: 11,
     fontWeight: '600',
@@ -1641,7 +1641,7 @@ const styles = StyleSheet.create({
   },
   receiptSchoolName: {
     fontSize: 17,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#0F172A',
     textAlign: 'center',
   },
@@ -1662,7 +1662,7 @@ const styles = StyleSheet.create({
   },
   officialReceiptBadgeText: {
     fontSize: 9.5,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#5B6EE8',
     letterSpacing: 0.5,
   },
@@ -1673,13 +1673,13 @@ const styles = StyleSheet.create({
   },
   receiptMetaLabel: {
     fontSize: 9.5,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#94A3B8',
     letterSpacing: 0.4,
   },
   receiptMetaValue: {
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#0F172A',
     marginTop: 2,
   },
@@ -1705,7 +1705,7 @@ const styles = StyleSheet.create({
   receiptDetailVal: {
     fontSize: 12.5,
     color: '#0F172A',
-    fontWeight: '800',
+    fontWeight: '700',
   },
   paymentModePill: {
     backgroundColor: '#ECFDF5',
@@ -1717,7 +1717,7 @@ const styles = StyleSheet.create({
   },
   paymentModePillText: {
     fontSize: 10.5,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#065F46',
   },
   receiptTable: {
@@ -1744,7 +1744,7 @@ const styles = StyleSheet.create({
   receiptTableVal: {
     fontSize: 13,
     color: '#0F172A',
-    fontWeight: '800',
+    fontWeight: '700',
   },
   paidStampBar: {
     flexDirection: 'row',
@@ -1759,7 +1759,7 @@ const styles = StyleSheet.create({
   },
   paidStampText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#065F46',
     letterSpacing: 0.4,
   },

@@ -407,7 +407,7 @@ const styles = StyleSheet.create({
   summaryCard: { marginBottom: SPACING.md, borderRadius: RADIUS.lg },
   summaryRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 4 },
   summaryItem: { flex: 1, alignItems: 'center' },
-  summaryVal: { fontSize: 22, fontWeight: '800', color: COLORS.primary },
+  summaryVal: { fontSize: 18, fontWeight: '700', color: COLORS.primary },
   summaryLabel: { fontSize: 11, color: COLORS.textMuted, marginTop: 2, fontWeight: '600' },
   summaryDivider: { width: 1, backgroundColor: COLORS.borderLight, height: 28 },
 
@@ -509,7 +509,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 5,
     paddingVertical: 1,
   },
-  subjectCodeText: { fontSize: 10, fontWeight: '800', color: COLORS.primary },
+  subjectCodeText: { fontSize: 10, fontWeight: '700', color: COLORS.primary },
 
   studentList: { marginTop: SPACING.sm },
   studentListDivider: { height: 1, backgroundColor: COLORS.borderLight, marginBottom: SPACING.sm },
