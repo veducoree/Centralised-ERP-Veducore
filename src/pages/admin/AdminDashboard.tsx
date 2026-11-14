@@ -60,6 +60,15 @@ export default function AdminDashboard() {
   const outstandingDash = outstandingPct * C;
 
   const currencySymbol = '₹';
+  // Space between the two donut arcs so the rounded ends don't overlap.
+  // 12px stroke with round caps → caps add 6px each end; 15 leaves a ~3px gap.
+  const donutGap = paidDash > 0 && outstandingDash > 0 ? 15 : 0;
+  const compactInr = (n: number) => {
+    if (n >= 1e7) return `₹${(n / 1e7).toFixed(2)} Cr`;
+    if (n >= 1e5) return `₹${(n / 1e5).toFixed(2)} L`;
+    if (n >= 1e3) return `₹${(n / 1e3).toFixed(1)}K`;
+    return `₹${Math.round(n)}`;
+  };
 
   // ── Extra panels (same look as the cards above) ──
   const monthly = summary?.monthly_collection ?? [];
@@ -246,44 +255,86 @@ export default function AdminDashboard() {
 
               {/* Fee donut chart */}
               <Card className="p-6">
-                <h3 className="mb-5 text-base font-semibold text-[#0F172A]">Fee Collection</h3>
-                <div className="flex items-center gap-8">
-                  <div className="relative flex-shrink-0">
-                    <svg viewBox="0 0 120 120" className="h-32 w-32">
-                      <circle cx="60" cy="60" r="50" fill="none" stroke="#EEF0FD" strokeWidth="14" />
-                      <circle
-                        cx="60" cy="60" r="50" fill="none"
-                        stroke="#22C08A" strokeWidth="14"
-                        strokeDasharray={`${paidDash} ${C - paidDash}`}
-                        strokeDashoffset={C * 0.25}
-                        strokeLinecap="round"
-                        style={{ transition: 'stroke-dasharray 1s ease-out' }}
-                      />
-                      <circle
-                        cx="60" cy="60" r="50" fill="none"
-                        stroke="#F87171" strokeWidth="14"
-                        strokeDasharray={`${outstandingDash} ${C - outstandingDash}`}
-                        strokeDashoffset={C * 0.25 - paidDash}
-                        strokeLinecap="round"
-                        style={{ transition: 'stroke-dasharray 1s ease-out' }}
-                      />
-                      <text x="60" y="56" textAnchor="middle" fontSize="9" fill="#94A3B8">Total</text>
-                      <text x="60" y="70" textAnchor="middle" fontSize="10" fontWeight="bold" fill="#0F172A">₹{(feeTotal / 1000).toFixed(0)}K</text>
-                    </svg>
+                {panelTitle('Fee Collection', { label: 'Collect fee', path: '/admin/fees' })}
+                {feeTotal === 0 ? (
+                  <div className="py-10 text-center">
+                    <IndianRupee className="mx-auto mb-2 h-8 w-8 text-slate-300" />
+                    <p className="text-sm text-slate-400">No fees assigned yet</p>
                   </div>
-                  <div className="flex-1 space-y-3">
-                    <div className="flex items-center gap-2.5 text-sm">
-                      <span className="h-3 w-3 flex-shrink-0 rounded-full bg-[#22C08A]"></span>
-                      <span className="text-slate-500">Collected</span>
-                      <span className="ml-auto font-bold text-[#0F172A]">{formatCurrency(feePaid, '₹')}</span>
+                ) : (
+                  <>
+                    <div className="flex flex-col items-center gap-6 sm:flex-row sm:gap-8">
+                      <div className="relative flex-shrink-0">
+                        <svg viewBox="0 0 120 120" className="h-36 w-36 -rotate-90">
+                          <circle cx="60" cy="60" r="50" fill="none" stroke="#EEF0FD" strokeWidth="12" />
+                          {paidDash > 0 && (
+                            <circle
+                              cx="60" cy="60" r="50" fill="none"
+                              stroke="#22C08A" strokeWidth="12" strokeLinecap="round"
+                              strokeDasharray={`${Math.max(paidDash - donutGap, 0.01)} ${C}`}
+                              style={{ transition: 'stroke-dasharray 1s ease-out' }}
+                            >
+                              <title>Collected: {formatCurrency(feePaid, '₹')}</title>
+                            </circle>
+                          )}
+                          {outstandingDash > 0 && (
+                            <circle
+                              cx="60" cy="60" r="50" fill="none"
+                              stroke="#F87171" strokeWidth="12" strokeLinecap="round"
+                              strokeDasharray={`${Math.max(outstandingDash - donutGap, 0.01)} ${C}`}
+                              strokeDashoffset={-paidDash}
+                              style={{ transition: 'stroke-dasharray 1s ease-out' }}
+                            >
+                              <title>Outstanding: {formatCurrency(feeOutstanding, '₹')}</title>
+                            </circle>
+                          )}
+                        </svg>
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className="text-2xl font-bold text-[#0F172A]">{Math.round(paidPct * 100)}%</span>
+                          <span className="text-[11px] text-slate-400">collected</span>
+                        </div>
+                      </div>
+
+                      <div className="w-full flex-1 space-y-4">
+                        <div>
+                          <p className="text-xs text-slate-400">Total fees</p>
+                          <p className="text-xl font-bold text-[#0F172A]">{compactInr(feeTotal)}</p>
+                        </div>
+                        {[
+                          { label: 'Collected', value: feePaid, pct: paidPct, dot: 'bg-[#22C08A]' },
+                          { label: 'Outstanding', value: feeOutstanding, pct: outstandingPct, dot: 'bg-[#F87171]' },
+                        ].map((r) => (
+                          <div key={r.label} className="flex items-center gap-2.5 text-sm">
+                            <span className={`h-3 w-3 flex-shrink-0 rounded-full ${r.dot}`}></span>
+                            <span className="text-slate-500">{r.label}</span>
+                            <span className="text-xs text-slate-400">{Math.round(r.pct * 100)}%</span>
+                            <span className="ml-auto font-bold text-[#0F172A]">{formatCurrency(r.value, currencySymbol)}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2.5 text-sm">
-                      <span className="h-3 w-3 flex-shrink-0 rounded-full bg-[#F87171]"></span>
-                      <span className="text-slate-500">Outstanding</span>
-                      <span className="ml-auto font-bold text-[#0F172A]">{formatCurrency(feeOutstanding, '₹')}</span>
-                    </div>
-                  </div>
-                </div>
+
+                    {summary && (
+                      <div className="mt-6 grid grid-cols-3 gap-3 border-t border-[#E8EAF3] pt-4">
+                        <div className="rounded-xl bg-[#E6F8F1] px-3 py-2.5">
+                          <p className="text-[11px] text-[#15803D]">Today</p>
+                          <p className="text-sm font-bold text-[#0F172A]">{compactInr(Number(summary.fees.collected_today))}</p>
+                        </div>
+                        <div className="rounded-xl bg-[#EEF0FD] px-3 py-2.5">
+                          <p className="text-[11px] text-[#3B4DC8]">This month</p>
+                          <p className="text-sm font-bold text-[#0F172A]">{compactInr(Number(summary.fees.collected_month))}</p>
+                        </div>
+                        <button
+                          onClick={() => navigate('/admin/fees')}
+                          className="rounded-xl bg-[#FEECEC] px-3 py-2.5 text-left transition hover:brightness-95"
+                        >
+                          <p className="text-[11px] text-[#C53030]">Overdue</p>
+                          <p className="text-sm font-bold text-[#0F172A]">{compactInr(Number(summary.fees.overdue_amount))}</p>
+                        </button>
+                      </div>
+                    )}
+                  </>
+                )}
               </Card>
             </div>
 
