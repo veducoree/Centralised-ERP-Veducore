@@ -578,3 +578,38 @@ export interface SidebarPreference {
   created_at: string;
   updated_at: string;
 }
+
+export interface AcademicSession {
+  id: string;
+  school_id: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  is_current: boolean;
+  status: 'upcoming' | 'active' | 'closed';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AdminDashboardSummary {
+  today: string;
+  session: { id: string; name: string; start_date: string; end_date: string } | null;
+  counts: {
+    students: number; boys: number; girls: number; teachers: number; parents: number;
+    classes: number; sections: number; new_admissions_month: number;
+  };
+  attendance_today: { present: number; absent: number; late: number; leave: number; marked: number; sections_marked: number };
+  unmarked_sections: { id: string; label: string; students: number }[];
+  attendance_trend: { date: string; present: number; absent: number; total: number }[];
+  fees: {
+    billed: number; collected: number; outstanding: number; overdue_amount: number;
+    overdue_students: number; collected_today: number; collected_month: number;
+  };
+  monthly_collection: { month: string; amount: number }[];
+  top_defaulters: { student_id: string; name: string; admission_number: string; class: string; due: number; since: string }[];
+  class_strength: { class: string; grade_level: number | null; students: number }[];
+  birthdays_today: { id: string; name: string; class: string }[];
+  upcoming_holidays: { date: string; label: string | null; type: string }[];
+  pending_transport: number;
+  recent_notifications: { id: string; title: string; category: string; audience: string; created_at: string; recipients: number }[];
+}

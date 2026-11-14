@@ -14,6 +14,7 @@ import type {
   AdmissionFeeLineItem, AdmissionDiscount, AdmissionPaymentOption,
   AdmissionPaymentMode, AdmissionReceipt,
   SidebarPreference,
+  AcademicSession, AdminDashboardSummary,
 } from '@/types';
 
 // Lightweight in-memory cache with TTL and in-flight request deduplication
@@ -3046,4 +3047,64 @@ export async function deleteAssignment(assignmentId: string): Promise<void> {
     .delete()
     .eq('id', assignmentId);
   if (error) throw error;
+}
+
+// ==========================================
+// Admin dashboard (server-side summary)
+// ==========================================
+export async function fetchAdminDashboardSummary(): Promise<AdminDashboardSummary> {
+  const { data, error } = await supabase.rpc('admin_dashboard');
+  if (error) throw error;
+  return data as AdminDashboardSummary;
+}
+
+// ==========================================
+// Academic sessions
+// ==========================================
+export async function fetchAcademicSessions(schoolId: string) {
+  const { data, error } = await supabase
+    .from('academic_sessions')
+    .select('*')
+    .eq('school_id', schoolId)
+    .order('start_date', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as AcademicSession[];
+}
+
+export async function saveAcademicSession(session: {
+  id?: string; school_id: string; name: string; start_date: string; end_date: string; is_current?: boolean;
+}) {
+  const { id, ...rest } = session;
+  const query = id
+    ? supabase.from('academic_sessions').update(rest).eq('id', id)
+    : supabase.from('academic_sessions').insert(rest);
+  const { data, error } = await query.select().maybeSingle();
+  if (error) {
+    if (error.code === '23505') throw new Error(`A session named "${session.name}" already exists`);
+    if (error.code === '23514') throw new Error('End date must be after the start date');
+    throw error;
+  }
+  apiCache.delete(`school:${session.school_id}`);
+  return data as AcademicSession;
+}
+
+export async function setCurrentAcademicSession(id: string, schoolId: string) {
+  const { error } = await supabase.from('academic_sessions').update({ is_current: true }).eq('id', id);
+  if (error) throw error;
+  apiCache.delete(`school:${schoolId}`);
+  try { sessionStorage.removeItem(`veducore_cached_school:${schoolId}`); } catch { /* ignore */ }
+}
+
+export async function deleteAcademicSession(id: string) {
+  const { error } = await supabase.from('academic_sessions').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function countSessionEnrollments(sessionId: string) {
+  const { count, error } = await supabase
+    .from('student_enrollments')
+    .select('id', { count: 'exact', head: true })
+    .eq('session_id', sessionId);
+  if (error) throw error;
+  return count ?? 0;
 }
