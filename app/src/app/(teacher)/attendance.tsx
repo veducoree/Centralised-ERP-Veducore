@@ -546,7 +546,6 @@ export default function TeacherAttendance() {
                         name={student.full_name}
                         uri={student.avatar_url}
                         size={38}
-                        color={student.gender === 'female' ? '#EC4899' : COLORS.primary}
                       />
                       <View style={styles.studentMeta}>
                         <Text style={styles.studentName} numberOfLines={1}>{student.full_name}</Text>
@@ -556,46 +555,47 @@ export default function TeacherAttendance() {
                       </View>
                     </View>
 
-                    {/* 4 Status Toggle Buttons */}
-                    <View style={styles.statusButtonsRow}>
-                      {(['present', 'absent', 'late', 'leave', 'medical'] as AttendanceStatus[]).map(stKey => {
-                        const isSelected = currentStatus === stKey;
-                        const cfg = STATUS_CONFIG[stKey];
-                        return (
-                          <TouchableOpacity
-                            key={stKey}
-                            disabled={!editStatus.isEditable}
-                            onPress={() => setStatus(student.id, stKey)}
-                            activeOpacity={0.7}
-                            style={[
-                              styles.statusBtn,
-                              isSelected && {
-                                backgroundColor: cfg.bg,
-                                borderColor: cfg.border,
-                              },
-                              !editStatus.isEditable && !isSelected && {
-                                opacity: 0.4,
-                              },
-                              !editStatus.isEditable && isSelected && {
-                                opacity: 0.95,
-                              },
-                            ]}>
-                            <Ionicons
-                              name={isSelected ? cfg.icon : `${cfg.icon}-outline` as keyof typeof Ionicons.glyphMap}
-                              size={15}
-                              color={isSelected ? cfg.color : COLORS.textMuted}
-                              style={{ marginRight: 4 }}
-                            />
-                            <Text
-                              style={[
-                                styles.statusBtnText,
-                                isSelected && { color: cfg.color, fontWeight: '700' },
-                              ]}>
-                              {cfg.label}
-                            </Text>
-                          </TouchableOpacity>
-                        );
-                      })}
+                    {/* Status buttons in two rows: Present / Absent, then Late / Leave / Medical */}
+                    <View style={styles.statusButtons}>
+                      {([['present', 'absent'], ['late', 'leave', 'medical']] as AttendanceStatus[][]).map((row, ri) => (
+                        <View key={ri} style={styles.statusButtonsRow}>
+                          {row.map(stKey => {
+                            const isSelected = currentStatus === stKey;
+                            const cfg = STATUS_CONFIG[stKey];
+                            return (
+                              <TouchableOpacity
+                                key={stKey}
+                                disabled={!editStatus.isEditable}
+                                onPress={() => setStatus(student.id, stKey)}
+                                activeOpacity={0.7}
+                                accessibilityRole="radio"
+                                accessibilityState={{ selected: isSelected, disabled: !editStatus.isEditable }}
+                                accessibilityLabel={`${cfg.label} for ${student.full_name}`}
+                                style={[
+                                  styles.statusBtn,
+                                  ri === 0 && styles.statusBtnMain,
+                                  isSelected && { backgroundColor: cfg.bg, borderColor: cfg.border },
+                                  !editStatus.isEditable && !isSelected && { opacity: 0.4 },
+                                ]}>
+                                <Ionicons
+                                  name={isSelected ? cfg.icon : `${cfg.icon}-outline` as keyof typeof Ionicons.glyphMap}
+                                  size={ri === 0 ? 16 : 14}
+                                  color={isSelected ? cfg.color : COLORS.textMuted}
+                                />
+                                <Text
+                                  numberOfLines={1}
+                                  style={[
+                                    styles.statusBtnText,
+                                    ri === 0 && styles.statusBtnTextMain,
+                                    isSelected && { color: cfg.color, fontWeight: '700' },
+                                  ]}>
+                                  {cfg.label}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      ))}
                     </View>
                   </GlassCard>
                 );
@@ -786,25 +786,32 @@ const styles = StyleSheet.create({
   studentName: { fontSize: 15, fontWeight: '700', color: COLORS.text },
   studentSubtitle: { fontSize: 12, color: COLORS.textMuted, marginTop: 1 },
 
-  statusButtonsRow: {
-    flexDirection: 'row',
+  statusButtons: {
     gap: 6,
     borderTopWidth: 1,
     borderTopColor: COLORS.borderLight,
     paddingTop: SPACING.sm,
+  },
+  statusButtonsRow: {
+    flexDirection: 'row',
+    gap: 6,
   },
   statusBtn: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: RADIUS.md,
+    gap: 4,
+    height: 34,
+    paddingHorizontal: 6,
+    borderRadius: 10,
     backgroundColor: '#F4F5FB',
     borderWidth: 1,
-    borderColor: COLORS.borderLight,
+    borderColor: 'transparent',
   },
-  statusBtnText: { fontSize: 11, fontWeight: '600', color: COLORS.textMuted },
+  statusBtnMain: { height: 38 },
+  statusBtnText: { flexShrink: 1, fontSize: 12, fontWeight: '600', color: COLORS.textMuted },
+  statusBtnTextMain: { fontSize: 13 },
 
   floatingBottomBar: {
     position: 'absolute',
