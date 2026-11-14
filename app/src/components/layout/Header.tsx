@@ -15,7 +15,6 @@ import { useRouter } from 'expo-router';
 import { GLASS, SPACING } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { portalName } from '@/lib/branding';
-import { getInitials } from '@/lib/utils';
 
 interface HeaderProps {
   title: string;
@@ -136,10 +135,8 @@ export function Header({
               onPress={onProfilePress}
               style={styles.avatarBtn}
               activeOpacity={0.75}>
-              <View style={styles.avatarCircle}>
-                <Text style={styles.avatarInitials}>
-                  {getInitials(displayName)}
-                </Text>
+              <View style={styles.avatarCircle} accessibilityLabel={`Profile: ${displayName}`}>
+                <Ionicons name="person" size={18} color="#FFFFFF" />
               </View>
             </TouchableOpacity>
           )}

@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,40 +22,50 @@ interface CustomTabBarProps {
   onTabPress: (name: string) => void;
 }
 
+function TabButton({ tab, focused, onPress }: { tab: TabItem; focused: boolean; onPress: () => void }) {
+  // Active icon grows slightly (spring) and turns brand colour; no background box.
+  const scale = useRef(new Animated.Value(focused ? 1.18 : 1)).current;
+
+  useEffect(() => {
+    Animated.spring(scale, {
+      toValue: focused ? 1.18 : 1,
+      friction: 5,
+      tension: 160,
+      useNativeDriver: true,
+    }).start();
+  }, [focused, scale]);
+
+  return (
+    <TouchableOpacity
+      style={styles.tab}
+      onPress={onPress}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: focused }}
+      accessibilityLabel={tab.label}
+      activeOpacity={0.7}>
+      <Animated.View style={[styles.iconWrap, { transform: [{ scale }] }]}>
+        <Ionicons
+          name={focused ? tab.iconFocused : tab.icon}
+          size={23}
+          color={focused ? '#5B6EE8' : '#94A3B8'}
+        />
+      </Animated.View>
+      <Text style={[styles.label, focused && styles.labelFocused]} numberOfLines={1} ellipsizeMode="tail">
+        {tab.label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 export function CustomTabBar({ tabs, activeTab, onTabPress }: CustomTabBarProps) {
   const insets = useSafeAreaInsets();
   const bottomPad = insets.bottom > 0 ? insets.bottom : 10;
 
   return (
     <View style={[styles.container, { paddingBottom: bottomPad }]} accessibilityRole="tablist">
-      {tabs.map((tab) => {
-        const focused = activeTab === tab.name;
-        return (
-          <TouchableOpacity
-            key={tab.name}
-            style={styles.tab}
-            onPress={() => onTabPress(tab.name)}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: focused }}
-            accessibilityLabel={tab.label}
-            activeOpacity={0.72}>
-            {/* Same active treatment as the website sidebar: tinted pill + brand colour */}
-            <View style={[styles.pill, focused && styles.pillFocused]}>
-              <Ionicons
-                name={focused ? tab.iconFocused : tab.icon}
-                size={22}
-                color={focused ? '#5B6EE8' : '#94A3B8'}
-              />
-            </View>
-            <Text
-              style={[styles.label, focused && styles.labelFocused]}
-              numberOfLines={1}
-              ellipsizeMode="tail">
-              {tab.label}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+      {tabs.map((tab) => (
+        <TabButton key={tab.name} tab={tab} focused={activeTab === tab.name} onPress={() => onTabPress(tab.name)} />
+      ))}
     </View>
   );
 }
@@ -63,7 +74,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    paddingTop: 8,
+    paddingTop: 10,
     paddingHorizontal: 6,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
@@ -79,16 +90,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 2,
   },
-  pill: {
-    width: 52,
-    height: 32,
-    borderRadius: 16,
+  iconWrap: {
+    height: 30,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 3,
-  },
-  pillFocused: {
-    backgroundColor: '#EEF0FD',
+    marginBottom: 2,
   },
   label: {
     fontSize: 11,
