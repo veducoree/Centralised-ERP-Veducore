@@ -135,8 +135,10 @@ export function Header({
               onPress={onProfilePress}
               style={styles.avatarBtn}
               activeOpacity={0.75}>
+              {/* Same as the website's account button: white box, grey person + chevron */}
               <View style={styles.avatarCircle} accessibilityLabel={`Profile: ${displayName}`}>
-                <Ionicons name="person" size={18} color="#FFFFFF" />
+                <Ionicons name="person-outline" size={19} color="#64748B" />
+                <Ionicons name="chevron-down" size={13} color="#94A3B8" />
               </View>
             </TouchableOpacity>
           )}
@@ -260,12 +262,17 @@ const styles = StyleSheet.create({
     padding: 1,
   },
   avatarCircle: {
-    width: 38,
     height: 38,
-    borderRadius: 19,
-    backgroundColor: '#5B6EE8',
-    borderWidth: 0,
-    borderColor: '#5B6EE8',
+    paddingHorizontal: 8,
+    flexDirection: 'row',
+    gap: 3,
+    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#5B6EE8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
