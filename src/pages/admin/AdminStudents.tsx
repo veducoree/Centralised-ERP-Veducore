@@ -27,6 +27,7 @@ export default function AdminStudents() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [classFilter, setClassFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Student | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -68,6 +69,9 @@ export default function AdminStudents() {
   }, [profile?.school_id, search, classFilter, toast]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  const shownStudents = statusFilter === 'all' ? students : students.filter((s) => s.status === statusFilter);
+  const leftCount = students.filter((s) => s.status === 'inactive').length;
 
   const availableSections = classes.find((c) => c.id === form.class_id)?.sections || [];
 
@@ -248,11 +252,19 @@ export default function AdminStudents() {
             <option value="">All Classes</option>
             {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
+          <div className="inline-flex rounded-[10px] bg-white p-1 shadow-[0_4px_20px_rgba(91,110,232,0.08)] text-xs font-medium" role="group" aria-label="Student status">
+            {([['active', 'Active'], ['inactive', `Left / Passed out${leftCount ? ` (${leftCount})` : ''}`], ['all', 'All']] as const).map(([v, label]) => (
+              <button key={v} type="button" onClick={() => setStatusFilter(v)} aria-pressed={statusFilter === v}
+                className={`whitespace-nowrap rounded-lg px-3 py-1.5 transition ${statusFilter === v ? 'bg-brand-500 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {loading ? (
           <LoadingSpinner />
-        ) : students.length === 0 ? (
+        ) : shownStudents.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-white py-16 text-center">
             <Users className="h-12 w-12 text-slate-300 mb-3" />
             <p className="font-medium text-slate-600">No students found</p>
@@ -274,7 +286,7 @@ export default function AdminStudents() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {students.map((s) => (
+                {shownStudents.map((s) => (
                   <tr key={s.id} className="hover:bg-[#F7F8FE] transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-brand-100 text-sm font-bold text-brand-700 flex-shrink-0">

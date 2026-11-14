@@ -1,13 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  FileText, CheckCircle, ScrollText, Award, Printer, Search,
+  FileText, CheckCircle, ScrollText, Award, Printer, Search, BadgeCheck, AlertTriangle, Ban,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
+import { Input, Select, Textarea } from '@/components/ui/Form';
+import { Modal } from '@/components/ui/Modal';
+import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
-import { fetchStudents, fetchSchool } from '@/services/api';
+import { usePermissions } from '@/auth/PermissionsContext';
+import {
+  fetchStudents, fetchSchool, fetchStudentOutstanding, issueCertificate, cancelCertificate,
+  fetchCertificates, DuesPendingError,
+} from '@/services/api';
 import { LoadingSpinner } from '@/components/ui/Primitives';
-import type { Student, School } from '@/types';
+import type { Student, School, Certificate, CertificateType } from '@/types';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -18,14 +26,25 @@ const DOC_LABELS: Record<DocType, string> = {
   bonafide: 'Bonafide Certificate',
   transfer: 'Transfer Certificate',
   character: 'Character Certificate',
-  fee_receipt: 'Fee Receipt / No-Dues',
+  fee_receipt: 'No-Dues Certificate',
 };
+
+/** Register type for each document. */
+const REGISTER_TYPE: Record<DocType, CertificateType> = {
+  bonafide: 'bonafide', transfer: 'transfer', character: 'character', fee_receipt: 'no_dues',
+};
+const REGISTER_LABEL: Record<CertificateType, string> = {
+  transfer: 'Transfer Certificate', bonafide: 'Bonafide', character: 'Character', no_dues: 'No-Dues',
+};
+
+interface TcFields { leaving_date: string; reason: string; conduct: string; last_result: string }
+const CONDUCTS = ['Excellent', 'Very Good', 'Good', 'Satisfactory'];
 
 const docTypes = [
   { id: 'bonafide' as DocType, icon: <ScrollText className="h-5 w-5 text-brand-600" />, title: 'Bonafide Certificate', desc: 'Confirms the student is currently enrolled.' },
   { id: 'transfer' as DocType, icon: <FileText className="h-5 w-5 text-brand-600" />, title: 'Transfer Certificate (TC)', desc: 'Issued when a student transfers to another school.' },
   { id: 'character' as DocType, icon: <Award className="h-5 w-5 text-brand-600" />, title: 'Character Certificate', desc: 'Attests the good conduct and character of the student.' },
-  { id: 'fee_receipt' as DocType, icon: <Printer className="h-5 w-5 text-brand-600" />, title: 'Fee Receipt / No-Dues', desc: 'Certifies all fee dues have been cleared.' },
+  { id: 'fee_receipt' as DocType, icon: <Printer className="h-5 w-5 text-brand-600" />, title: 'No-Dues Certificate', desc: 'Certifies all fee dues have been cleared (checked against fees).' },
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -40,7 +59,7 @@ function todayDDMMYYYY(): string {
 }
 
 // Returns body parts so we can insert inline editable spans
-function buildDocParts(docType: DocType, student: Student, school: School | null) {
+function buildDocParts(docType: DocType, student: Student, school: School | null, tc?: TcFields) {
   const name = student.full_name;
   const sd = sonOrDaughter(student.gender);
   const father = student.father_name ?? '___';
@@ -63,7 +82,7 @@ function buildDocParts(docType: DocType, student: Student, school: School | null
         pre: `This is to certify that ${name}, ${sd} of ${father}, bearing Admission No. ${adm}, was a student of this institution in Class ${cls}, Section ${sec}. He/She has been struck off from the rolls of this school w.e.f. `,
         purposeField: false,
         datefield: true,
-        post: `. His/Her conduct and character during his/her stay in this school was Good. He/She is hereby issued this Transfer Certificate.`,
+        post: `.${tc?.last_result ? ` Last examination: ${tc.last_result}.` : ''}${tc?.reason ? ` Reason for leaving: ${tc.reason}.` : ''} His/Her conduct and character during his/her stay in this school was ${tc?.conduct || 'Good'}. He/She is hereby issued this Transfer Certificate.`,
       };
     case 'character':
       return {
@@ -158,7 +177,7 @@ interface PreviewFields {
 }
 
 function DocumentPreview({
-  student, school, docType, pageMode, fields, onField,
+  student, school, docType, pageMode, fields, onField, tc, issued,
 }: {
   student: Student;
   school: School | null;
@@ -166,8 +185,10 @@ function DocumentPreview({
   pageMode: PageMode;
   fields: PreviewFields;
   onField: (k: keyof PreviewFields, v: string) => void;
+  tc?: TcFields;
+  issued?: Certificate | null;
 }) {
-  const parts = buildDocParts(docType, student, school);
+  const parts = buildDocParts(docType, student, school, tc);
   const title = DOC_LABELS[docType].toUpperCase();
   const isLetterhead = pageMode === 'letterhead';
   const topPadding = isLetterhead ? '6cm' : '1.8cm';
@@ -244,14 +265,11 @@ function DocumentPreview({
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '18px', fontSize: '12px', color: '#555' }}>
         <span>
           Cert. No.:{' '}
-          <EditableInline
-            value={fields.certNo}
-            onChange={v => onField('certNo', v)}
-            placeholder="Enter cert. no."
-            minWidth="100px"
-          />
+          {issued ? <b style={{ color: '#111' }}>{issued.cert_no}</b> : (
+            <span style={{ color: '#b45309', fontStyle: 'italic' }}>DRAFT — issue to assign a number</span>
+          )}
         </span>
-        <span>Date: {todayDDMMYYYY()}</span>
+        <span>Date: {issued ? issued.issued_on.split('-').reverse().join('/') : todayDDMMYYYY()}</span>
       </div>
 
       {/* Salutation */}
@@ -319,7 +337,23 @@ function DocumentPreview({
 
 export default function AdminDocuments() {
   const { profile } = useAuth();
+  const toast = useToast();
+  const { can } = usePermissions();
+  const canIssue = can('documents', 'edit');
   const [showGenerator, setShowGenerator] = useState(false);
+
+  // Register / issuing
+  const [issued, setIssued] = useState<Certificate | null>(null);
+  const [dues, setDues] = useState<number | null>(null);
+  const [tc, setTc] = useState<TcFields>({ leaving_date: new Date().toISOString().slice(0, 10), reason: '', conduct: 'Good', last_result: '' });
+  const [issueOpen, setIssueOpen] = useState(false);
+  const [forceDues, setForceDues] = useState(false);
+  const [issuing, setIssuing] = useState(false);
+  const [register, setRegister] = useState<Certificate[]>([]);
+  const [registerLoading, setRegisterLoading] = useState(false);
+  const [cancelTarget, setCancelTarget] = useState<Certificate | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [reactivate, setReactivate] = useState(true);
 
   const [students, setStudents] = useState<Student[]>([]);
   const [school, setSchool] = useState<School | null>(null);
@@ -345,7 +379,62 @@ export default function AdminDocuments() {
   // Reset per-doc fields when student or docType changes
   useEffect(() => {
     setFields(f => ({ ...f, certNo: '', purpose: '', dateField: '' }));
+    setIssued(null);
+    setForceDues(false);
+    setDues(null);
+    if (selectedStudent) fetchStudentOutstanding(selectedStudent.id).then(setDues).catch(() => setDues(null));
   }, [selectedStudent, docType]);
+
+  const loadRegister = useCallback(async () => {
+    if (!profile?.school_id) return;
+    setRegisterLoading(true);
+    try { setRegister(await fetchCertificates(profile.school_id)); } catch { /* table may be empty */ }
+    finally { setRegisterLoading(false); }
+  }, [profile?.school_id]);
+
+  useEffect(() => { if (!showGenerator) loadRegister(); }, [showGenerator, loadRegister]);
+
+  function printNow() { setTimeout(() => window.print(), 50); }
+
+  async function handleIssue() {
+    if (!selectedStudent) return;
+    if (docType === 'transfer' && !tc.leaving_date) { toast('Enter the leaving date', 'error'); return; }
+    setIssuing(true);
+    try {
+      const data: Record<string, unknown> = docType === 'transfer'
+        ? { ...tc }
+        : docType === 'bonafide' ? { purpose: fields.purpose } : {};
+      const cert = await issueCertificate(selectedStudent.id, REGISTER_TYPE[docType], data, forceDues);
+      setIssued(cert);
+      setIssueOpen(false);
+      if (docType === 'transfer') {
+        setFields(f => ({ ...f, dateField: tc.leaving_date.split('-').reverse().join('/') }));
+        setStudents(prev => prev.map(s => s.id === selectedStudent.id ? { ...s, status: 'inactive' } : s));
+      }
+      toast(`${cert.cert_no} issued${docType === 'transfer' ? ' — student marked as left' : ''}`, 'success');
+      printNow();
+    } catch (err) {
+      if (err instanceof DuesPendingError) {
+        setDues(err.amount);
+        toast(docType === 'fee_receipt' ? err.message + ' — no-dues certificate not allowed' : err.message, 'error');
+      } else {
+        toast(err instanceof Error ? err.message : 'Failed to issue', 'error');
+      }
+    } finally { setIssuing(false); }
+  }
+
+  async function handleCancel() {
+    if (!cancelTarget) return;
+    try {
+      await cancelCertificate(cancelTarget.id, cancelReason, cancelTarget.type === 'transfer' && reactivate);
+      toast('Certificate cancelled', 'success');
+      setCancelTarget(null);
+      setCancelReason('');
+      loadRegister();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to cancel', 'error');
+    }
+  }
 
   useEffect(() => {
     const style = document.createElement('style');
@@ -443,14 +532,24 @@ export default function AdminDocuments() {
               />
             </div>
 
-            {/* Print */}
-            <button
-              onClick={() => window.print()}
-              disabled={!selectedStudent}
-              className="flex items-center gap-2 bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
-            >
-              <Printer className="h-4 w-4" /> Export PDF
-            </button>
+            {/* Print / issue */}
+            {issued ? (
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-2 bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors shadow-sm"
+              >
+                <Printer className="h-4 w-4" /> Print {issued.cert_no}
+              </button>
+            ) : (
+              <button
+                onClick={() => setIssueOpen(true)}
+                disabled={!selectedStudent || !canIssue}
+                title={!canIssue ? 'Your role cannot issue certificates' : undefined}
+                className="flex items-center gap-2 bg-brand-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-brand-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+              >
+                <BadgeCheck className="h-4 w-4" /> Issue & Print
+              </button>
+            )}
           </div>
         </div>
 
@@ -489,6 +588,17 @@ export default function AdminDocuments() {
           </div>
 
           {/* Preview */}
+          <div className="flex-1 flex flex-col gap-3 min-w-0">
+          {selectedStudent && dues !== null && dues > 0 && (docType === 'fee_receipt' || docType === 'transfer') && (
+            <div className="flex items-center gap-2 rounded-xl bg-amber-50 px-4 py-2.5 text-sm text-amber-800">
+              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              ₹{dues.toLocaleString('en-IN')} fees outstanding for {selectedStudent.full_name}.
+              {docType === 'fee_receipt' ? ' A no-dues certificate can\'t be issued until it is cleared.' : ' You can still issue the TC after confirming.'}
+            </div>
+          )}
+          {selectedStudent?.status === 'inactive' && docType !== 'transfer' && (
+            <div className="rounded-xl bg-slate-100 px-4 py-2.5 text-sm text-slate-600">This student is no longer active.</div>
+          )}
           <div className="flex-1 rounded-xl bg-slate-300 p-6 overflow-y-auto flex items-start justify-center">
             {!selectedStudent ? (
               <div className="flex flex-col items-center justify-center h-full text-slate-400 gap-2 mt-24">
@@ -506,10 +616,50 @@ export default function AdminDocuments() {
                 pageMode={pageMode}
                 fields={fields}
                 onField={onField}
+                tc={tc}
+                issued={issued}
               />
             )}
           </div>
+          </div>
         </div>
+
+        {/* Issue modal */}
+        <Modal open={issueOpen} onClose={() => setIssueOpen(false)} title={`Issue ${DOC_LABELS[docType]}`}
+          description={selectedStudent ? `${selectedStudent.full_name} · ${selectedStudent.admission_number}` : undefined}
+          footer={<><Button variant="ghost" onClick={() => setIssueOpen(false)}>Cancel</Button>
+            <Button loading={issuing} onClick={handleIssue}
+              disabled={(docType === 'fee_receipt' && (dues ?? 0) > 0) || (docType === 'transfer' && (dues ?? 0) > 0 && !forceDues)}>
+              Issue & print
+            </Button></>}>
+          <div className="space-y-4">
+            <p className="text-sm text-slate-600">A certificate number is assigned and recorded in the register. It can be cancelled later but the number is not reused.</p>
+            {docType === 'transfer' && (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Input label="Leaving date" type="date" required value={tc.leaving_date} onChange={e => setTc({ ...tc, leaving_date: e.target.value })} />
+                  <Select label="Conduct" value={tc.conduct} onChange={e => setTc({ ...tc, conduct: e.target.value })}>
+                    {CONDUCTS.map(c => <option key={c} value={c}>{c}</option>)}
+                  </Select>
+                </div>
+                <Input label="Reason for leaving" value={tc.reason} placeholder="e.g. Parent's transfer" onChange={e => setTc({ ...tc, reason: e.target.value })} />
+                <Input label="Last examination passed (optional)" value={tc.last_result} placeholder="e.g. Class 5 Annual Exam – Passed" onChange={e => setTc({ ...tc, last_result: e.target.value })} />
+                <div className="rounded-xl bg-red-50 px-3 py-2 text-xs text-red-700">Issuing the TC marks the student as left (inactive). Cancelling the TC can reactivate them.</div>
+              </>
+            )}
+            {dues !== null && (dues > 0 ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                <p className="font-medium">₹{dues.toLocaleString('en-IN')} fees outstanding</p>
+                {docType === 'transfer' && (
+                  <label className="mt-2 flex items-center gap-2"><input type="checkbox" checked={forceDues} onChange={e => setForceDues(e.target.checked)} /> Issue the TC anyway</label>
+                )}
+                {docType === 'fee_receipt' && <p className="mt-1">Collect the dues first.</p>}
+              </div>
+            ) : (
+              <p className="flex items-center gap-1.5 text-sm text-emerald-700"><CheckCircle className="h-4 w-4" /> No fees outstanding</p>
+            ))}
+          </div>
+        </Modal>
 
         {/* Print-only */}
         {selectedStudent && (
@@ -521,6 +671,8 @@ export default function AdminDocuments() {
               pageMode={pageMode}
               fields={fields}
               onField={onField}
+              tc={tc}
+              issued={issued}
             />
           </div>
         )}
@@ -554,6 +706,65 @@ export default function AdminDocuments() {
             </button>
           </div>
         </Card>
+
+        {/* Register */}
+        <Card className="overflow-hidden">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+            <div>
+              <h3 className="text-base font-semibold text-slate-900">Certificate register</h3>
+              <p className="text-xs text-slate-500">Every issued certificate with its number. Cancelled ones stay listed.</p>
+            </div>
+          </div>
+          {registerLoading ? <div className="p-6"><LoadingSpinner size="sm" variant="spinner" /></div> : register.length === 0 ? (
+            <p className="px-5 py-8 text-center text-sm text-slate-400">Nothing issued yet. Certificates you issue appear here.</p>
+          ) : (
+            <div className="max-h-[420px] overflow-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-slate-50 text-left text-xs text-slate-500">
+                  <tr><th className="px-4 py-2 font-medium">No.</th><th className="px-4 py-2 font-medium">Type</th><th className="px-4 py-2 font-medium">Student</th><th className="px-4 py-2 font-medium">Issued</th><th className="px-4 py-2 font-medium">Status</th><th /></tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {register.map(c => (
+                    <tr key={c.id} className={c.status === 'cancelled' ? 'text-slate-400' : ''}>
+                      <td className="px-4 py-2 font-mono text-xs">{c.cert_no}</td>
+                      <td className="px-4 py-2">{REGISTER_LABEL[c.type]}</td>
+                      <td className="px-4 py-2">
+                        <p className="font-medium">{c.data.snapshot?.full_name ?? '—'}</p>
+                        <p className="text-[11px] text-slate-400">{c.data.snapshot?.admission_number}{c.data.snapshot?.class ? ` · ${c.data.snapshot.class}${c.data.snapshot.section ? '-' + c.data.snapshot.section : ''}` : ''}</p>
+                      </td>
+                      <td className="px-4 py-2 text-xs">{c.issued_on.split('-').reverse().join('/')}</td>
+                      <td className="px-4 py-2">
+                        {c.status === 'issued'
+                          ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Issued</span>
+                          : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500" title={c.cancel_reason ?? ''}>Cancelled</span>}
+                      </td>
+                      <td className="px-4 py-2 text-right">
+                        {c.status === 'issued' && canIssue && (
+                          <button onClick={() => { setCancelTarget(c); setCancelReason(''); setReactivate(true); }}
+                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-slate-500 hover:bg-red-50 hover:text-red-600">
+                            <Ban className="h-3.5 w-3.5" /> Cancel
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+
+        <Modal open={!!cancelTarget} onClose={() => setCancelTarget(null)} title={`Cancel ${cancelTarget?.cert_no}?`}
+          footer={<><Button variant="ghost" onClick={() => setCancelTarget(null)}>Keep</Button><Button variant="danger" onClick={handleCancel}>Cancel certificate</Button></>}>
+          <div className="space-y-3">
+            <Textarea label="Reason" rows={2} value={cancelReason} onChange={e => setCancelReason(e.target.value)} placeholder="e.g. Issued by mistake" />
+            {cancelTarget?.type === 'transfer' && (
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input type="checkbox" checked={reactivate} onChange={e => setReactivate(e.target.checked)} /> Mark the student active again
+              </label>
+            )}
+          </div>
+        </Modal>
 
         {/* Document Types */}
         <div>

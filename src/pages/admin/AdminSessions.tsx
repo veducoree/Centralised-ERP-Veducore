@@ -144,7 +144,7 @@ export default function AdminSessions() {
 
         <div className="flex items-start gap-2 rounded-xl border border-sky-100 bg-sky-50 px-4 py-3 text-sm text-sky-800">
           <Info className="mt-0.5 h-4 w-4 flex-shrink-0" />
-          <p>Create next year's session in advance. Switching the current session closes the old one; its fees, marks and class history stay available. Student promotion to the new session comes in the Promotion module.</p>
+          <p>Create next year's session in advance. Switching the current session closes the old one; its fees, marks and class history stay available. After switching, move students up from the Promotion page.</p>
         </div>
 
         {loading ? <LoadingSpinner variant="cards" /> : (

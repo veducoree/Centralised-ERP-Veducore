@@ -23,6 +23,7 @@ const MODULE_COLORS: Record<string, TileColor> = {
   '/admin/documents':     'blue',
   '/admin/holidays':      'pink',
   '/admin/sessions':      'violet',
+  '/admin/promotion':     'emerald',
   '/admin/notifications': 'orange',
   '/admin/settings':      'gray',
   '/admin/staff':         'violet',

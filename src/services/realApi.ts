@@ -17,6 +17,7 @@ import type {
   AcademicSession, AdminDashboardSummary,
   StaffRole, StaffMember, MyPermissions, PermissionLevel,
   Exam, ExamScheduleRow, GradingScale, GradeBand, ExamResultRow, ExamProgressRow, RecordType,
+  Certificate, CertificateType, PromotionAction,
 } from '@/types';
 
 // Lightweight in-memory cache with TTL and in-flight request deduplication
@@ -3382,4 +3383,58 @@ export async function fetchRecordsForSections(sectionIds: string[]) {
     .in('student.section_id', sectionIds);
   if (error) throw error;
   return (data ?? []) as unknown as StudentRecord[];
+}
+
+// ==========================================
+// Certificates & promotion
+// ==========================================
+export class DuesPendingError extends Error {
+  constructor(public amount: number) { super(`Fees of ₹${amount.toLocaleString('en-IN')} are outstanding`); }
+}
+
+export async function fetchStudentOutstanding(studentId: string) {
+  const { data, error } = await supabase.rpc('student_outstanding', { p_student: studentId });
+  if (error) throw error;
+  return Number(data ?? 0);
+}
+
+export async function issueCertificate(studentId: string, type: CertificateType, data: Record<string, unknown>, force = false) {
+  const { data: row, error } = await supabase.rpc('issue_certificate', { p_student: studentId, p_type: type, p_data: data, p_force: force });
+  if (error) {
+    const m = /DUES_PENDING:([\d.]+)/.exec(error.message);
+    if (m) throw new DuesPendingError(Number(m[1]));
+    throw new Error(error.message);
+  }
+  clearApiCache();
+  return row as Certificate;
+}
+
+export async function cancelCertificate(id: string, reason: string, reactivate: boolean) {
+  const { error } = await supabase.rpc('cancel_certificate', { p_id: id, p_reason: reason, p_reactivate: reactivate });
+  if (error) throw error;
+  clearApiCache();
+}
+
+export async function fetchCertificates(schoolId: string, studentId?: string) {
+  let q = supabase.from('certificates').select('*').eq('school_id', schoolId).order('created_at', { ascending: false }).limit(500);
+  if (studentId) q = q.eq('student_id', studentId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as Certificate[];
+}
+
+export async function fetchPromotionStatus(classId: string) {
+  const { data, error } = await supabase.rpc('promotion_status', { p_class: classId });
+  if (error) throw error;
+  return (data ?? []) as { student_id: string; from_status: string | null; from_class: string | null; current_class: string | null; current_section: string | null; active: boolean }[];
+}
+
+export async function promoteStudents(
+  moves: { student_id: string; action: PromotionAction; class_id?: string | null; section_id?: string | null }[],
+  renumber: boolean,
+) {
+  const { data, error } = await supabase.rpc('promote_students', { p_moves: moves, p_renumber: renumber });
+  if (error) throw error;
+  clearApiCache();
+  return data as Record<PromotionAction, number>;
 }

@@ -729,3 +729,24 @@ export interface ExamProgressRow {
   students: number;
   entered: number;
 }
+
+export type CertificateType = 'transfer' | 'bonafide' | 'character' | 'no_dues';
+
+export interface Certificate {
+  id: string;
+  school_id: string;
+  student_id: string;
+  session_id: string | null;
+  type: CertificateType;
+  cert_no: string;
+  issued_on: string;
+  data: Record<string, unknown> & {
+    snapshot?: { full_name?: string; admission_number?: string; class?: string | null; section?: string | null };
+    dues_at_issue?: number;
+  };
+  status: 'issued' | 'cancelled';
+  cancel_reason: string | null;
+  created_at: string;
+}
+
+export type PromotionAction = 'promote' | 'retain' | 'leave' | 'graduate';

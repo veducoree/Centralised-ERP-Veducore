@@ -31,6 +31,7 @@ const PATH_MODULES: [prefix: string, module: string][] = [
   ['/admin/dashboard', 'dashboard'],
   ['/admin/new-admission', 'admissions'],
   ['/admin/students', 'students'],
+  ['/admin/promotion', 'students'],
   ['/admin/teachers', 'teachers'],
   ['/admin/parents', 'parents'],
   ['/admin/classes', 'classes'],

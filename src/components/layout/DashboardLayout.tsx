@@ -5,7 +5,7 @@ import {
   IndianRupee, FileText, Bell, Settings, LogOut,
   X, UserCircle, ChevronDown, Shield, User,
   Megaphone, UserPlus, ClipboardCheck, CreditCard, CalendarDays, Bus,
-  LayoutGrid, GripVertical, RotateCcw, Pencil, Check, ChevronRight, ChevronLeft, UserRound, Boxes, Library, CalendarClock, CalendarRange, UserCog,
+  LayoutGrid, GripVertical, RotateCcw, Pencil, Check, ChevronRight, ChevronLeft, UserRound, Boxes, Library, CalendarClock, CalendarRange, UserCog, ArrowUpCircle,
 } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
@@ -53,6 +53,7 @@ export const adminNav: NavItem[] = [
   { label: 'Documents',          path: '/admin/documents',     icon: <FileText className="h-5 w-5" /> },
   { label: 'Holidays',           path: '/admin/holidays',      icon: <CalendarDays className="h-5 w-5" /> },
   { label: 'Academic Year',      path: '/admin/sessions',      icon: <CalendarRange className="h-5 w-5" /> },
+  { label: 'Promotion',          path: '/admin/promotion',     icon: <ArrowUpCircle className="h-5 w-5" /> },
   { label: 'Notifications',      path: '/admin/notifications', icon: <Bell className="h-5 w-5" /> },
   { label: 'Settings',           path: '/admin/settings',      icon: <Settings className="h-5 w-5" /> },
   { label: 'Staff & Roles',      path: '/admin/staff',         icon: <UserCog className="h-5 w-5" /> },
