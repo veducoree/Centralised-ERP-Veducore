@@ -173,6 +173,19 @@ export interface Notification {
   entity_id: string | null;
   is_read: boolean;
   created_at: string;
+  audience?: 'all' | 'parents' | 'teachers' | 'class' | 'section' | 'student' | 'user';
+  class_id?: string | null;
+  section_id?: string | null;
+  student_id?: string | null;
+  category?: string;
+  priority?: 'normal' | 'high' | 'urgent';
+  link?: string | null;
+}
+
+export interface NotificationPreferences {
+  user_id: string;
+  muted_categories: string[];
+  push_enabled: boolean;
 }
 
 export interface StudentRecord {

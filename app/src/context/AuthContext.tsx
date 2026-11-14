@@ -1,3 +1,4 @@
+import { unregisterPushToken } from '@/lib/notifications';
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Session, User } from '@supabase/supabase-js';
@@ -257,6 +258,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = useCallback(async () => {
+    // Stop pushes to this device; needs the session, so do it first.
+    await Promise.race([unregisterPushToken(), new Promise((r) => setTimeout(r, 800))]);
     currentUserIdRef.current = null;
     clearApiCache();
     setState({

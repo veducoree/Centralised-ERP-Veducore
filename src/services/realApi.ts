@@ -7,6 +7,7 @@ import type {
   ClassAssignment, TeacherSchedule, Attendance, StudentRecord,
   TimetablePeriod, TimetableSubstitution,
   Remark, FeeType, Fee, FeePayment, Notification, AuditLog,
+  NotificationAudience, NotificationCategory, NotificationPriority,
   ParentStudent, School, Profile,
   Holiday, ExamDef, FeeStructure, PaymentSetup,
   TransportStop, TransportBus, StudentTransportAssignment,
@@ -1405,11 +1406,12 @@ export async function deleteFee(id: string) {
   if (error) throw error;
 }
 
-export async function fetchNotifications(userId?: string, schoolId?: string) {
+export async function fetchNotifications(userId?: string, schoolId?: string, limit = 200) {
   let query = supabase
     .from('notifications')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(limit);
 
   if (userId) query = query.eq('user_id', userId);
   if (schoolId) query = query.eq('school_id', schoolId);
@@ -1419,24 +1421,79 @@ export async function fetchNotifications(userId?: string, schoolId?: string) {
   return data as Notification[];
 }
 
-export async function createNotification(notification: {
+export interface NotificationInput {
   school_id: string;
-  user_id?: string;
   title: string;
   message: string;
   type?: string;
-}) {
+  audience?: NotificationAudience;
+  user_id?: string | null;
+  class_id?: string | null;
+  section_id?: string | null;
+  student_id?: string | null;
+  category?: NotificationCategory;
+  priority?: NotificationPriority;
+  link?: string | null;
+}
+
+/** Inserts a notification and asks the edge function to push it to devices. */
+export async function createNotification(notification: NotificationInput) {
+  const { data: auth } = await supabase.auth.getUser();
   const { data, error } = await supabase
     .from('notifications')
-    .insert(notification)
+    .insert({ ...notification, sent_by: auth.user?.id ?? null })
     .select()
     .maybeSingle();
   if (error) throw error;
+  if (data?.id && data.push_status === 'pending') {
+    // Fire-and-forget: the DB trigger may already have dispatched it.
+    supabase.functions.invoke('push-dispatch', { body: { notification_id: data.id } }).catch(() => {});
+  }
   return data as Notification | null;
 }
 
+/** Returns how many people will receive a notification for the given audience. */
+export async function countNotificationRecipients(n: Pick<NotificationInput, 'audience' | 'user_id' | 'class_id' | 'section_id' | 'student_id'>) {
+  const { data, error } = await supabase.rpc('count_notification_recipients', {
+    p_audience: n.audience ?? 'all',
+    p_user: n.user_id ?? null,
+    p_class: n.class_id ?? null,
+    p_section: n.section_id ?? null,
+    p_student: n.student_id ?? null,
+  });
+  if (error) throw error;
+  return (data as number) ?? 0;
+}
+
+export async function fetchNotificationReadCounts(ids: string[]) {
+  if (!ids.length) return {} as Record<string, number>;
+  const { data, error } = await supabase.rpc('notification_read_counts', { p_ids: ids });
+  if (error) throw error;
+  const out: Record<string, number> = {};
+  for (const r of (data ?? []) as { notification_id: string; reads: number }[]) out[r.notification_id] = Number(r.reads);
+  return out;
+}
+
+export async function sendFeeReminders(schoolId: string) {
+  const { data, error } = await supabase.rpc('send_fee_reminders', { p_school: schoolId });
+  if (error) throw error;
+  return (data as number) ?? 0;
+}
+
+/** The signed-in user's own feed (RLS-filtered) with per-user read state. */
+export async function fetchMyNotifications(limit = 50) {
+  const { data, error } = await supabase.rpc('fetch_my_notifications', { p_limit: limit });
+  if (error) throw error;
+  return (data ?? []) as Notification[];
+}
+
+export async function markAllNotificationsRead() {
+  const { error } = await supabase.rpc('mark_all_notifications_read');
+  if (error) throw error;
+}
+
 export async function markNotificationRead(id: string) {
-  const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+  const { error } = await supabase.rpc('mark_notifications_read', { p_ids: [id] });
   if (error) throw error;
 }
 

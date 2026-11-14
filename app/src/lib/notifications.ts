@@ -1,180 +1,170 @@
 import { Platform } from 'react-native';
 import { isRunningInExpoGo } from 'expo';
-import { fetchParents, fetchParentStudents, createNotification } from '@/services/api';
-import type { Student, AttendanceStatus } from '@/types';
+import Constants from 'expo-constants';
+import { supabase } from '@/lib/supabase';
 
 // Safely obtain expo-notifications without crashing in Expo Go on Android (SDK 53+)
-let _notificationsModule: typeof import('expo-notifications') | null | undefined = undefined;
+type NotificationsModule = typeof import('expo-notifications');
+let _mod: NotificationsModule | null | undefined;
 
-function getNotificationsModule(): typeof import('expo-notifications') | null {
-  if (_notificationsModule !== undefined) {
-    return _notificationsModule;
-  }
+function getNotificationsModule(): NotificationsModule | null {
+  if (_mod !== undefined) return _mod;
 
-  // expo-notifications Android push functionality was removed in Expo Go SDK 53+
-  // Importing or requiring it in Expo Go on Android throws an uncaught error.
+  // Remote push was removed from Expo Go on Android; requiring it throws.
   if (isRunningInExpoGo() && Platform.OS === 'android') {
-    _notificationsModule = null;
+    _mod = null;
     return null;
   }
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const mod = require('expo-notifications');
-    if (mod?.setNotificationHandler) {
-      mod.setNotificationHandler({
-        handleNotification: async () => ({
-          shouldShowAlert: true,
-          shouldShowBanner: true,
-          shouldShowList: true,
-          shouldPlaySound: true,
-          shouldSetBadge: true,
-        }),
-      });
-    }
-    _notificationsModule = mod;
-    return _notificationsModule ?? null;
+    const mod: NotificationsModule = require('expo-notifications');
+    mod.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+      }),
+    });
+    _mod = mod;
   } catch (err) {
     console.warn('expo-notifications is not available in current environment:', err);
-    _notificationsModule = null;
-    return null;
+    _mod = null;
   }
+  return _mod;
 }
 
-/**
- * Initializes notification channels and requests device permissions
- */
+/** Creates Android channels and asks for permission. Returns true if granted. */
 export async function setupNotifications(): Promise<boolean> {
   const mod = getNotificationsModule();
-  if (!mod) {
-    return false;
-  }
+  if (!mod) return false;
 
   try {
     if (Platform.OS === 'android') {
-      await mod.setNotificationChannelAsync('attendance-channel', {
-        name: 'Attendance & School Alerts',
+      // Channel ids must match what the push-dispatch edge function sends.
+      await mod.setNotificationChannelAsync('default', {
+        name: 'School updates',
+        importance: mod.AndroidImportance.DEFAULT,
+        sound: 'default',
+        lightColor: '#6366F1',
+      });
+      await mod.setNotificationChannelAsync('important', {
+        name: 'Important & urgent alerts',
         importance: mod.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#6366F1',
         sound: 'default',
+        lightColor: '#EF4444',
       });
     }
 
-    const { status: existingStatus } = await mod.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    if (existingStatus !== 'granted') {
-      const { status } = await mod.requestPermissionsAsync();
-      finalStatus = status;
-    }
-
-    return finalStatus === 'granted';
+    const { status: existing } = await mod.getPermissionsAsync();
+    if (existing === 'granted') return true;
+    const { status } = await mod.requestPermissionsAsync();
+    return status === 'granted';
   } catch (err) {
     console.warn('Setup notifications error:', err);
     return false;
   }
 }
 
+let _currentToken: string | null = null;
+
+function getProjectId(): string | undefined {
+  const extra = Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined;
+  return extra?.eas?.projectId ?? Constants.easConfig?.projectId ?? undefined;
+}
+
 /**
- * Triggers a native system push notification that appears in the device's
- * notification tray / lock screen / heads-up banner even outside the app.
+ * Gets this device's Expo push token and stores it against the signed-in
+ * user so the server can push to them.
  */
-export async function sendSystemNotification({
-  title,
-  body,
-  data = {},
-}: {
-  title: string;
-  body: string;
-  data?: Record<string, unknown>;
-}) {
+export async function registerPushToken(userId: string, schoolId: string | null) {
   const mod = getNotificationsModule();
-  if (!mod) {
-    console.log('[System Notification (Expo Go fallback)]:', title, '-', body);
+  if (!mod || Platform.OS === 'web') return;
+
+  const granted = await setupNotifications();
+  if (!granted) return;
+
+  const projectId = getProjectId();
+  if (!projectId) {
+    console.warn('Push disabled: set expo.extra.eas.projectId in app.json (run `eas init`).');
     return;
   }
 
   try {
-    await setupNotifications();
-    await mod.scheduleNotificationAsync({
-      content: {
-        title,
-        body,
-        data,
-        sound: true,
+    const { data: token } = await mod.getExpoPushTokenAsync({ projectId });
+    if (!token) return;
+    _currentToken = token;
+    const { error } = await supabase.from('push_tokens').upsert(
+      {
+        user_id: userId,
+        school_id: schoolId,
+        token,
+        platform: Platform.OS,
+        last_seen_at: new Date().toISOString(),
       },
-      trigger: Platform.OS === 'android' ? { channelId: 'attendance-channel' } : null,
-    });
+      { onConflict: 'token' },
+    );
+    if (error) console.warn('Saving push token failed:', error.message);
   } catch (err) {
-    console.warn('Send system notification error:', err);
+    console.warn('Push token registration failed:', err);
   }
 }
 
-/**
- * Dispatches attendance notifications to parents both in-app (Supabase)
- * and outside the app (native device system push notification).
- */
-export async function notifyParentsOnAttendance({
-  sectionId,
-  date,
-  sectionLabel,
-  students,
-  statuses,
-}: {
-  sectionId: string;
-  date: string;
-  sectionLabel: string;
-  students: Student[];
-  statuses: Record<string, AttendanceStatus>;
-}) {
+/** Removes this device's token. Call before signing out (needs the session). */
+export async function unregisterPushToken() {
+  if (!_currentToken) return;
+  const token = _currentToken;
+  _currentToken = null;
   try {
-    const schoolId = students[0]?.school_id || 'school-001';
-    let presentCount = 0;
-    let absentCount = 0;
-
-    for (const st of students) {
-      const status = statuses[st.id] || 'present';
-      if (status === 'present') presentCount++;
-      if (status === 'absent') absentCount++;
-
-      const statusEmoji =
-        status === 'present' ? '✅' : status === 'absent' ? '❌' : status === 'late' ? '⏰' : '📝';
-      const statusText = status.toUpperCase();
-
-      // 1. Insert in-app notification into Supabase
-      try {
-        await createNotification({
-          school_id: schoolId,
-          user_id: null,
-          title: `${statusEmoji} Attendance Marked - ${st.full_name}`,
-          message: `${st.full_name} has been marked ${statusText} for ${date} in ${sectionLabel}.`,
-          type: status === 'present' ? 'success' : status === 'absent' ? 'error' : 'warning',
-          entity_type: 'attendance',
-          entity_id: st.id,
-        });
-      } catch (e) {
-        console.warn('In-app notification insert skipped:', e);
-      }
-    }
-
-    // 2. Trigger native device system push notification (visible outside the app!)
-    const isToday = date === new Date().toISOString().split('T')[0];
-    const dayLabel = isToday ? 'today' : date;
-
-    const notifBody = absentCount > 0
-      ? `Attendance for ${sectionLabel} recorded: ${presentCount} Present, ${absentCount} Absent. Tap to view details.`
-      : `All students marked Present for ${sectionLabel} (${dayLabel}). Parent notifications delivered!`;
-
-    await sendSystemNotification({
-      title: `🔔 Parent Alert: Attendance Recorded (${dayLabel})`,
-      body: notifBody,
-      data: {
-        type: 'attendance',
-        section_id: sectionId,
-        date,
-      },
-    });
-  } catch (err) {
-    console.error('Notify parents on attendance error:', err);
+    await supabase.from('push_tokens').delete().eq('token', token);
+  } catch {
+    // best effort
   }
+}
+
+/** Maps a notification's web link / category to an app route. */
+export function routeForNotification(
+  role: 'teacher' | 'parent',
+  data: { link?: string | null; category?: string | null },
+): string {
+  const link = data.link ?? '';
+  if (role === 'parent') {
+    if (link.startsWith('/parent/attendance') || data.category === 'attendance') return '/(parent)/attendance';
+    if (link.startsWith('/parent/fees') || data.category === 'fee') return '/(parent)/fees';
+    if (link.startsWith('/parent/records') || data.category === 'exam') return '/(parent)/records';
+    if (link.startsWith('/parent/remarks') || data.category === 'remark') return '/(parent)/remarks';
+    if (link.startsWith('/parent/transport') || data.category === 'transport') return '/(parent)/transport';
+    if (link.startsWith('/parent/timetable') || data.category === 'timetable') return '/parent-modal/timetable';
+    return '/parent-modal/notifications';
+  }
+  if (link.startsWith('/teacher/schedule') || data.category === 'timetable') return '/teacher-modal/schedule';
+  return '/teacher-modal/notifications';
+}
+
+/**
+ * Subscribes to taps on push notifications. Returns an unsubscribe fn.
+ * Also handles the tap that cold-started the app.
+ */
+export function onNotificationTap(handler: (data: Record<string, unknown>) => void): () => void {
+  const mod = getNotificationsModule();
+  if (!mod) return () => {};
+
+  mod.getLastNotificationResponseAsync?.()
+    .then((res) => { if (res) handler(res.notification.request.content.data ?? {}); })
+    .catch(() => {});
+
+  const sub = mod.addNotificationResponseReceivedListener((res) => {
+    handler(res.notification.request.content.data ?? {});
+  });
+  return () => sub.remove();
+}
+
+/** Sets the app icon badge count (iOS / supported launchers). */
+export async function setBadgeCount(count: number) {
+  const mod = getNotificationsModule();
+  if (!mod) return;
+  try { await mod.setBadgeCountAsync(count); } catch { /* ignore */ }
 }

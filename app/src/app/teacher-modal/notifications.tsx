@@ -12,7 +12,8 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Header } from '@/components/layout/Header';
-import { fetchNotifications, markNotificationRead } from '@/services/api';
+import { fetchMyNotifications, markNotificationRead, markAllNotificationsRead } from '@/services/api';
+import { setBadgeCount } from '@/lib/notifications';
 import { COLORS, SPACING, RADIUS, SHADOW } from '@/lib/utils';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -52,9 +53,9 @@ export default function TeacherNotificationsModal() {
 
   const loadData = useCallback(async () => {
     try {
-      const all = await fetchNotifications(user?.id, profile?.school_id);
-      const filtered = all.filter(n => !n.user_id || n.user_id === user?.id);
-      const sorted = [...filtered].sort((a, b) => {
+      const all = await fetchMyNotifications(150);
+      setBadgeCount(all.filter(n => !n.is_read).length);
+      const sorted = [...all].sort((a, b) => {
         if (a.is_read !== b.is_read) return a.is_read ? 1 : -1;
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
@@ -88,11 +89,9 @@ export default function TeacherNotificationsModal() {
 
   const handleMarkAllRead = async () => {
     try {
-      const unread = notifications.filter(n => !n.is_read);
-      for (const n of unread) {
-        await markNotificationRead(n.id);
-      }
+      await markAllNotificationsRead();
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      setBadgeCount(0);
     } catch (err) {
       console.error('Mark all read error', err);
     }

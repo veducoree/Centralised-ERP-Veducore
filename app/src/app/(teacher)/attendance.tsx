@@ -23,7 +23,6 @@ import {
   upsertAttendance,
 } from '@/services/api';
 import { COLORS, SPACING, RADIUS, SHADOW, formatDate } from '@/lib/utils';
-import { notifyParentsOnAttendance } from '@/lib/notifications';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
@@ -307,20 +306,12 @@ export default function TeacherAttendance() {
       const activeSection = sections.find(s => s.sectionId === selectedSectionId);
       const sectionLabel = activeSection?.label || 'Class';
 
-      await notifyParentsOnAttendance({
-        sectionId: selectedSectionId,
-        date: selectedDate,
-        sectionLabel,
-        students,
-        statuses,
-      });
-
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
 
       Alert.alert(
         'Attendance Saved ✅',
-        `Attendance for ${selectedDate} (${sectionLabel}) has been saved.\n\nNotifications dispatched to parents in-app and via phone alerts.`
+        `Attendance for ${selectedDate} (${sectionLabel}) has been saved.\n\nParents of absent and late students are notified automatically.`
       );
 
       await loadAttendanceData(selectedSectionId, selectedDate);

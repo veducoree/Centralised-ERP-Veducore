@@ -14,60 +14,75 @@ import { StatusBar } from 'expo-status-bar';
 
 import { Header } from '@/components/layout/Header';
 import {
-  fetchParentByUserId,
-  fetchParentStudents,
-  fetchNotifications,
+  fetchMyNotifications,
   markNotificationRead,
+  markAllNotificationsRead,
 } from '@/services/api';
+import { routeForNotification, setBadgeCount } from '@/lib/notifications';
 import { COLORS, SPACING, RADIUS, SHADOW, formatDate } from '@/lib/utils';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { MobileInlineSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/context/AuthContext';
-import type { Notification, Parent, ParentStudent } from '@/types';
+import type { Notification } from '@/types';
 
-type FilterType = 'all' | 'attendance' | 'announcements';
+type FilterType = 'all' | 'attendance' | 'fee' | 'academic' | 'notice';
+
+const FILTERS: { key: FilterType; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'attendance', label: 'Attendance' },
+  { key: 'fee', label: 'Fees' },
+  { key: 'academic', label: 'Academics' },
+  { key: 'notice', label: 'School Notices' },
+];
+
+const ACADEMIC = ['exam', 'homework', 'remark', 'timetable'];
+
+function filterGroup(n: Notification): FilterType {
+  const c = n.category ?? (n.entity_type === 'attendance' ? 'attendance' : 'general');
+  if (c === 'attendance') return 'attendance';
+  if (c === 'fee') return 'fee';
+  if (ACADEMIC.includes(c)) return 'academic';
+  return 'notice';
+}
+
+const CATEGORY_STYLE: Record<string, { icon: keyof typeof Ionicons.glyphMap; color: string; bg: string; border: string }> = {
+  attendance: { icon: 'calendar', color: '#D97706', bg: '#FFFBEB', border: '#FDE68A' },
+  fee: { icon: 'wallet', color: '#059669', bg: '#ECFDF5', border: '#A7F3D0' },
+  exam: { icon: 'document-text', color: '#7C3AED', bg: '#F5F3FF', border: '#DDD6FE' },
+  homework: { icon: 'book', color: '#0284C7', bg: '#F0F9FF', border: '#BAE6FD' },
+  remark: { icon: 'chatbubble-ellipses', color: '#475569', bg: '#F1F5F9', border: '#E2E8F0' },
+  holiday: { icon: 'sunny', color: '#0D9488', bg: '#F0FDFA', border: '#99F6E4' },
+  event: { icon: 'sparkles', color: '#DB2777', bg: '#FDF2F8', border: '#FBCFE8' },
+  transport: { icon: 'bus', color: '#EA580C', bg: '#FFF7ED', border: '#FED7AA' },
+  timetable: { icon: 'time', color: '#0891B2', bg: '#ECFEFF', border: '#A5F3FC' },
+  emergency: { icon: 'alert-circle', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
+  announcement: { icon: 'megaphone', color: '#4F46E5', bg: '#EEF2FF', border: '#C7D2FE' },
+};
 
 export default function ParentNotificationsScreen() {
   const router = useRouter();
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [filter, setFilter] = useState<FilterType>('all');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // Load notifications relevant to the logged-in parent
+  // RLS returns exactly what this parent should see: school-wide notices,
+  // notices for their children's class/section, and child-specific alerts.
   const loadNotifications = useCallback(async () => {
     if (!user?.id) return;
     try {
-      // Find linked students for this parent
-      const parent = await fetchParentByUserId(user.id);
-      let linkedStudentIds: string[] = [];
-      if (parent) {
-        const links = await fetchParentStudents(parent.id);
-        linkedStudentIds = links.map(l => l.student_id);
-      }
-
-      const allNotifs = await fetchNotifications(user.id, profile?.school_id);
-
-      // Filter notifications belonging to this parent, school-wide (null), or their children
-      const userNotifs = allNotifs.filter(n => {
-        if (n.user_id === user.id) return true;
-        if (n.user_id === null) return true;
-        if (n.entity_id && linkedStudentIds.includes(n.entity_id)) return true;
-        return false;
-      });
-
-      // Sort newest first
-      userNotifs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setNotifications(userNotifs);
+      const list = await fetchMyNotifications(150);
+      setNotifications(list);
+      setBadgeCount(list.filter(n => !n.is_read).length);
     } catch (err) {
       console.error('Failed to load notifications:', err);
     } finally {
       setLoading(false);
     }
-  }, [user?.id, profile?.school_id]);
+  }, [user?.id]);
 
   useEffect(() => {
     loadNotifications();
@@ -92,36 +107,33 @@ export default function ParentNotificationsScreen() {
 
   const markAllAsRead = async () => {
     try {
-      for (const n of notifications) {
-        if (!n.is_read) {
-          await markNotificationRead(n.id);
-        }
-      }
+      await markAllNotificationsRead();
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
+      setBadgeCount(0);
     } catch (err) {
       console.error('Failed to mark all as read:', err);
     }
   };
 
-  const filteredList = useMemo(() => {
-    if (filter === 'attendance') {
-      return notifications.filter(
-        n => n.entity_type === 'attendance' || n.title.toLowerCase().includes('attendance')
-      );
-    }
-    if (filter === 'announcements') {
-      return notifications.filter(
-        n => n.entity_type !== 'attendance' && !n.title.toLowerCase().includes('attendance')
-      );
-    }
-    return notifications;
-  }, [notifications, filter]);
+  const filteredList = useMemo(
+    () => (filter === 'all' ? notifications : notifications.filter(n => filterGroup(n) === filter)),
+    [notifications, filter],
+  );
+
+  const openNotification = (notif: Notification) => {
+    if (!notif.is_read) markAsRead(notif.id);
+    const route = routeForNotification('parent', { link: notif.link, category: notif.category });
+    if (route !== '/parent-modal/notifications') router.push(route as never);
+  };
 
   const unreadCount = useMemo(() => {
     return notifications.filter(n => !n.is_read).length;
   }, [notifications]);
 
   const getNotifStyle = (notif: Notification) => {
+    if (notif.priority === 'urgent') return CATEGORY_STYLE.emergency;
+    const byCategory = notif.category ? CATEGORY_STYLE[notif.category] : undefined;
+    if (byCategory) return byCategory;
     if (notif.type === 'success' || notif.title.includes('✅')) {
       return {
         icon: 'checkmark-circle' as const,
@@ -193,9 +205,8 @@ export default function ParentNotificationsScreen() {
 
         {/* Filter Chips */}
         <View style={styles.filterChipsRow}>
-          {(['all', 'attendance', 'announcements'] as FilterType[]).map(tabKey => {
+          {FILTERS.map(({ key: tabKey, label }) => {
             const active = filter === tabKey;
-            const label = tabKey === 'all' ? 'All Alerts' : tabKey === 'attendance' ? 'Attendance' : 'School Notices';
             return (
               <TouchableOpacity
                 key={tabKey}
@@ -229,7 +240,7 @@ export default function ParentNotificationsScreen() {
               title="No notifications"
               subtitle={
                 filter === 'attendance'
-                  ? 'No attendance alerts yet. You will be notified whenever attendance is marked.'
+                  ? 'No attendance alerts. You will be notified if your child is absent or late.'
                   : 'You have no notifications in this category.'
               }
             />
@@ -253,7 +264,7 @@ export default function ParentNotificationsScreen() {
                 <TouchableOpacity
                   key={notif.id}
                   activeOpacity={0.8}
-                  onPress={() => markAsRead(notif.id)}>
+                  onPress={() => openNotification(notif)}>
                   <GlassCard
                     style={[
                       styles.notifCard,
@@ -282,9 +293,14 @@ export default function ParentNotificationsScreen() {
                           <Text style={styles.notifTime}>
                             {formatNotifTime(notif.created_at)}
                           </Text>
-                          {notif.entity_type && (
+                          {(notif.category || notif.entity_type) && (
                             <View style={styles.tagPill}>
-                              <Text style={styles.tagText}>{notif.entity_type.toUpperCase()}</Text>
+                              <Text style={styles.tagText}>{(notif.category || notif.entity_type || '').toUpperCase()}</Text>
+                            </View>
+                          )}
+                          {notif.priority === 'urgent' && (
+                            <View style={[styles.tagPill, { backgroundColor: '#FEE2E2' }]}>
+                              <Text style={[styles.tagText, { color: '#B91C1C' }]}>URGENT</Text>
                             </View>
                           )}
                         </View>
@@ -345,6 +361,7 @@ const styles = StyleSheet.create({
 
   filterChipsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     paddingHorizontal: SPACING.md,
     marginVertical: SPACING.sm,

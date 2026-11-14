@@ -18,6 +18,7 @@ import type {
   FeeType,
   Fee,
   Notification,
+  NotificationPreferences,
   ParentStudent,
   School,
   Profile,
@@ -824,45 +825,77 @@ export async function updateFee(id: string, updates: Partial<Fee>) {
 // ==========================================
 // Notifications API
 // ==========================================
-export async function fetchNotifications(userId?: string, schoolId?: string) {
-  let query = supabase
-    .from('notifications')
-    .select('*')
-    .order('created_at', { ascending: false });
-
-  if (userId) query = query.eq('user_id', userId);
-  if (schoolId) query = query.eq('school_id', schoolId);
-
-  const { data, error } = await query;
+/**
+ * Notifications visible to the signed-in user (RLS decides which), with
+ * per-user read state. Covers school-wide, class/section and child-specific
+ * notices as well as ones addressed to the user directly.
+ */
+export async function fetchMyNotifications(limit = 100) {
+  const { data, error } = await supabase.rpc('fetch_my_notifications', { p_limit: limit });
   if (error) throw error;
   return (data || []) as Notification[];
 }
 
+/** @deprecated use fetchMyNotifications — kept for older call sites. */
+export async function fetchNotifications(_userId?: string, _schoolId?: string) {
+  return fetchMyNotifications();
+}
+
+export async function fetchUnreadNotificationCount() {
+  const list = await fetchMyNotifications(200);
+  return list.filter((n) => !n.is_read).length;
+}
+
 export async function createNotification(notification: {
   school_id: string;
-  user_id?: string | null;
   title: string;
   message: string;
   type?: string;
+  audience?: 'class' | 'section' | 'student';
+  class_id?: string | null;
+  section_id?: string | null;
+  student_id?: string | null;
+  category?: string;
+  priority?: 'normal' | 'high' | 'urgent';
   entity_type?: string | null;
   entity_id?: string | null;
 }) {
+  const { data: auth } = await supabase.auth.getUser();
   const { data, error } = await supabase
     .from('notifications')
-    .insert(notification)
+    .insert({ ...notification, sent_by: auth.user?.id ?? null })
     .select()
     .maybeSingle();
   if (error) throw error;
+  if (data?.id) {
+    supabase.functions.invoke('push-dispatch', { body: { notification_id: data.id } }).catch(() => {});
+  }
   return data as Notification | null;
 }
 
 export async function markNotificationRead(id: string) {
-  const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+  const { error } = await supabase.rpc('mark_notifications_read', { p_ids: [id] });
   if (error) throw error;
 }
 
-export async function deleteNotification(id: string) {
-  const { error } = await supabase.from('notifications').delete().eq('id', id);
+export async function markAllNotificationsRead() {
+  const { error } = await supabase.rpc('mark_all_notifications_read');
+  if (error) throw error;
+}
+
+export async function fetchNotificationPreferences(userId: string): Promise<NotificationPreferences> {
+  const { data } = await supabase
+    .from('notification_preferences')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+  return (data as NotificationPreferences | null) ?? { user_id: userId, muted_categories: [], push_enabled: true };
+}
+
+export async function saveNotificationPreferences(prefs: NotificationPreferences) {
+  const { error } = await supabase
+    .from('notification_preferences')
+    .upsert({ ...prefs, updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
   if (error) throw error;
 }
 

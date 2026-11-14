@@ -17,7 +17,8 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '@/auth/AuthContext';
-import { fetchSchool, getCachedSchoolSync, fetchNotifications } from '@/services/api';
+import { fetchSchool, getCachedSchoolSync } from '@/services/api';
+import { NotificationBell } from './NotificationBell';
 import { cn, getInitials } from '@/lib/utils';
 import veducoreLogo from '@/assets/veducore-logo.png';
 import type { School } from '@/types';
@@ -369,13 +370,11 @@ export function DashboardLayout({
   activeNavPath?: string;
 }) {
   const { profile, signOut } = useAuth();
-  const location = useLocation();
   const navigate = useNavigate();
 
   const [sidebarExpanded, setSidebarExpanded] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [school, setSchool] = useState<School | null>(() => getCachedSchoolSync(profile?.school_id));
-  const [unreadCount, setUnreadCount] = useState(0);
 
   const firstFocusRef = useRef<HTMLButtonElement>(null);
 
@@ -402,16 +401,6 @@ export function DashboardLayout({
     fetchSchool(profile.school_id).then((s) => { if (!cancelled && s) setSchool(s); }).catch(() => {});
     return () => { cancelled = true; };
   }, [profile?.school_id]);
-
-  // ── Unread notifications ──────────────────────────────────
-  useEffect(() => {
-    if (!profile?.school_id) return;
-    let cancelled = false;
-    fetchNotifications(undefined, profile.school_id)
-      .then((data) => { if (!cancelled) setUnreadCount(data.filter((n) => !n.is_read).length); })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [profile?.school_id, location.pathname]);
 
   const handleSignOut = async () => {
     setUserMenuOpen(false);
@@ -477,16 +466,7 @@ export function DashboardLayout({
           <div className="flex-1" />
 
           {/* Notifications */}
-          <button
-            onClick={() => navigate(`/${profile?.role}/notifications`)}
-            aria-label="Notifications"
-            className="relative flex-shrink-0 rounded-xl bg-white p-2.5 text-slate-500 shadow-[0_4px_20px_rgba(91,110,232,0.08)] transition-colors hover:text-[#5B6EE8]"
-          >
-            <Bell className="h-5 w-5" />
-            {unreadCount > 0 && (
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-red-500" aria-hidden="true" />
-            )}
-          </button>
+          <NotificationBell role={profile?.role} schoolId={profile?.school_id} />
 
           {/* Profile dropdown */}
           <div className="relative flex-shrink-0">

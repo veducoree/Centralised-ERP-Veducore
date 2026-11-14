@@ -327,7 +327,24 @@ export interface Notification {
   entity_id: string | null;
   is_read: boolean;
   created_at: string;
+  audience?: NotificationAudience;
+  class_id?: string | null;
+  section_id?: string | null;
+  student_id?: string | null;
+  category?: NotificationCategory;
+  priority?: NotificationPriority;
+  link?: string | null;
+  sent_by?: string | null;
+  recipients_count?: number;
+  push_status?: 'pending' | 'sending' | 'sent' | 'skipped' | 'failed';
+  push_sent_count?: number;
 }
+
+export type NotificationAudience = 'all' | 'parents' | 'teachers' | 'class' | 'section' | 'student' | 'user';
+export type NotificationPriority = 'normal' | 'high' | 'urgent';
+export type NotificationCategory =
+  | 'general' | 'announcement' | 'attendance' | 'fee' | 'exam' | 'homework'
+  | 'holiday' | 'event' | 'transport' | 'remark' | 'timetable' | 'emergency';
 
 export interface AuditLog {
   id: string;
