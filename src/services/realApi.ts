@@ -3560,3 +3560,11 @@ export async function reviewLeave(id: string, approve: boolean, note?: string) {
   const { error } = await supabase.rpc('review_leave', { p_id: id, p_approve: approve, p_note: note ?? null });
   if (error) throw new Error(error.message);
 }
+
+/** Datesheet rows for several exams (teachers use this for subjects + max marks). */
+export async function fetchExamScheduleFor(examIds: string[]) {
+  if (!examIds.length) return [] as ExamScheduleRow[];
+  const { data, error } = await supabase.from('exam_schedule').select('*').in('exam_id', examIds);
+  if (error) throw error;
+  return (data ?? []) as ExamScheduleRow[];
+}

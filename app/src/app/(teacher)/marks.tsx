@@ -22,8 +22,7 @@ import {
   fetchTeacherByUserId,
   fetchTeacherAssignments,
   fetchExamDefs,
-  createExamDef,
-  deleteExamDef,
+  fetchExamScheduleFor,
   fetchClasses,
   fetchSubjects,
   fetchStudentsBySection,
@@ -47,7 +46,6 @@ import type {
   Student,
   StudentRecord,
   ExamDef,
-  RecordType,
 } from '@/types';
 
 function computeGrade(marks: number, maxMarks: number): string {
@@ -88,14 +86,6 @@ export default function TeacherMarks() {
   // Filter exams by section
   const [selectedSectionFilter, setSelectedSectionFilter] = useState<string>('all');
 
-  // Create Exam Modal state
-  const [createModalVisible, setCreateModalVisible] = useState(false);
-  const [newExamName, setNewExamName] = useState('');
-  const [newExamType, setNewExamType] = useState<RecordType>('unit_test');
-  const [newMaxMarks, setNewMaxMarks] = useState('50');
-  const [newSectionId, setNewSectionId] = useState('');
-  const [newExamDate, setNewExamDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [creatingExam, setCreatingExam] = useState(false);
 
   // Enter Marks view state
   const [selectedExam, setSelectedExam] = useState<ExamDef | null>(null);
@@ -105,6 +95,8 @@ export default function TeacherMarks() {
   const [commentInput, setCommentInput] = useState<Record<string, string>>({});
   const [studentsLoading, setStudentsLoading] = useState(false);
   const [savingMarks, setSavingMarks] = useState(false);
+  const [schedule, setSchedule] = useState<{ exam_id: string; class_id: string; subject_id: string; max_marks: number }[]>([]);
+  const [selectedMax, setSelectedMax] = useState(100);
 
   const { user } = useAuth();
 
@@ -124,20 +116,21 @@ export default function TeacherMarks() {
 
       const secList: Section[] = cls.flatMap(c => c.sections || []);
 
-      setExamDefs(defs);
+      // Exams are scheduled by the office; teachers only enter marks.
+      const officeDefs = defs.filter(d => d.exam_id);
+      setExamDefs(officeDefs);
+      const examIds = [...new Set(officeDefs.map(d => d.exam_id as string))];
+      setSchedule(await fetchExamScheduleFor(examIds).catch(() => []));
       setAssignments(ca);
       setClasses(cls);
       setSections(secList);
       setSubjects(sub);
       setAllRecords(records);
 
-      if (ca.length > 0 && !newSectionId) {
-        setNewSectionId(ca[0].section_id);
-      }
     } catch (err) {
       console.error('Teacher marks load error', err);
     }
-  }, [user?.id, newSectionId]);
+  }, [user?.id]);
 
   useEffect(() => {
     loadData().finally(() => setLoading(false));
@@ -176,14 +169,23 @@ export default function TeacherMarks() {
   };
 
   // Subjects available for an exam based on teacher's assignments
+  const classIdOf = (sectionId: string) => sections.find(s => s.id === sectionId)?.class_id;
+
+  // Class teacher: every subject on the exam's datesheet for the class.
+  // Subject teacher: only their own subjects from that datesheet.
   const getSubjectsForExam = (exam: ExamDef): Subject[] => {
-    const isClassTeacher = assignments.some(
-      a => a.section_id === exam.section_id && (a.is_class_teacher === true || !a.subject_id)
-    );
-    if (isClassTeacher) return subjects;
-    return subjects.filter(sub =>
-      assignments.some(a => a.section_id === exam.section_id && a.subject_id === sub.id)
-    );
+    const classId = classIdOf(exam.section_id);
+    const scheduled = schedule.filter(r => r.exam_id === exam.exam_id && r.class_id === classId).map(r => r.subject_id);
+    const isClassTeacher = assignments.some(a => a.section_id === exam.section_id && !a.subject_id);
+    const mineIds = new Set(assignments.filter(a => a.section_id === exam.section_id && a.subject_id).map(a => a.subject_id as string));
+    const allowed = isClassTeacher ? scheduled : scheduled.filter(id => mineIds.has(id));
+    return subjects.filter(sub => allowed.includes(sub.id));
+  };
+
+  const maxFor = (exam: ExamDef, subjectId: string) => {
+    const classId = classIdOf(exam.section_id);
+    const row = schedule.find(r => r.exam_id === exam.exam_id && r.class_id === classId && r.subject_id === subjectId);
+    return Number(row?.max_marks ?? exam.max_marks);
   };
 
   // Count marked students for an exam and subject
@@ -196,79 +198,10 @@ export default function TeacherMarks() {
     return { marked: records.length, total: 5 };
   };
 
-  // Create new Exam handler
-  const handleCreateExam = async () => {
-    if (!newExamName.trim() || !newSectionId) {
-      Alert.alert('Missing Fields', 'Please enter an exam name and select a section.');
-      return;
-    }
-    setCreatingExam(true);
-    try {
-      const teacher = user?.id ? await fetchTeacherByUserId(user.id) : null;
-      const schoolId = teacher?.school_id || 'school-001';
-      const maxMarksNum = parseFloat(newMaxMarks) || 50;
-
-      const created = await createExamDef({
-        exam_name: newExamName.trim(),
-        record_type: newExamType,
-        max_marks: maxMarksNum,
-        section_id: newSectionId,
-        date: newExamDate,
-        school_id: schoolId,
-        created_by_teacher_id: teacher?.id || '',
-      });
-
-      if (created) {
-        setExamDefs(prev => [created, ...prev]);
-      }
-      setCreateModalVisible(false);
-      setNewExamName('');
-      setNewMaxMarks('50');
-      Alert.alert('Exam Created', `"${newExamName.trim()}" has been created successfully.`);
-    } catch (err) {
-      Alert.alert('Error', 'Failed to create exam.');
-    } finally {
-      setCreatingExam(false);
-    }
-  };
-
-  // Delete Exam handler
-  const handleDeleteExam = (exam: ExamDef) => {
-    if (exam.exam_id) {
-      Alert.alert('School exam', 'This exam was scheduled by the school office and can only be removed there.');
-      return;
-    }
-    Alert.alert(
-      'Delete Exam',
-      `Are you sure you want to delete "${exam.exam_name}"? All student marks associated with this exam will be removed.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await deleteExamDef(exam.id);
-              const toDelete = allRecords.filter(r => r.exam_name === exam.exam_name);
-              for (const r of toDelete) {
-                await deleteStudentRecord(r.id);
-              }
-              setExamDefs(prev => prev.filter(d => d.id !== exam.id));
-              setAllRecords(prev => prev.filter(r => r.exam_name !== exam.exam_name));
-              Alert.alert('Exam Deleted', `Exam "${exam.exam_name}" deleted.`);
-            } catch (err) {
-              Alert.alert('Error', 'Failed to delete exam.');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  // Open Enter Marks view for a given exam and subject
   const openEnterMarks = async (exam: ExamDef, subject: Subject) => {
     setSelectedExam(exam);
     setSelectedSubject(subject);
+    setSelectedMax(maxFor(exam, subject.id));
     setView('enter-marks');
     setStudentsLoading(true);
 
@@ -317,7 +250,7 @@ export default function TeacherMarks() {
         const num = parseFloat(val);
         if (isNaN(num)) continue;
 
-        const grade = computeGrade(num, selectedExam.max_marks);
+        const grade = computeGrade(num, selectedMax);
         await createStudentRecord({
           school_id: schoolId,
           student_id: st.id,
@@ -327,7 +260,7 @@ export default function TeacherMarks() {
           record_type: selectedExam.record_type,
           exam_name: selectedExam.exam_name,
           marks: num,
-          max_marks: selectedExam.max_marks,
+          max_marks: selectedMax,
           grade,
           date: selectedExam.date,
           teacher_comment: commentInput[st.id] || null,
@@ -400,7 +333,7 @@ export default function TeacherMarks() {
                   </Text>
                 </View>
                 <View style={styles.bannerMaxMarksPill}>
-                  <Text style={styles.bannerMaxMarksVal}>Max {selectedExam.max_marks} pts</Text>
+                  <Text style={styles.bannerMaxMarksVal}>Max {selectedMax} pts</Text>
                 </View>
               </View>
 
@@ -435,9 +368,9 @@ export default function TeacherMarks() {
                 {sectionStudents.map((student, idx) => {
                   const currentVal = marksInput[student.id] ?? '';
                   const num = parseFloat(currentVal);
-                  const valid = !isNaN(num) && num >= 0 && num <= selectedExam.max_marks;
-                  const grade = valid ? computeGrade(num, selectedExam.max_marks) : null;
-                  const isOverMax = !isNaN(num) && num > selectedExam.max_marks;
+                  const valid = !isNaN(num) && num >= 0 && num <= selectedMax;
+                  const grade = valid ? computeGrade(num, selectedMax) : null;
+                  const isOverMax = !isNaN(num) && num > selectedMax;
 
                   return (
                     <GlassCard key={student.id} style={styles.entryCard} padding={SPACING.md}>
@@ -469,7 +402,7 @@ export default function TeacherMarks() {
                       {/* Marks Input & Comment */}
                       <View style={styles.entryInputsRow}>
                         <View style={styles.marksInputWrap}>
-                          <Text style={styles.inputFieldLabel}>Marks (/{selectedExam.max_marks})</Text>
+                          <Text style={styles.inputFieldLabel}>Marks (/{selectedMax})</Text>
                           <TextInput
                             style={[styles.numericInput, isOverMax && styles.inputError]}
                             keyboardType="numeric"
@@ -479,7 +412,7 @@ export default function TeacherMarks() {
                             onChangeText={txt => setMarksInput(prev => ({ ...prev, [student.id]: txt }))}
                           />
                           {isOverMax && (
-                            <Text style={styles.errorText}>Max {selectedExam.max_marks}</Text>
+                            <Text style={styles.errorText}>Max {selectedMax}</Text>
                           )}
                         </View>
 
@@ -543,19 +476,11 @@ export default function TeacherMarks() {
             />
           }>
 
-          {/* Header Action Row: Add Exam button */}
           <View style={styles.examTopActionRow}>
             <View style={styles.pageTitleBlock}>
-              <Text style={styles.pageTitle} numberOfLines={1}>Scheduled Exams</Text>
-              <Text style={styles.pageSubtitle} numberOfLines={1}>Manage definitions & record marks</Text>
+              <Text style={styles.pageTitle} numberOfLines={1}>Exam Marks</Text>
+              <Text style={styles.pageSubtitle} numberOfLines={2}>Exams are set by the office. Enter marks for your subjects.</Text>
             </View>
-            <TouchableOpacity
-              onPress={() => setCreateModalVisible(true)}
-              style={styles.addExamBtn}
-              activeOpacity={0.8}>
-              <Ionicons name="add" size={18} color="#FFFFFF" style={{ marginRight: 4 }} />
-              <Text style={styles.addExamBtnText}>Create Exam</Text>
-            </TouchableOpacity>
           </View>
 
           {/* Section Filter Chips */}
@@ -600,7 +525,7 @@ export default function TeacherMarks() {
               <EmptyState
                 icon="stats-chart-outline"
                 title="No exams found"
-                subtitle="Tap '+ Create Exam' to define a new test or examination."
+                subtitle="Exams appear here once the office adds them with a datesheet."
               />
             </View>
           ) : (
@@ -623,16 +548,10 @@ export default function TeacherMarks() {
                       </View>
 
                       <Text style={styles.examSectionSub}>
-                        {sectionLabelFor(exam.section_id)} · Max {exam.max_marks} pts · {formatDate(exam.date)}
+                        {sectionLabelFor(exam.section_id)} · {formatDate(exam.date)}
                       </Text>
                     </View>
 
-                    <TouchableOpacity
-                      onPress={() => handleDeleteExam(exam)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      style={styles.deleteExamBtn}>
-                      <Ionicons name="trash-outline" size={17} color="#DC2626" />
-                    </TouchableOpacity>
                   </View>
 
                   <View style={styles.examDivider} />
@@ -692,121 +611,6 @@ export default function TeacherMarks() {
           <View style={{ height: SPACING.xxl }} />
         </ScrollView>
 
-        {/* Modal: Create New Exam */}
-        <Modal
-          visible={createModalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setCreateModalVisible(false)}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={styles.modalOverlay}>
-            <View style={styles.modalBackdrop}>
-              <View style={styles.modalBox}>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Create New Exam</Text>
-                  <TouchableOpacity onPress={() => setCreateModalVisible(false)}>
-                    <Ionicons name="close" size={22} color={COLORS.textMuted} />
-                  </TouchableOpacity>
-                </View>
-
-                <ScrollView
-                  style={{ maxHeight: 460 }}
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled">
-                  {/* Exam Name */}
-                  <Text style={styles.modalLabel}>Exam Name *</Text>
-                  <TextInput
-                    style={styles.modalInput}
-                    placeholder="e.g. Unit Test 2, Mid Term"
-                    placeholderTextColor={COLORS.textLight}
-                    value={newExamName}
-                    onChangeText={setNewExamName}
-                  />
-
-                  {/* Record Type */}
-                  <Text style={styles.modalLabel}>Record Type</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typePickerScroll}>
-                    {(['unit_test', 'mid_term', 'final_exam', 'assignment', 'practical'] as RecordType[]).map(t => {
-                      const active = newExamType === t;
-                      return (
-                        <TouchableOpacity
-                          key={t}
-                          onPress={() => setNewExamType(t)}
-                          style={[styles.typeChip, active && styles.typeChipActive]}>
-                          <Text style={[styles.typeChipText, active && styles.typeChipTextActive]}>
-                            {getRecordTypeLabel(t)}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-
-                  {/* Class / Section */}
-                  <Text style={styles.modalLabel}>Class / Section *</Text>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.typePickerScroll}>
-                    {uniqueSections.map(s => {
-                      const active = newSectionId === s.id;
-                      return (
-                        <TouchableOpacity
-                          key={s.id}
-                          onPress={() => setNewSectionId(s.id)}
-                          style={[styles.typeChip, active && styles.typeChipActive]}>
-                          <Text style={[styles.typeChipText, active && styles.typeChipTextActive]}>
-                            {s.label}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-
-                  {/* Max Marks & Date Row */}
-                  <View style={styles.modalTwoCols}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.modalLabel}>Max Marks</Text>
-                      <TextInput
-                        style={styles.modalInput}
-                        keyboardType="numeric"
-                        placeholder="50"
-                        placeholderTextColor={COLORS.textLight}
-                        value={newMaxMarks}
-                        onChangeText={setNewMaxMarks}
-                      />
-                    </View>
-
-                    <View style={{ flex: 1, marginLeft: 12 }}>
-                      <Text style={styles.modalLabel}>Date (YYYY-MM-DD)</Text>
-                      <TextInput
-                        style={styles.modalInput}
-                        placeholder="2026-01-15"
-                        placeholderTextColor={COLORS.textLight}
-                        value={newExamDate}
-                        onChangeText={setNewExamDate}
-                      />
-                    </View>
-                  </View>
-
-                  {/* Submit Buttons */}
-                  <View style={styles.modalActionsRow}>
-                    <Button
-                      label="Cancel"
-                      variant="outline"
-                      onPress={() => setCreateModalVisible(false)}
-                      style={{ flex: 1 }}
-                    />
-                    <Button
-                      label={creatingExam ? 'Creating...' : 'Create Exam'}
-                      variant="primary"
-                      loading={creatingExam}
-                      onPress={handleCreateExam}
-                      style={{ flex: 1 }}
-                    />
-                  </View>
-                </ScrollView>
-              </View>
-            </View>
-          </KeyboardAvoidingView>
-        </Modal>
       </View>
     </View>
   );

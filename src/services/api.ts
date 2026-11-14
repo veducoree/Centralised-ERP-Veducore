@@ -118,6 +118,7 @@ export {
   fetchRecordsForExamSubject,
   fetchExamStatuses,
   fetchRecordsForSections,
+  fetchExamScheduleFor,
   fetchStudentOutstanding,
   issueCertificate,
   cancelCertificate,

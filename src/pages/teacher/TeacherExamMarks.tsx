@@ -1,9 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, Trash2, ClipboardList, ChevronRight, Save, ArrowLeft, Lock } from 'lucide-react';
+import { ClipboardList, ChevronRight, Save, ArrowLeft, Lock } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/Button';
-import { Input, Select } from '@/components/ui/Form';
-import { Modal, ConfirmDialog } from '@/components/ui/Modal';
 import { PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
@@ -15,13 +13,12 @@ import {
   deleteStudentRecord,
   fetchSubjects,
   fetchExamDefs,
-  createExamDef,
-  deleteExamDef,
+  fetchExamScheduleFor,
   fetchRecordsForExamSubject,
   fetchExamStatuses,
   fetchRecordsForSections,
 } from '@/services/api';
-import type { Teacher, ClassAssignment, Student, StudentRecord, Subject, ExamDef, RecordType } from '@/types';
+import type { Teacher, ClassAssignment, Student, StudentRecord, Subject, ExamDef, RecordType, ExamScheduleRow } from '@/types';
 import { formatDate } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
 
@@ -38,17 +35,6 @@ export default function TeacherExamMarks() {
   const [examStatus, setExamStatus] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
-  // Create exam modal
-  const [createModalOpen, setCreateModalOpen] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [examDefForm, setExamDefForm] = useState({
-    exam_name: '',
-    record_type: 'unit_test',
-    max_marks: '50',
-    section_id: '',
-    date: new Date().toISOString().split('T')[0],
-  });
-
   // Enter marks view
   const [view, setView] = useState<View>('list');
   const [selectedExamDef, setSelectedExamDef] = useState<ExamDef | null>(null);
@@ -58,8 +44,8 @@ export default function TeacherExamMarks() {
   const [commentInput, setCommentInput] = useState<Record<string, string>>({});
   const [submittingMarks, setSubmittingMarks] = useState(false);
 
-  // Delete
-  const [deleteExamId, setDeleteExamId] = useState<string | null>(null);
+  const [schedule, setSchedule] = useState<ExamScheduleRow[]>([]);
+  const [selectedMax, setSelectedMax] = useState(100);
 
   const loadData = useCallback(async () => {
     if (!profile?.id || !profile?.school_id) return;
@@ -80,7 +66,9 @@ export default function TeacherExamMarks() {
         const sectionIds = new Set(a.map((x) => x.section_id));
         setAllRecords(await fetchRecordsForSections([...sectionIds]));
         const ids = [...new Set(defs.map((d) => d.exam_id).filter(Boolean))] as string[];
-        setExamStatus(await fetchExamStatuses(ids).catch(() => ({})));
+        const [st, sch] = await Promise.all([fetchExamStatuses(ids).catch(() => ({})), fetchExamScheduleFor(ids).catch(() => [])]);
+        setExamStatus(st);
+        setSchedule(sch);
       }
     } catch {
       /* handled */
@@ -97,19 +85,11 @@ export default function TeacherExamMarks() {
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
-  const uniqueSections = assignments.reduce(
-    (acc: { id: string; label: string }[], a) => {
-      if (!acc.find((x) => x.id === a.section_id)) {
-        acc.push({ id: a.section_id, label: `${a.class?.name} - ${a.section?.name}` });
-      }
-      return acc;
-    },
-    []
-  );
 
   const assignedSectionIds = new Set(assignments.map((a) => a.section_id));
+  // Exams are scheduled by the office; teachers only enter marks.
   const visibleExamDefs = examDefs
-    .filter((d) => assignedSectionIds.has(d.section_id))
+    .filter((d) => d.exam_id && assignedSectionIds.has(d.section_id))
     .sort((a, b) => b.date.localeCompare(a.date));
 
   // ── Helpers ────────────────────────────────────────────────────────────────
@@ -119,16 +99,28 @@ export default function TeacherExamMarks() {
     return a ? `${a.class?.name ?? ''} - ${a.section?.name ?? ''}` : sectionId;
   }
 
+  function classIdOf(sectionId: string) {
+    return assignments.find((a) => a.section_id === sectionId)?.class_id;
+  }
+
+  function scheduleRow(examDef: ExamDef, subjectId: string) {
+    const classId = classIdOf(examDef.section_id);
+    return schedule.find((r) => r.exam_id === examDef.exam_id && r.class_id === classId && r.subject_id === subjectId);
+  }
+
+  /** Class teacher: every subject of the section. Subject teacher: only their subjects. Limited to the datesheet. */
   function getSubjectsForExam(examDef: ExamDef): Subject[] {
-    const isClassTeacher = assignments.some(
-      (a) => a.section_id === examDef.section_id && (a.is_class_teacher === true || !a.subject_id)
-    );
-    if (isClassTeacher) return subjects.filter((sub) => sub.section_ids.includes(examDef.section_id));
-    return subjects.filter((sub) =>
-      assignments.some(
-        (a) => a.section_id === examDef.section_id && a.subject_id === sub.id
-      )
-    );
+    const isClassTeacher = assignments.some((a) => a.section_id === examDef.section_id && !a.subject_id);
+    const mine = isClassTeacher
+      ? subjects.filter((sub) => sub.section_ids.includes(examDef.section_id))
+      : subjects.filter((sub) => assignments.some((a) => a.section_id === examDef.section_id && a.subject_id === sub.id));
+    const classId = classIdOf(examDef.section_id);
+    const scheduled = schedule.filter((r) => r.exam_id === examDef.exam_id && r.class_id === classId);
+    return scheduled.length ? mine.filter((sub) => scheduled.some((r) => r.subject_id === sub.id)) : mine;
+  }
+
+  function maxFor(examDef: ExamDef, subjectId: string) {
+    return Number(scheduleRow(examDef, subjectId)?.max_marks ?? examDef.max_marks);
   }
 
   function countMarked(examDef: ExamDef, subject: Subject): number {
@@ -152,42 +144,10 @@ export default function TeacherExamMarks() {
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
-  async function handleCreateExam() {
-    if (!teacher || !profile?.school_id || !examDefForm.exam_name.trim() || !examDefForm.section_id) {
-      toast('Please fill all required fields', 'error');
-      return;
-    }
-    setSaving(true);
-    try {
-      const created = await createExamDef({
-        exam_name: examDefForm.exam_name.trim(),
-        record_type: examDefForm.record_type,
-        max_marks: parseFloat(examDefForm.max_marks) || 50,
-        section_id: examDefForm.section_id,
-        date: examDefForm.date,
-        school_id: profile.school_id,
-        created_by_teacher_id: teacher.id,
-      });
-      if (created) setExamDefs((prev) => [created, ...prev]);
-      setCreateModalOpen(false);
-      setExamDefForm({
-        exam_name: '',
-        record_type: 'unit_test',
-        max_marks: '50',
-        section_id: uniqueSections[0]?.id || '',
-        date: new Date().toISOString().split('T')[0],
-      });
-      toast('Exam created', 'success');
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to create exam', 'error');
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function openEnterMarks(examDef: ExamDef, subject: Subject) {
     setSelectedExamDef(examDef);
     setSelectedSubject(subject);
+    setSelectedMax(maxFor(examDef, subject.id));
     setView('enter-marks');
     const students = await fetchStudentsBySection(examDef.section_id);
     setSectionStudents(students);
@@ -226,7 +186,7 @@ export default function TeacherExamMarks() {
           record_type: selectedExamDef.record_type as RecordType,
           exam_name: selectedExamDef.exam_name,
           marks: parsed,
-          max_marks: selectedExamDef.max_marks,
+          max_marks: selectedMax,
           date: selectedExamDef.date,
           teacher_comment: commentInput[student.id] || undefined,
         });
@@ -238,30 +198,6 @@ export default function TeacherExamMarks() {
       toast(err instanceof Error ? err.message : 'Failed to save marks', 'error');
     } finally {
       setSubmittingMarks(false);
-    }
-  }
-
-  async function handleDeleteExam() {
-    if (!deleteExamId || !profile?.school_id) return;
-    const def = examDefs.find((d) => d.id === deleteExamId);
-    if (!def) return;
-    try {
-      // Delete all records for this exam where student belongs to this section
-      if (def.exam_id) { toast('School exams can only be removed by the office', 'error'); return; }
-      const toDelete = allRecords.filter(
-        (r) => r.exam_name === def.exam_name && r.student?.section_id === def.section_id
-      );
-      for (const r of toDelete) {
-        await deleteStudentRecord(r.id);
-      }
-      await deleteExamDef(def.id);
-      setExamDefs((prev) => prev.filter((d) => d.id !== deleteExamId));
-      toast('Exam deleted', 'success');
-      await loadData();
-    } catch {
-      toast('Failed to delete exam', 'error');
-    } finally {
-      setDeleteExamId(null);
     }
   }
 
@@ -295,7 +231,7 @@ export default function TeacherExamMarks() {
                   {getRecordTypeLabel(selectedExamDef.record_type)}
                 </p>
                 <p className="text-sm text-slate-500">
-                  Max Marks: {selectedExamDef.max_marks} &middot; Date: {formatDate(selectedExamDef.date)}
+                  Max Marks: {selectedMax} &middot; Date: {formatDate(selectedExamDef.date)}
                 </p>
               </div>
               <div className="mt-2 flex items-center gap-3 sm:mt-0">
@@ -323,7 +259,7 @@ export default function TeacherExamMarks() {
                   <th className="px-4 py-3 font-semibold text-slate-600">Adm. No.</th>
                   <th className="px-4 py-3 font-semibold text-slate-600 w-32">
                     Marks{' '}
-                    <span className="font-normal text-slate-400">/ {selectedExamDef.max_marks}</span>
+                    <span className="font-normal text-slate-400">/ {selectedMax}</span>
                   </th>
                   <th className="px-4 py-3 font-semibold text-slate-600">Comment (optional)</th>
                 </tr>
@@ -338,7 +274,7 @@ export default function TeacherExamMarks() {
                       <input
                         type="number"
                         min={0}
-                        max={selectedExamDef.max_marks}
+                        max={selectedMax}
                         value={marksInput[student.id] || ''}
                         onChange={(e) =>
                           setMarksInput({ ...marksInput, [student.id]: e.target.value })
@@ -385,24 +321,7 @@ export default function TeacherExamMarks() {
       <div className="space-y-6">
         <PageHeader
           title="Exam Marks"
-          description="Create exams and enter student marks per subject"
-          action={
-            <Button
-              icon={<Plus className="h-4 w-4" />}
-              onClick={() => {
-                setExamDefForm({
-                  exam_name: '',
-                  record_type: 'unit_test',
-                  max_marks: '50',
-                  section_id: uniqueSections[0]?.id || '',
-                  date: new Date().toISOString().split('T')[0],
-                });
-                setCreateModalOpen(true);
-              }}
-            >
-              Create Exam
-            </Button>
-          }
+          description="Exams are scheduled by the office. Class teachers enter marks for every subject of their class; subject teachers for their own subjects."
         />
 
         {loading ? (
@@ -410,9 +329,9 @@ export default function TeacherExamMarks() {
         ) : visibleExamDefs.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
             <ClipboardList className="h-12 w-12 text-slate-300 mb-3" />
-            <p className="font-medium text-slate-600">No exams created yet</p>
+            <p className="font-medium text-slate-600">No exams scheduled yet</p>
             <p className="mt-1 text-sm text-slate-400">
-              Click &ldquo;Create Exam&rdquo; to add Unit Test 1, Mid Term, Final Exam etc.
+              Exams appear here once the office adds them with a datesheet.
             </p>
           </div>
         ) : (
@@ -433,20 +352,10 @@ export default function TeacherExamMarks() {
                       <p className="text-sm font-semibold text-slate-900">{def.exam_name}</p>
                       <Badge variant="info">{getRecordTypeLabel(def.record_type)}</Badge>
                       <span className="text-xs text-slate-500">{sectionLabelFor(def.section_id)}</span>
-                      <span className="text-xs text-slate-400">&middot; Max: {def.max_marks}</span>
                       <span className="text-xs text-slate-400">&middot; {formatDate(def.date)}</span>
                       {def.exam_id && <Badge variant="default">School exam</Badge>}
                       {isLocked(def) && <span className="inline-flex items-center gap-1 text-xs text-emerald-700"><Lock className="h-3 w-3" /> Results published</span>}
                     </div>
-                    {!def.exam_id && (
-                      <button
-                        onClick={() => setDeleteExamId(def.id)}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                        aria-label="Delete exam"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    )}
                   </div>
 
                   {/* Subject rows */}
@@ -490,85 +399,6 @@ export default function TeacherExamMarks() {
       </div>
 
       {/* Create Exam Modal */}
-      <Modal
-        open={createModalOpen}
-        onClose={() => setCreateModalOpen(false)}
-        title="Create New Exam"
-        description="Set exam details. You'll enter marks per subject after creating."
-        size="md"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setCreateModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreateExam} loading={saving}>
-              Create Exam
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <Input
-            label="Exam Name"
-            required
-            value={examDefForm.exam_name}
-            onChange={(e) => setExamDefForm({ ...examDefForm, exam_name: e.target.value })}
-            placeholder="e.g. Unit Test 1, Mid Term, Final Exam"
-          />
-          <Select
-            label="Exam Type"
-            required
-            value={examDefForm.record_type}
-            onChange={(e) => setExamDefForm({ ...examDefForm, record_type: e.target.value })}
-          >
-            <option value="unit_test">Unit Test</option>
-            <option value="mid_term">Mid Term</option>
-            <option value="final_exam">Final Exam</option>
-            <option value="assignment">Assignment</option>
-            <option value="practical">Practical</option>
-          </Select>
-          <Select
-            label="Section"
-            required
-            value={examDefForm.section_id}
-            onChange={(e) => setExamDefForm({ ...examDefForm, section_id: e.target.value })}
-          >
-            <option value="">Select section...</option>
-            {uniqueSections.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.label}
-              </option>
-            ))}
-          </Select>
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Max Marks"
-              type="number"
-              required
-              value={examDefForm.max_marks}
-              onChange={(e) => setExamDefForm({ ...examDefForm, max_marks: e.target.value })}
-              placeholder="50"
-            />
-            <Input
-              label="Exam Date"
-              type="date"
-              required
-              value={examDefForm.date}
-              onChange={(e) => setExamDefForm({ ...examDefForm, date: e.target.value })}
-            />
-          </div>
-        </div>
-      </Modal>
-
-      <ConfirmDialog
-        open={!!deleteExamId}
-        onClose={() => setDeleteExamId(null)}
-        onConfirm={handleDeleteExam}
-        title="Delete Exam"
-        message="This will delete all marks for this exam. This action cannot be undone."
-        confirmText="Delete Exam"
-        variant="danger"
-      />
     </DashboardLayout>
   );
 }

@@ -746,6 +746,14 @@ export async function cancelMyLeave(id: string) {
   if (error) throw new Error(error.message);
 }
 
+/** Datesheet rows for exams (subjects + max marks per class). */
+export async function fetchExamScheduleFor(examIds: string[]) {
+  if (!examIds.length) return [] as { exam_id: string; class_id: string; subject_id: string; max_marks: number }[];
+  const { data, error } = await supabase.from('exam_schedule').select('exam_id, class_id, subject_id, max_marks').in('exam_id', examIds);
+  if (error) throw error;
+  return (data || []) as { exam_id: string; class_id: string; subject_id: string; max_marks: number }[];
+}
+
 // ==========================================
 // Exam Definitions API
 // ==========================================
