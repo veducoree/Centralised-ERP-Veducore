@@ -8,7 +8,7 @@ import {
 } from '@/services/api';
 import type { Exam, School, ExamResultRow, Student, GradingScale, AcademicSession } from '@/types';
 
-type Att = Record<string, { present: number; absent: number; late: number; on_leave: number; total: number }>;
+type Att = Record<string, { present: number; absent: number; late: number; on_leave: number; medical: number; total: number }>;
 
 const fmtDate = (d: string | null | undefined) =>
   d ? new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -78,7 +78,8 @@ export default function ExamReportCards() {
         {results.map((r) => {
           const st = students[r.student_id];
           const att = attendance[r.student_id];
-          const attPct = att?.total ? Math.round(((att.present + att.late) / att.total) * 100) : null;
+          const attended = att ? att.present + att.late + (att.medical ?? 0) : 0;
+          const attPct = att?.total ? Math.round((attended / att.total) * 100) : null;
           return (
             <div key={r.student_id} className="card mx-4 bg-white p-8 text-[13px] text-slate-800 shadow-sm print:mx-0 print:p-0">
               {/* School header */}
@@ -160,7 +161,7 @@ export default function ExamReportCards() {
                   ['Percentage', r.percent !== null ? `${r.percent.toFixed(2)}%` : '—'],
                   ['Rank in section', r.rank ?? '—'],
                   ['Result', r.percent === null ? 'Absent' : r.passed ? 'PASS' : 'NEEDS IMPROVEMENT'],
-                  ['Attendance', att ? `${att.present + att.late}/${att.total}${attPct !== null ? ` (${attPct}%)` : ''}` : '—'],
+                  ['Attendance', att ? `${attended}/${att.total}${attPct !== null ? ` (${attPct}%)` : ''}` : '—'],
                 ].map(([label, value], i) => (
                   <div key={label as string} className={`px-2 py-2 ${i < 3 ? 'border-r border-slate-300' : ''}`}>
                     <p className="text-[11px] uppercase text-slate-500">{label}</p>

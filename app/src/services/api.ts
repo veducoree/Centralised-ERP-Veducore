@@ -687,6 +687,58 @@ export async function fetchRecordsForExamSubject(examName: string, subjectId: st
   return (data || []) as StudentRecord[];
 }
 
+/** Sections the signed-in teacher may mark attendance for (class teacher). */
+export async function fetchMyAttendanceSections() {
+  const { data, error } = await supabase.rpc('my_attendance_sections');
+  if (error) throw error;
+  return (data || []) as { section_id: string; class_id: string; label: string; is_class_teacher: boolean }[];
+}
+
+// ==========================================
+// Teacher self attendance & leave
+// ==========================================
+export interface StaffAttendanceRow {
+  id: string; teacher_id: string; attendance_date: string;
+  status: 'present' | 'absent' | 'half_day' | 'leave' | 'late';
+  check_in: string | null; check_out: string | null; note: string | null;
+}
+export interface StaffLeave {
+  id: string; teacher_id: string; leave_type: 'full_day' | 'half_day';
+  from_date: string; to_date: string; days: number; reason: string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'; review_note: string | null; created_at: string;
+}
+
+export async function markMyAttendance(checkOut = false) {
+  const { data, error } = await supabase.rpc('mark_my_attendance', { p_check_out: checkOut });
+  if (error) throw new Error(error.message);
+  return data as StaffAttendanceRow;
+}
+
+export async function fetchMyStaffAttendance(teacherId: string, from: string, to: string) {
+  const { data, error } = await supabase.from('staff_attendance').select('*')
+    .eq('teacher_id', teacherId).gte('attendance_date', from).lte('attendance_date', to).order('attendance_date');
+  if (error) throw error;
+  return (data || []) as StaffAttendanceRow[];
+}
+
+export async function applyLeave(type: 'full_day' | 'half_day', from: string, to: string, reason: string) {
+  const { data, error } = await supabase.rpc('apply_leave', { p_type: type, p_from: from, p_to: to, p_reason: reason });
+  if (error) throw new Error(error.message);
+  return data as StaffLeave;
+}
+
+export async function fetchMyLeaves(teacherId: string) {
+  const { data, error } = await supabase.from('staff_leaves').select('*').eq('teacher_id', teacherId)
+    .order('from_date', { ascending: false }).limit(50);
+  if (error) throw error;
+  return (data || []) as StaffLeave[];
+}
+
+export async function cancelMyLeave(id: string) {
+  const { error } = await supabase.rpc('cancel_my_leave', { p_id: id });
+  if (error) throw new Error(error.message);
+}
+
 // ==========================================
 // Exam Definitions API
 // ==========================================

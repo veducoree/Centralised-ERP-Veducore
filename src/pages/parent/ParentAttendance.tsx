@@ -49,11 +49,13 @@ export default function ParentAttendance() {
 
   useEffect(() => { loadAttendance(); }, [loadAttendance]);
 
-  const present = records.filter((r) => r.status === 'present').length;
+  const medical = records.filter((r) => r.status === 'medical').length;
+  // Medical leave (ML) counts as present.
+  const present = records.filter((r) => r.status === 'present').length + medical;
   const absent = records.filter((r) => r.status === 'absent').length;
   const late = records.filter((r) => r.status === 'late').length;
   const leave = records.filter((r) => r.status === 'leave').length;
-  const rate = records.length > 0 ? Math.round((present / records.length) * 100) : 0;
+  const rate = records.length > 0 ? Math.round(((present + late) / records.length) * 100) : 0;
 
   if (loading) return <DashboardLayout title="Attendance"><LoadingSpinner /></DashboardLayout>;
 
@@ -72,7 +74,7 @@ export default function ParentAttendance() {
 
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
           <StatCard label="Attendance Rate" value={`${rate}%`} color="emerald" />
-          <StatCard label="Present" value={present} color="blue" />
+          <StatCard label={medical ? `Present (incl. ${medical} ML)` : 'Present'} value={present} color="blue" />
           <StatCard label="Absent" value={absent} color="red" />
           <StatCard label="Late / Leave" value={late + leave} color="amber" />
         </div>

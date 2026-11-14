@@ -17,7 +17,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Header } from '@/components/layout/Header';
 import {
   fetchTeacherByUserId,
-  fetchTeacherAssignments,
+  fetchMyAttendanceSections,
   fetchStudentsBySection,
   fetchAttendance,
   upsertAttendance,
@@ -72,6 +72,13 @@ const STATUS_CONFIG: Record<
     color: '#0E7490',
     bg: '#ECFEFF',
     border: '#06B6D4',
+  },
+  medical: {
+    label: 'Medical',
+    icon: 'medkit',
+    color: '#6D28D9',
+    bg: '#F5F3FF',
+    border: '#8B5CF6',
   },
 };
 
@@ -185,22 +192,11 @@ export default function TeacherAttendance() {
       const teacher = await fetchTeacherByUserId(user.id);
       if (!teacher) return;
 
-      const classAssignments = await fetchTeacherAssignments(teacher.id);
-
-      const seen = new Set<string>();
-      const opts: SectionOption[] = [];
-
-      for (const ca of classAssignments) {
-        if (!seen.has(ca.section_id)) {
-          seen.add(ca.section_id);
-          const cls = (ca as any).class;
-          const sec = (ca as any).section;
-          opts.push({
-            sectionId: ca.section_id,
-            label: `${cls?.name ?? 'Class'} - ${sec?.name ?? 'Section'}`,
-          });
-        }
-      }
+      // Only the class teacher marks a section's attendance.
+      const opts: SectionOption[] = (await fetchMyAttendanceSections()).map(x => ({
+        sectionId: x.section_id,
+        label: x.label,
+      }));
 
       setSections(opts);
       if (opts.length > 0 && !selectedSectionId) {
@@ -317,7 +313,10 @@ export default function TeacherAttendance() {
       await loadAttendanceData(selectedSectionId, selectedDate);
     } catch (err) {
       console.error('Error saving attendance:', err);
-      Alert.alert('Error', 'Failed to save attendance. Please try again.');
+      const msg = err instanceof Error ? err.message : '';
+      Alert.alert('Error', /row-level security|policy/i.test(msg)
+        ? 'Only the class teacher can mark attendance for this section.'
+        : 'Failed to save attendance. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -352,7 +351,7 @@ export default function TeacherAttendance() {
     let lv = 0;
     students.forEach(s => {
       const st = statuses[s.id] || 'present';
-      if (st === 'present') p++;
+      if (st === 'present' || st === 'medical') p++;
       else if (st === 'absent') a++;
       else if (st === 'late') l++;
       else if (st === 'leave') lv++;
@@ -530,7 +529,7 @@ export default function TeacherAttendance() {
               <EmptyState
                 icon="checkbox-outline"
                 title="No students found"
-                subtitle={search ? 'No students match your search.' : 'No students in this section.'}
+                subtitle={search ? 'No students match your search.' : sections.length === 0 ? 'Attendance is taken by the class teacher. You are not the class teacher of any section.' : 'No students in this section.'}
               />
             </View>
           ) : (
@@ -559,7 +558,7 @@ export default function TeacherAttendance() {
 
                     {/* 4 Status Toggle Buttons */}
                     <View style={styles.statusButtonsRow}>
-                      {(['present', 'absent', 'late', 'leave'] as AttendanceStatus[]).map(stKey => {
+                      {(['present', 'absent', 'late', 'leave', 'medical'] as AttendanceStatus[]).map(stKey => {
                         const isSelected = currentStatus === stKey;
                         const cfg = STATUS_CONFIG[stKey];
                         return (

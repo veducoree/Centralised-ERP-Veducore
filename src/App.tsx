@@ -53,6 +53,7 @@ const TeacherStudents = lazy(() => import('@/pages/teacher/TeacherStudents'));
 const TeacherAddStudent = lazy(() => import('@/pages/teacher/TeacherAddStudent'));
 const TeacherNewAdmission = lazy(() => import('@/pages/teacher/TeacherNewAdmission'));
 const TeacherAttendance = lazy(() => import('@/pages/teacher/TeacherAttendance'));
+const TeacherMyAttendance = lazy(() => import('@/pages/teacher/TeacherMyAttendance'));
 const TeacherExamMarks = lazy(() => import('@/pages/teacher/TeacherExamMarks'));
 const TeacherRecords = lazy(() => import('@/pages/teacher/TeacherRecords'));
 const TeacherRemarks = lazy(() => import('@/pages/teacher/TeacherRemarks'));
@@ -186,6 +187,7 @@ function App() {
             <Route path="/teacher/add-student" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherAddStudent /></ProtectedRoute>} />
             <Route path="/teacher/new-admission" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherNewAdmission /></ProtectedRoute>} />
             <Route path="/teacher/attendance" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherAttendance /></ProtectedRoute>} />
+            <Route path="/teacher/my-attendance" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherMyAttendance /></ProtectedRoute>} />
             <Route path="/teacher/exam-marks" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherExamMarks /></ProtectedRoute>} />
             <Route path="/teacher/records" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherRecords /></ProtectedRoute>} />
             <Route path="/teacher/remarks" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherRemarks /></ProtectedRoute>} />

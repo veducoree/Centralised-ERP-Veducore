@@ -1,6 +1,6 @@
 export type UserRole = 'admin' | 'teacher' | 'parent';
 export type ActiveStatus = 'active' | 'inactive';
-export type AttendanceStatus = 'present' | 'absent' | 'late' | 'leave';
+export type AttendanceStatus = 'present' | 'absent' | 'late' | 'leave' | 'medical';
 export type FeeStatus = 'paid' | 'partially_paid' | 'pending' | 'overdue';
 export type RemarkCategory = 'academic' | 'behaviour' | 'attendance' | 'performance' | 'general';
 export type RemarkVisibility = 'public' | 'parents_only' | 'staff_only';
@@ -753,13 +753,13 @@ export type PromotionAction = 'promote' | 'retain' | 'leave' | 'graduate';
 
 export interface SectionDayOverview {
   section_id: string; class_id: string; label: string; grade_level: number | null;
-  students: number; marked: number; present: number; absent: number; late: number; on_leave: number;
+  students: number; marked: number; present: number; absent: number; late: number; on_leave: number; medical: number;
 }
 
 export interface RegisterRow {
   student_id: string; full_name: string; roll_number: number | null; admission_number: string;
   days: Record<string, AttendanceStatus>;
-  present: number; absent: number; late: number; on_leave: number; total: number;
+  present: number; absent: number; late: number; on_leave: number; medical: number; total: number;
 }
 
 export interface AttendanceDefaulter {
@@ -774,4 +774,30 @@ export interface StaffRegisterRow {
   teacher_id: string; full_name: string; employee_id: string;
   days: Record<string, StaffAttendanceStatus>;
   present: number; absent: number; half_day: number; on_leave: number; late: number; total: number;
+}
+
+export interface StaffLeave {
+  id: string;
+  school_id: string;
+  teacher_id: string;
+  leave_type: 'full_day' | 'half_day';
+  from_date: string;
+  to_date: string;
+  days: number;
+  reason: string;
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled';
+  review_note: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  teacher?: { full_name: string; employee_id: string } | null;
+}
+
+export interface StaffAttendanceRow {
+  id: string;
+  teacher_id: string;
+  attendance_date: string;
+  status: StaffAttendanceStatus;
+  check_in: string | null;
+  check_out: string | null;
+  note: string | null;
 }

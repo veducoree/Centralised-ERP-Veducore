@@ -5,7 +5,7 @@ import {
   IndianRupee, FileText, Bell, Settings, LogOut,
   X, UserCircle, ChevronDown, Shield, User,
   Megaphone, UserPlus, ClipboardCheck, CreditCard, CalendarDays, Bus,
-  LayoutGrid, GripVertical, RotateCcw, Pencil, Check, ChevronRight, ChevronLeft, UserRound, Boxes, Library, CalendarClock, CalendarRange, UserCog, ArrowUpCircle,
+  LayoutGrid, GripVertical, RotateCcw, Pencil, Check, ChevronRight, ChevronLeft, UserRound, Boxes, Library, CalendarClock, CalendarRange, UserCog, ArrowUpCircle, CalendarCheck2,
 } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
@@ -66,7 +66,8 @@ export const teacherNav: NavItem[] = [
   { label: 'My Timetable',     path: '/teacher/schedule',    icon: <CalendarClock className="h-5 w-5" /> },
   { label: 'Students',         path: '/teacher/students',    icon: <Users className="h-5 w-5" /> },
   { label: 'Add Student',      path: '/teacher/add-student', icon: <UserPlus className="h-5 w-5" /> },
-  { label: 'Attendance',       path: '/teacher/attendance',  icon: <ClipboardList className="h-5 w-5" /> },
+  { label: 'Class Attendance', path: '/teacher/attendance',  icon: <ClipboardList className="h-5 w-5" /> },
+  { label: 'My Attendance',    path: '/teacher/my-attendance', icon: <CalendarCheck2 className="h-5 w-5" /> },
   { label: 'Exam Marks',       path: '/teacher/exam-marks',  icon: <ClipboardCheck className="h-5 w-5" /> },
   { label: 'Student Records',  path: '/teacher/records',     icon: <FileText className="h-5 w-5" /> },
   { label: 'Remarks',          path: '/teacher/remarks',     icon: <Megaphone className="h-5 w-5" /> },

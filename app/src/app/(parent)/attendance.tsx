@@ -41,6 +41,7 @@ const STATUS_THEME: Record<AttendanceStatus, { color: string; bg: string; label:
   absent: { color: '#EF4444', bg: 'rgba(239, 68, 68, 0.15)', label: 'Absent', icon: 'close-circle' },
   late: { color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.15)', label: 'Late', icon: 'time' },
   leave: { color: '#06B6D4', bg: 'rgba(6, 182, 212, 0.15)', label: 'Leave', icon: 'calendar' },
+  medical: { color: '#7C3AED', bg: 'rgba(124, 58, 237, 0.15)', label: 'Medical', icon: 'medkit' },
 };
 
 export default function ParentAttendance() {
@@ -137,12 +138,14 @@ export default function ParentAttendance() {
     setRefreshing(false);
   }, [loadChildren, loadUnreadNotifications, children, selectedIndex, loadAttendance]);
 
-  const presentCount = attendance.filter(a => a.status === 'present').length;
+  const medicalCount = attendance.filter(a => a.status === 'medical').length;
+  // Medical leave (ML) counts as present.
+  const presentCount = attendance.filter(a => a.status === 'present').length + medicalCount;
   const absentCount = attendance.filter(a => a.status === 'absent').length;
   const lateCount = attendance.filter(a => a.status === 'late').length;
   const leaveCount = attendance.filter(a => a.status === 'leave').length;
   const total = attendance.length;
-  const rate = total > 0 ? Math.round((presentCount / total) * 100) : 0;
+  const rate = total > 0 ? Math.round(((presentCount + lateCount) / total) * 100) : 0;
 
   const filteredAttendance = useMemo(() => {
     if (statusFilter === 'all') return attendance;
@@ -264,6 +267,7 @@ export default function ParentAttendance() {
               { id: 'absent', label: `Absent (${absentCount})` },
               { id: 'late', label: `Late (${lateCount})` },
               { id: 'leave', label: `Leave (${leaveCount})` },
+              ...(medicalCount ? [{ id: 'medical', label: `Medical (${medicalCount})` }] : []),
             ].map(f => {
               const active = statusFilter === f.id;
               return (
@@ -297,9 +301,10 @@ export default function ParentAttendance() {
                 const isPresent = status === 'present';
                 const isAbsent = status === 'absent';
                 const isLate = status === 'late';
-                const color = isPresent ? '#059669' : isAbsent ? '#DC2626' : isLate ? '#D97706' : '#2563EB';
-                const bgColor = isPresent ? '#ECFDF5' : isAbsent ? '#FEF2F2' : isLate ? '#FFFBEB' : '#EFF6FF';
-                const borderColor = isPresent ? '#A7F3D0' : isAbsent ? '#FECACA' : isLate ? '#FDE68A' : '#BFDBFE';
+                const isMedical = status === 'medical';
+                const color = isPresent ? '#059669' : isAbsent ? '#DC2626' : isLate ? '#D97706' : isMedical ? '#7C3AED' : '#2563EB';
+                const bgColor = isPresent ? '#ECFDF5' : isAbsent ? '#FEF2F2' : isLate ? '#FFFBEB' : isMedical ? '#F5F3FF' : '#EFF6FF';
+                const borderColor = isPresent ? '#A7F3D0' : isAbsent ? '#FECACA' : isLate ? '#FDE68A' : isMedical ? '#DDD6FE' : '#BFDBFE';
                 const iconName = isPresent ? 'checkmark-circle' : isAbsent ? 'close-circle' : 'time';
 
                 return (
@@ -315,7 +320,7 @@ export default function ParentAttendance() {
                       <View style={[styles.statusBadge, { backgroundColor: bgColor, borderColor }]}>
                         <Ionicons name={iconName} size={14} color={color} style={{ marginRight: 4 }} />
                         <Text style={[styles.statusBadgeText, { color }]}>
-                          {status.toUpperCase()}
+                          {isMedical ? 'ML' : status.toUpperCase()}
                         </Text>
                       </View>
                     </View>

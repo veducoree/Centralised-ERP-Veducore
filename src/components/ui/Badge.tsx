@@ -63,6 +63,9 @@ export function StatusBadge({ status }: { status: string }) {
     partially_paid:  'info',
     late:            'warning',
     leave:           'info',
+    medical:         'info',
+    half_day:        'warning',
+    cancelled:       'neutral',
     maintenance:     'warning',
     // negative
     inactive:        'neutral',
@@ -71,6 +74,6 @@ export function StatusBadge({ status }: { status: string }) {
     absent:          'danger',
     rejected:        'danger',
   };
-  const label = status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  const label = status === 'medical' ? 'Medical (ML)' : status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   return <Badge variant={map[status] ?? 'neutral'}>{label}</Badge>;
 }

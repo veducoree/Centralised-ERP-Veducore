@@ -19,6 +19,7 @@ import type {
   Exam, ExamScheduleRow, GradingScale, GradeBand, ExamResultRow, ExamProgressRow, RecordType,
   Certificate, CertificateType, PromotionAction,
   SectionDayOverview, RegisterRow, AttendanceDefaulter, StaffRegisterRow, StaffAttendanceStatus,
+  StaffLeave, StaffAttendanceRow,
 } from '@/types';
 
 // Lightweight in-memory cache with TTL and in-flight request deduplication
@@ -3353,8 +3354,8 @@ export async function saveGradingScale(scaleId: string, passPercent: number, ban
 export async function fetchAttendanceSummary(sectionId: string, from: string, to: string) {
   const { data, error } = await supabase.rpc('attendance_summary', { p_section: sectionId, p_from: from, p_to: to });
   if (error) throw error;
-  const out: Record<string, { present: number; absent: number; late: number; on_leave: number; total: number }> = {};
-  for (const r of (data ?? []) as { student_id: string; present: number; absent: number; late: number; on_leave: number; total: number }[]) {
+  const out: Record<string, { present: number; absent: number; late: number; on_leave: number; medical: number; total: number }> = {};
+  for (const r of (data ?? []) as { student_id: string; present: number; absent: number; late: number; on_leave: number; medical: number; total: number }[]) {
     out[r.student_id] = r;
   }
   return out;
@@ -3486,4 +3487,58 @@ export async function fetchStaffAttendanceRegister(from: string, to: string) {
   const { data, error } = await supabase.rpc('staff_attendance_register', { p_from: from, p_to: to });
   if (error) throw error;
   return (data ?? []) as StaffRegisterRow[];
+}
+
+// ==========================================
+// Teacher: markable sections, self attendance, leave
+// ==========================================
+export async function fetchMyAttendanceSections() {
+  const { data, error } = await supabase.rpc('my_attendance_sections');
+  if (error) throw error;
+  return (data ?? []) as { section_id: string; class_id: string; label: string; is_class_teacher: boolean }[];
+}
+
+export async function markMyAttendance(checkOut = false) {
+  const { data, error } = await supabase.rpc('mark_my_attendance', { p_check_out: checkOut });
+  if (error) throw new Error(error.message);
+  return data as StaffAttendanceRow;
+}
+
+export async function fetchMyStaffAttendance(teacherId: string, from: string, to: string) {
+  const { data, error } = await supabase.from('staff_attendance').select('*')
+    .eq('teacher_id', teacherId).gte('attendance_date', from).lte('attendance_date', to).order('attendance_date');
+  if (error) throw error;
+  return (data ?? []) as StaffAttendanceRow[];
+}
+
+export async function applyLeave(type: 'full_day' | 'half_day', from: string, to: string, reason: string) {
+  const { data, error } = await supabase.rpc('apply_leave', { p_type: type, p_from: from, p_to: to, p_reason: reason });
+  if (error) throw new Error(error.message);
+  return data as StaffLeave;
+}
+
+export async function cancelMyLeave(id: string) {
+  const { error } = await supabase.rpc('cancel_my_leave', { p_id: id });
+  if (error) throw new Error(error.message);
+}
+
+export async function fetchMyLeaves(teacherId: string) {
+  const { data, error } = await supabase.from('staff_leaves').select('*').eq('teacher_id', teacherId)
+    .order('from_date', { ascending: false }).limit(100);
+  if (error) throw error;
+  return (data ?? []) as StaffLeave[];
+}
+
+export async function fetchLeaveRequests(schoolId: string, status?: StaffLeave['status']) {
+  let q = supabase.from('staff_leaves').select('*, teacher:teachers(full_name, employee_id)').eq('school_id', schoolId)
+    .order('created_at', { ascending: false }).limit(200);
+  if (status) q = q.eq('status', status);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as StaffLeave[];
+}
+
+export async function reviewLeave(id: string, approve: boolean, note?: string) {
+  const { error } = await supabase.rpc('review_leave', { p_id: id, p_approve: approve, p_note: note ?? null });
+  if (error) throw new Error(error.message);
 }

@@ -116,7 +116,7 @@ export interface Student {
   section?: Section;
 }
 
-export type AttendanceStatus = 'present' | 'absent' | 'late' | 'leave';
+export type AttendanceStatus = 'present' | 'absent' | 'late' | 'leave' | 'medical';
 export type RecordType = 'unit_test' | 'mid_term' | 'final_exam' | 'assignment' | 'practical';
 
 export interface ExamDef {
@@ -139,7 +139,7 @@ export interface Attendance {
   section_id: string;
   teacher_id: string;
   attendance_date: string;
-  status: 'present' | 'absent' | 'late' | 'leave';
+  status: AttendanceStatus;
   notes: string | null;
   created_at: string;
   updated_at: string;

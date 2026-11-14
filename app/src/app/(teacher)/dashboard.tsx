@@ -327,6 +327,15 @@ export default function TeacherDashboard() {
               <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
             </TouchableOpacity>
 
+            <TouchableOpacity
+              style={styles.timetableLink}
+              onPress={() => router.push('/teacher-modal/my-attendance' as never)}
+              activeOpacity={0.8}>
+              <Ionicons name="finger-print-outline" size={16} color={COLORS.primary} />
+              <Text style={styles.timetableLinkText}>My Attendance & Leave</Text>
+              <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
+            </TouchableOpacity>
+
             {/* 7-Day Cycle Strip */}
             <View style={styles.cycleStrip}>
               {CYCLE_DAYS.map(item => {

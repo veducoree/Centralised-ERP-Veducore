@@ -1,24 +1,26 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  CalendarCheck, Grid3x3, AlertTriangle, UserCog, Download, Send, CheckCheck, ChevronLeft, ChevronRight, Save,
+  CalendarCheck, Grid3x3, AlertTriangle, UserCog, Download, Send, CheckCheck, ChevronLeft, ChevronRight, Save, Eye, Check, X,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Input, Select } from '@/components/ui/Form';
+import { Input, Select, Textarea } from '@/components/ui/Form';
 import { Modal } from '@/components/ui/Modal';
 import { PageHeader, LoadingSpinner, SearchInput } from '@/components/ui/Primitives';
 import { useToast } from '@/components/ui/Toast';
+import { StatusBadge } from '@/components/ui/Badge';
 import { useAuth } from '@/auth/AuthContext';
 import { usePermissions } from '@/auth/PermissionsContext';
 import {
-  fetchClasses, fetchAttendance, fetchStudentsBySection, upsertAttendance, fetchHolidays, fetchTeachers,
+  fetchClasses, fetchAttendance, fetchStudentsBySection, fetchHolidays, fetchTeachers,
   fetchAttendanceOverview, fetchAttendanceRegister, fetchAttendanceDefaulters, notifyLowAttendance,
   fetchStaffAttendanceForDate, saveStaffAttendance, fetchStaffAttendanceRegister, fetchAcademicSessions,
+  fetchLeaveRequests, reviewLeave,
 } from '@/services/api';
 import type {
   Class, Section, Student, AttendanceStatus, Holiday, Teacher, SectionDayOverview, RegisterRow,
-  AttendanceDefaulter, StaffAttendanceStatus, StaffRegisterRow,
+  AttendanceDefaulter, StaffAttendanceStatus, StaffRegisterRow, StaffLeave,
 } from '@/types';
 import { sortByClassOrder, sortSections } from '@/lib/classOrder';
 
@@ -40,6 +42,7 @@ const STATUS: Record<AttendanceStatus, { short: string; label: string; on: strin
   absent: { short: 'A', label: 'Absent', on: 'bg-red-500 text-white', cell: 'bg-red-50 text-red-600 font-semibold' },
   late: { short: 'L', label: 'Late', on: 'bg-amber-500 text-white', cell: 'bg-amber-50 text-amber-700' },
   leave: { short: 'LV', label: 'Leave', on: 'bg-sky-500 text-white', cell: 'bg-sky-50 text-sky-700' },
+  medical: { short: 'ML', label: 'Medical (counts as present)', on: 'bg-violet-500 text-white', cell: 'bg-violet-50 text-violet-700' },
 };
 const STAFF_STATUS: Record<StaffAttendanceStatus, { short: string; label: string; on: string }> = {
   present: { short: 'P', label: 'Present', on: 'bg-emerald-500 text-white' },
@@ -104,7 +107,7 @@ export default function AdminAttendance() {
   return (
     <DashboardLayout title="Attendance">
       <div className="space-y-6">
-        <PageHeader title="Attendance" description="Daily status, monthly registers, low-attendance follow-up and staff attendance." />
+        <PageHeader title="Attendance" description="Student attendance is marked by class teachers. Here you can follow it, export registers, chase low attendance and manage staff attendance and leave." />
         <div className="flex flex-wrap gap-1 rounded-xl bg-white p-1 shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
           {tabs.filter((t) => t.show).map(({ key, label, icon: Icon }) => (
             <button key={key} onClick={() => setTab(key)}
@@ -113,7 +116,7 @@ export default function AdminAttendance() {
             </button>
           ))}
         </div>
-        {schoolId && tab === 'today' && <DailyTab schoolId={schoolId} canEdit={can('attendance', 'edit')} />}
+        {tab === 'today' && <DailyTab />}
         {tab === 'register' && <RegisterTab classes={classes} holidays={holidays} />}
         {tab === 'low' && <LowTab classes={classes} defaultFrom={sessionStart} canNotify={can('notifications', 'edit')} />}
         {schoolId && tab === 'staff' && <StaffTab schoolId={schoolId} holidays={holidays} canEdit={can('teachers', 'edit') || can('attendance', 'edit')} />}
@@ -123,7 +126,7 @@ export default function AdminAttendance() {
 }
 
 // ─── Daily ──────────────────────────────────────────────────────────────────
-function DailyTab({ schoolId, canEdit }: { schoolId: string; canEdit: boolean }) {
+function DailyTab() {
   const toast = useToast();
   const [date, setDate] = useState(localISO());
   const [rows, setRows] = useState<SectionDayOverview[]>([]);
@@ -140,7 +143,7 @@ function DailyTab({ schoolId, canEdit }: { schoolId: string; canEdit: boolean })
 
   const withStudents = rows.filter((r) => r.students > 0);
   const marked = withStudents.filter((r) => r.marked > 0);
-  const t = rows.reduce((a, r) => ({ p: a.p + r.present + r.late, m: a.m + r.marked, ab: a.ab + r.absent }), { p: 0, m: 0, ab: 0 });
+  const t = rows.reduce((a, r) => ({ p: a.p + r.present + r.late + r.medical, m: a.m + r.marked, ab: a.ab + r.absent }), { p: 0, m: 0, ab: 0 });
   const shift = (d: number) => { const x = new Date(date + 'T00:00:00'); x.setDate(x.getDate() + d); setDate(localISO(x)); };
 
   return (
@@ -168,7 +171,7 @@ function DailyTab({ schoolId, canEdit }: { schoolId: string; canEdit: boolean })
                 <div className="mb-2 flex items-center justify-between">
                   <p className="font-semibold text-slate-900">{r.label}</p>
                   {done
-                    ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">{pct(r.present + r.late, r.marked)}%</span>
+                    ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">{pct(r.present + r.late + r.medical, r.marked)}%</span>
                     : <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">Not marked</span>}
                 </div>
                 {done ? (
@@ -177,9 +180,10 @@ function DailyTab({ schoolId, canEdit }: { schoolId: string; canEdit: boolean })
                     <span><b className="text-red-600">{r.absent}</b> A</span>
                     <span><b className="text-amber-600">{r.late}</b> L</span>
                     <span><b className="text-sky-600">{r.on_leave}</b> LV</span>
+                    {r.medical > 0 && <span><b className="text-violet-600">{r.medical}</b> ML</span>}
                     {r.marked < r.students && <span className="text-amber-600">{r.students - r.marked} left</span>}
                   </div>
-                ) : <p className="text-xs text-slate-400">{r.students} students · {canEdit ? 'tap to mark' : 'waiting for teacher'}</p>}
+                ) : <p className="text-xs text-slate-400">{r.students} students · waiting for class teacher</p>}
               </button>
             );
           })}
@@ -187,83 +191,51 @@ function DailyTab({ schoolId, canEdit }: { schoolId: string; canEdit: boolean })
         </div>
       )}
 
-      {open && <MarkModal schoolId={schoolId} section={open} date={date} canEdit={canEdit} onClose={() => setOpen(null)} onSaved={() => { setOpen(null); load(); }} />}
+      {open && <ViewModal section={open} date={date} onClose={() => setOpen(null)} />}
     </div>
   );
 }
 
-function MarkModal({ schoolId, section, date, canEdit, onClose, onSaved }: {
-  schoolId: string; section: SectionDayOverview; date: string; canEdit: boolean; onClose: () => void; onSaved: () => void;
-}) {
+function ViewModal({ section, date, onClose }: { section: SectionDayOverview; date: string; onClose: () => void }) {
   const toast = useToast();
   const [students, setStudents] = useState<Student[]>([]);
   const [status, setStatus] = useState<Record<string, AttendanceStatus>>({});
-  const [original, setOriginal] = useState<Record<string, AttendanceStatus>>({});
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
         const [st, att] = await Promise.all([fetchStudentsBySection(section.section_id), fetchAttendance({ sectionId: section.section_id, date })]);
         setStudents(st);
-        const m = Object.fromEntries(att.map((a) => [a.student_id, a.status as AttendanceStatus]));
-        setOriginal(m);
-        setStatus(m);
+        setStatus(Object.fromEntries(att.map((a) => [a.student_id, a.status as AttendanceStatus])));
+        setNotes(Object.fromEntries(att.filter((a) => a.notes).map((a) => [a.student_id, a.notes as string])));
       } catch { toast('Failed to load students', 'error'); }
       finally { setLoading(false); }
     })();
   }, [section.section_id, date, toast]);
 
-  const changed = students.filter((s) => status[s.id] && status[s.id] !== original[s.id]);
+  const shown = students.filter((s) => !search || s.full_name.toLowerCase().includes(search.toLowerCase()));
   const unmarked = students.filter((s) => !status[s.id]).length;
 
-  async function save() {
-    if (!changed.length) { onClose(); return; }
-    setSaving(true);
-    try {
-      await upsertAttendance(changed.map((s) => ({
-        school_id: schoolId, student_id: s.id, section_id: section.section_id, attendance_date: date, status: status[s.id],
-      })));
-      toast(`Saved ${changed.length} record${changed.length === 1 ? '' : 's'}`, 'success');
-      onSaved();
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Failed to save', 'error');
-    } finally { setSaving(false); }
-  }
-
-  const shown = students.filter((s) => !search || s.full_name.toLowerCase().includes(search.toLowerCase()));
-
   return (
-    <Modal open onClose={onClose} size="lg" title={`${section.label} · ${new Date(date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}`}
-      description={canEdit ? 'Parents of absent and late students are notified automatically.' : 'View only'}
-      footer={canEdit ? <><span className="mr-auto text-xs text-slate-500">{unmarked ? `${unmarked} not marked` : 'All marked'}</span><Button variant="ghost" onClick={onClose}>Cancel</Button><Button loading={saving} onClick={save} icon={<Save className="h-4 w-4" />}>Save{changed.length ? ` (${changed.length})` : ''}</Button></> : <Button onClick={onClose}>Close</Button>}>
+    <Modal open onClose={onClose} size="lg"
+      title={`${section.label} · ${new Date(date + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}`}
+      description="View only — attendance is marked by the class teacher."
+      footer={<><span className="mr-auto flex items-center gap-1.5 text-xs text-slate-500"><Eye className="h-3.5 w-3.5" /> {unmarked ? `${unmarked} not marked` : 'All marked'}</span><Button onClick={onClose}>Close</Button></>}>
       {loading ? <LoadingSpinner /> : (
         <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <SearchInput value={search} onChange={setSearch} placeholder="Search student…" className="flex-1" />
-            {canEdit && (
-              <Button size="sm" variant="outline" icon={<CheckCheck className="h-4 w-4" />}
-                onClick={() => setStatus(Object.fromEntries(students.map((s) => [s.id, status[s.id] ?? 'present'])))}>
-                Unmarked → present
-              </Button>
-            )}
-          </div>
+          <SearchInput value={search} onChange={setSearch} placeholder="Search student…" />
           <div className="max-h-[52vh] divide-y divide-slate-100 overflow-y-auto">
             {shown.map((s) => (
               <div key={s.id} className="flex items-center gap-3 py-2">
                 <span className="w-8 text-xs tabular-nums text-slate-400">{s.roll_number ?? '—'}</span>
-                <span className="flex-1 truncate text-sm text-slate-800">{s.full_name}</span>
-                <div className="flex gap-1" role="radiogroup" aria-label={`Attendance for ${s.full_name}`}>
-                  {(Object.keys(STATUS) as AttendanceStatus[]).map((k) => (
-                    <button key={k} type="button" role="radio" aria-checked={status[s.id] === k} disabled={!canEdit} title={STATUS[k].label}
-                      onClick={() => setStatus({ ...status, [s.id]: k })}
-                      className={`h-8 min-w-[36px] rounded-lg px-2 text-xs font-semibold transition ${status[s.id] === k ? STATUS[k].on : 'bg-slate-100 text-slate-500 hover:bg-slate-200'} disabled:cursor-default`}>
-                      {STATUS[k].short}
-                    </button>
-                  ))}
-                </div>
+                <span className="flex-1 min-w-0">
+                  <span className="block truncate text-sm text-slate-800">{s.full_name}</span>
+                  {notes[s.id] && <span className="block truncate text-[11px] text-slate-400">{notes[s.id]}</span>}
+                </span>
+                {status[s.id] ? <StatusBadge status={status[s.id]} /> : <span className="text-xs text-slate-400">Not marked</span>}
               </div>
             ))}
           </div>
@@ -309,10 +281,10 @@ function RegisterTab({ classes, holidays }: { classes: ClassWithSections[]; holi
 
   function exportCsv() {
     downloadCsv(`Attendance ${label} ${month}`, [
-      ['Roll', 'Name', 'Admission No', ...days.map((d) => d.slice(8)), 'Present', 'Absent', 'Late', 'Leave', 'Marked', '%'],
+      ['Roll', 'Name', 'Admission No', ...days.map((d) => d.slice(8)), 'Present', 'Absent', 'Late', 'Leave', 'Medical', 'Marked', '%'],
       ...rows.map((r) => [r.roll_number, r.full_name, r.admission_number,
         ...days.map((d) => r.days[d] ? STATUS[r.days[d]].short : offDay(d) ? 'H' : ''),
-        r.present, r.absent, r.late, r.on_leave, r.total, pct(r.present + r.late, r.total)]),
+        r.present, r.absent, r.late, r.on_leave, r.medical, r.total, pct(r.present + r.late + r.medical, r.total)]),
     ]);
   }
 
@@ -352,7 +324,7 @@ function RegisterTab({ classes, holidays }: { classes: ClassWithSections[]; holi
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {rows.map((r) => {
-                  const p = pct(r.present + r.late, r.total);
+                  const p = pct(r.present + r.late + r.medical, r.total);
                   return (
                     <tr key={r.student_id} className="hover:bg-slate-50/60">
                       <td className="sticky left-0 z-10 bg-white px-3 py-1.5">
@@ -369,7 +341,7 @@ function RegisterTab({ classes, holidays }: { classes: ClassWithSections[]; holi
                           </td>
                         );
                       })}
-                      <td className="px-2 py-1.5 text-center tabular-nums">{r.present + r.late}</td>
+                      <td className="px-2 py-1.5 text-center tabular-nums">{r.present + r.late + r.medical}</td>
                       <td className="px-2 py-1.5 text-center tabular-nums text-red-600">{r.absent}</td>
                       <td className={`px-2 py-1.5 text-center font-semibold tabular-nums ${r.total && p < 75 ? 'text-red-600' : 'text-slate-800'}`}>{r.total ? `${p}%` : '—'}</td>
                     </tr>
@@ -532,7 +504,9 @@ function StaffTab({ schoolId, holidays, canEdit }: { schoolId: string; holidays:
 
   return (
     <div className="space-y-6">
+      <LeaveRequests schoolId={schoolId} canEdit={canEdit} onChanged={() => { load(); loadRegister(); }} />
       <Card className="p-5">
+        <p className="mb-3 text-xs text-slate-500">Teachers mark themselves present from their portal or app. Approved leave fills in automatically. You can correct entries here.</p>
         <div className="mb-4 flex flex-wrap items-end gap-3">
           <div className="w-44"><Input label="Date" type="date" value={date} max={localISO()} onChange={(e) => setDate(e.target.value)} /></div>
           {off && <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">{off}</span>}
@@ -607,5 +581,81 @@ function StaffTab({ schoolId, holidays, canEdit }: { schoolId: string; holidays:
         </div>
       </Card>
     </div>
+  );
+}
+
+// ─── Leave requests ─────────────────────────────────────────────────────────
+function LeaveRequests({ schoolId, canEdit, onChanged }: { schoolId: string; canEdit: boolean; onChanged: () => void }) {
+  const toast = useToast();
+  const [filter, setFilter] = useState<'pending' | 'all'>('pending');
+  const [rows, setRows] = useState<StaffLeave[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [review, setReview] = useState<{ leave: StaffLeave; approve: boolean } | null>(null);
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setRows(await fetchLeaveRequests(schoolId, filter === 'pending' ? 'pending' : undefined)); }
+    catch { toast('Failed to load leave requests', 'error'); }
+    finally { setLoading(false); }
+  }, [schoolId, filter, toast]);
+  useEffect(() => { load(); }, [load]);
+
+  const fmt = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+
+  async function submit() {
+    if (!review) return;
+    setBusy(true);
+    try {
+      await reviewLeave(review.leave.id, review.approve, note);
+      toast(review.approve ? 'Leave approved — attendance updated' : 'Leave rejected', 'success');
+      setReview(null); setNote('');
+      load(); onChanged();
+    } catch (e) { toast(e instanceof Error ? e.message : 'Failed', 'error'); }
+    finally { setBusy(false); }
+  }
+
+  return (
+    <Card className="overflow-hidden">
+      <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-5 py-4">
+        <p className="flex-1 font-semibold text-slate-900">Leave requests{filter === 'pending' && rows.length ? ` (${rows.length})` : ''}</p>
+        <div className="inline-flex rounded-lg bg-slate-100 p-1 text-xs font-medium">
+          {(['pending', 'all'] as const).map((f) => (
+            <button key={f} onClick={() => setFilter(f)} className={`rounded-md px-3 py-1 ${filter === f ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500'}`}>{f === 'pending' ? 'Pending' : 'All'}</button>
+          ))}
+        </div>
+      </div>
+      {loading ? <div className="p-5"><LoadingSpinner /></div> : rows.length === 0 ? (
+        <p className="px-5 py-6 text-center text-sm text-slate-500">{filter === 'pending' ? 'No pending leave requests.' : 'No leave requests yet.'}</p>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {rows.map((l) => (
+            <li key={l.id} className="flex flex-col gap-2 px-5 py-3 md:flex-row md:items-center">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-900">{l.teacher?.full_name ?? 'Teacher'}
+                  <span className="ml-2 text-xs font-normal text-slate-500">
+                    {l.leave_type === 'half_day' ? `Half day · ${fmt(l.from_date)}` : `${l.days} day${Number(l.days) === 1 ? '' : 's'} · ${fmt(l.from_date)}${l.to_date !== l.from_date ? ` – ${fmt(l.to_date)}` : ''}`}
+                  </span>
+                </p>
+                <p className="truncate text-xs text-slate-500">{l.reason}{l.review_note ? ` · Note: ${l.review_note}` : ''}</p>
+              </div>
+              {l.status === 'pending' && canEdit ? (
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" icon={<X className="h-4 w-4" />} onClick={() => { setReview({ leave: l, approve: false }); setNote(''); }}>Reject</Button>
+                  <Button size="sm" icon={<Check className="h-4 w-4" />} onClick={() => { setReview({ leave: l, approve: true }); setNote(''); }}>Approve</Button>
+                </div>
+              ) : <StatusBadge status={l.status} />}
+            </li>
+          ))}
+        </ul>
+      )}
+      <Modal open={!!review} onClose={() => setReview(null)} title={review?.approve ? 'Approve leave?' : 'Reject leave?'}
+        description={review ? `${review.leave.teacher?.full_name} · ${review.leave.reason}` : undefined}
+        footer={<><Button variant="ghost" onClick={() => setReview(null)}>Cancel</Button><Button variant={review?.approve ? 'primary' : 'danger'} loading={busy} onClick={submit}>{review?.approve ? 'Approve' : 'Reject'}</Button></>}>
+        <Textarea label="Note to teacher (optional)" rows={2} value={note} onChange={(e) => setNote(e.target.value)} />
+        {review?.approve && <p className="mt-2 text-xs text-slate-500">Working days in the range are marked as {review.leave.leave_type === 'half_day' ? 'half day' : 'leave'} in staff attendance.</p>}
+      </Modal>
+    </Card>
   );
 }
