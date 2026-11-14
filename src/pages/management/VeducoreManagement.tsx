@@ -146,24 +146,24 @@ export default function VeducoreManagement() {
 
   const sidebar = (
     <>
-      <div className="flex h-14 flex-shrink-0 items-center gap-2.5 border-b border-slate-100 px-5">
+      <div className="flex h-16 flex-shrink-0 items-center gap-2.5 border-b border-slate-100 px-6">
         <img src={veducoreLogo} alt="Veducore" className="h-6 w-auto object-contain" />
         <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-600">Superadmin</span>
       </div>
-      <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-2.5">
+      <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4">
         {NAV.map((g) => {
           const items = g.items.filter((i) => isManager || !i.managersOnly);
           if (!items.length) return null;
           return (
-            <div key={g.group || 'top'} className="mb-2">
-              {g.group && <p className="mb-0.5 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">{g.group}</p>}
+            <div key={g.group || 'top'} className="mb-4">
+              {g.group && <p className="mb-1.5 px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">{g.group}</p>}
               <ul className="space-y-0.5">
                 {items.map((i) => {
                   const active = current === i.id;
                   return (
                     <li key={i.id}>
                       <button onClick={() => setSection(i.id)}
-                        className={cx('flex w-full items-center gap-3 rounded-xl px-3 py-[7px] text-sm font-medium transition',
+                        className={cx('flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition',
                           active ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-500/25' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900')}>
                         {i.icon}
                         <span className="flex-1 text-left">{i.label}</span>
