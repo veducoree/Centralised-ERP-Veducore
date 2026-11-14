@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS receipt_sequences (
 
 ALTER TABLE receipt_sequences ENABLE ROW LEVEL SECURITY;
 
+DROP TRIGGER IF EXISTS set_updated_at_receipt_sequences ON receipt_sequences;
 CREATE TRIGGER set_updated_at_receipt_sequences
   BEFORE UPDATE ON receipt_sequences
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -83,6 +84,7 @@ CREATE INDEX IF NOT EXISTS idx_admission_receipts_school_id  ON admission_receip
 CREATE INDEX IF NOT EXISTS idx_admission_receipts_student_id ON admission_receipts(student_id);
 CREATE INDEX IF NOT EXISTS idx_admission_receipts_created_at ON admission_receipts(created_at DESC);
 
+DROP TRIGGER IF EXISTS set_updated_at_admission_receipts ON admission_receipts;
 CREATE TRIGGER set_updated_at_admission_receipts
   BEFORE UPDATE ON admission_receipts
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

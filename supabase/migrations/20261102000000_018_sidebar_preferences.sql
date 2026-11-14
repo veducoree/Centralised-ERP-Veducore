@@ -21,6 +21,7 @@ ALTER TABLE sidebar_preferences ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_sidebar_preferences_profile_id
   ON sidebar_preferences(profile_id);
 
+DROP TRIGGER IF EXISTS set_updated_at_sidebar_preferences ON sidebar_preferences;
 CREATE TRIGGER set_updated_at_sidebar_preferences
   BEFORE UPDATE ON sidebar_preferences
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

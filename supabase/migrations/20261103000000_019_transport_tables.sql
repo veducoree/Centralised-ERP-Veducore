@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS transport_buses (
 
 ALTER TABLE transport_buses ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_transport_buses_school_id ON transport_buses(school_id);
+DROP TRIGGER IF EXISTS set_updated_at_transport_buses ON transport_buses;
 CREATE TRIGGER set_updated_at_transport_buses
   BEFORE UPDATE ON transport_buses
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -64,6 +65,7 @@ CREATE TABLE IF NOT EXISTS transport_stops (
 ALTER TABLE transport_stops ENABLE ROW LEVEL SECURITY;
 CREATE INDEX IF NOT EXISTS idx_transport_stops_bus_id    ON transport_stops(bus_id);
 CREATE INDEX IF NOT EXISTS idx_transport_stops_school_id ON transport_stops(school_id);
+DROP TRIGGER IF EXISTS set_updated_at_transport_stops ON transport_stops;
 CREATE TRIGGER set_updated_at_transport_stops
   BEFORE UPDATE ON transport_stops
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -120,6 +122,7 @@ CREATE INDEX IF NOT EXISTS idx_sta_school_id    ON student_transport_assignments
 CREATE INDEX IF NOT EXISTS idx_sta_student_id   ON student_transport_assignments(student_id);
 CREATE INDEX IF NOT EXISTS idx_sta_bus_id       ON student_transport_assignments(bus_id);
 CREATE INDEX IF NOT EXISTS idx_sta_status       ON student_transport_assignments(status);
+DROP TRIGGER IF EXISTS set_updated_at_student_transport_assignments ON student_transport_assignments;
 CREATE TRIGGER set_updated_at_student_transport_assignments
   BEFORE UPDATE ON student_transport_assignments
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -167,6 +170,7 @@ CREATE TABLE IF NOT EXISTS transport_config (
 );
 
 ALTER TABLE transport_config ENABLE ROW LEVEL SECURITY;
+DROP TRIGGER IF EXISTS set_updated_at_transport_config ON transport_config;
 CREATE TRIGGER set_updated_at_transport_config
   BEFORE UPDATE ON transport_config
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
