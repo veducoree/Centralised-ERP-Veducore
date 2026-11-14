@@ -694,6 +694,13 @@ export async function fetchMyAttendanceSections() {
   return (data || []) as { section_id: string; class_id: string; label: string; is_class_teacher: boolean }[];
 }
 
+/** School holidays / declared working days (for calendars). */
+export async function fetchHolidays(schoolId: string) {
+  const { data, error } = await supabase.from('holidays').select('date, type, label').eq('school_id', schoolId);
+  if (error) throw error;
+  return (data || []) as { date: string; type: 'holiday' | 'festival' | 'working'; label: string | null }[];
+}
+
 // ==========================================
 // Teacher self attendance & leave
 // ==========================================
