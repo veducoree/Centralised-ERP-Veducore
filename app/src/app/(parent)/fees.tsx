@@ -491,8 +491,8 @@ export default function ParentFees() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#4F46E5"
-              colors={['#4F46E5']}
+              tintColor="#5B6EE8"
+              colors={['#5B6EE8']}
             />
           }
         >
@@ -589,7 +589,7 @@ export default function ParentFees() {
                 <Ionicons
                   name="calendar-outline"
                   size={18}
-                  color={structureMode === 'monthly' ? '#FFFFFF' : '#4F46E5'}
+                  color={structureMode === 'monthly' ? '#FFFFFF' : '#5B6EE8'}
                 />
                 <Text
                   style={[
@@ -626,7 +626,7 @@ export default function ParentFees() {
                     structureMode === 'quarterly'
                       ? '#FFFFFF'
                       : hasQuarterlyPlan
-                        ? '#4F46E5'
+                        ? '#5B6EE8'
                         : '#94A3B8'
                   }
                 />
@@ -666,7 +666,7 @@ export default function ParentFees() {
                     structureMode === 'annually'
                       ? '#FFFFFF'
                       : hasAnnualPlan
-                        ? '#4F46E5'
+                        ? '#5B6EE8'
                         : '#94A3B8'
                   }
                 />
@@ -748,12 +748,12 @@ export default function ParentFees() {
                             backgroundColor: isFullyPaid
                               ? '#ECFDF5'
                               : fee.status === 'partially_paid'
-                                ? '#EEF2FF'
+                                ? '#EEF0FD'
                                 : '#FFFBEB',
                             borderColor: isFullyPaid
                               ? '#A7F3D0'
                               : fee.status === 'partially_paid'
-                                ? '#C7D2FE'
+                                ? '#C7CDFB'
                                 : '#FDE68A',
                           },
                         ]}
@@ -765,7 +765,7 @@ export default function ParentFees() {
                               color: isFullyPaid
                                 ? '#059669'
                                 : fee.status === 'partially_paid'
-                                  ? '#4F46E5'
+                                  ? '#5B6EE8'
                                   : '#D97706',
                             },
                           ]}
@@ -825,7 +825,7 @@ export default function ParentFees() {
                                     : 'lock-closed-outline'
                                 }
                                 size={11}
-                                color={plan.isPaymentWindowOpen ? '#4F46E5' : '#D97706'}
+                                color={plan.isPaymentWindowOpen ? '#5B6EE8' : '#D97706'}
                               />
                               <Text
                                 style={[
@@ -1011,7 +1011,7 @@ export default function ParentFees() {
                           activeOpacity={0.8}
                           style={styles.receiptBtn}
                         >
-                          <Ionicons name="receipt-outline" size={16} color="#4F46E5" />
+                          <Ionicons name="receipt-outline" size={16} color="#5B6EE8" />
                           <Text style={styles.receiptBtnText}>View Receipt</Text>
                         </TouchableOpacity>
                       )}
@@ -1078,7 +1078,7 @@ export default function ParentFees() {
                           <Ionicons
                             name={pm.icon as keyof typeof Ionicons.glyphMap}
                             size={18}
-                            color={active ? '#4F46E5' : '#64748B'}
+                            color={active ? '#5B6EE8' : '#64748B'}
                             style={{ marginRight: 10 }}
                           />
                           <Text
@@ -1090,7 +1090,7 @@ export default function ParentFees() {
                             <Ionicons
                               name="checkmark-circle"
                               size={18}
-                              color="#4F46E5"
+                              color="#5B6EE8"
                               style={{ marginLeft: 'auto' }}
                             />
                           )}
@@ -1223,7 +1223,7 @@ export default function ParentFees() {
                     {lastPaidInstallmentAmount !== null && (
                       <View style={styles.receiptTableRow}>
                         <Text style={styles.receiptTableKey}>Current Installment Paid</Text>
-                        <Text style={[styles.receiptTableVal, { color: '#4F46E5' }]}>
+                        <Text style={[styles.receiptTableVal, { color: '#5B6EE8' }]}>
                           {formatCurrency(lastPaidInstallmentAmount)}
                         </Text>
                       </View>
@@ -1287,7 +1287,7 @@ export default function ParentFees() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: '#F4F5FB' },
   content: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.md, paddingTop: SPACING.xs },
@@ -1309,25 +1309,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  childChipActive: { backgroundColor: '#EEF2FF', borderColor: '#4F46E5' },
+  childChipActive: { backgroundColor: '#EEF0FD', borderColor: '#5B6EE8' },
   childChipName: { fontSize: 13, fontWeight: '700', color: '#64748B' },
-  childChipNameActive: { color: '#4F46E5' },
+  childChipNameActive: { color: '#5B6EE8' },
   childChipSub: { fontSize: 11, color: '#94A3B8', marginTop: 1 },
-  childChipSubActive: { color: '#4338CA' },
+  childChipSubActive: { color: '#4B5DD8' },
 
   singleChildBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#EEF0FD',
     borderRadius: RADIUS.md,
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginBottom: SPACING.sm,
     borderWidth: 1,
-    borderColor: '#E0E7FF',
+    borderColor: '#DFE3FC',
   },
-  singleChildDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#4F46E5', marginRight: 8 },
-  singleChildText: { fontSize: 12, fontWeight: '600', color: '#3730A3' },
+  singleChildDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#5B6EE8', marginRight: 8 },
+  singleChildText: { fontSize: 12, fontWeight: '600', color: '#3B4DC8' },
 
   statsCard: {
     backgroundColor: '#FFFFFF',
@@ -1357,7 +1357,7 @@ const styles = StyleSheet.create({
   modeTabsRow: { flexDirection: 'row', gap: 8 },
   modeTab: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderRadius: RADIUS.md,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
@@ -1366,11 +1366,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modeTabActive: {
-    backgroundColor: '#4F46E5',
-    borderColor: '#4F46E5',
+    backgroundColor: '#5B6EE8',
+    borderColor: '#5B6EE8',
   },
   modeTabDisabled: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderColor: '#E2E8F0',
     opacity: 0.65,
   },
@@ -1378,7 +1378,7 @@ const styles = StyleSheet.create({
   modeTabTitleActive: { color: '#FFFFFF' },
   modeTabTitleDisabled: { color: '#64748B' },
   modeTabSub: { fontSize: 9, fontWeight: '600', color: '#64748B', marginTop: 1, textAlign: 'center' },
-  modeTabSubActive: { color: '#E0E7FF' },
+  modeTabSubActive: { color: '#DFE3FC' },
 
   emptyWrap: { marginTop: 40 },
   feesList: { gap: 12 },
@@ -1404,7 +1404,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderRadius: RADIUS.md,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -1417,7 +1417,7 @@ const styles = StyleSheet.create({
   amountColVal: { fontSize: 14, fontWeight: '800', color: '#0F172A' },
 
   scheduleBox: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderRadius: RADIUS.md,
     padding: 10,
     borderWidth: 1,
@@ -1435,7 +1435,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#EEF0FD',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: RADIUS.full,
@@ -1446,7 +1446,7 @@ const styles = StyleSheet.create({
   windowPillText: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#4F46E5',
+    color: '#5B6EE8',
   },
   monthChipsRow: { flexDirection: 'row', gap: 6, paddingBottom: 4 },
   monthChip: {
@@ -1462,8 +1462,8 @@ const styles = StyleSheet.create({
     borderColor: '#A7F3D0',
   },
   monthChipCurrent: {
-    backgroundColor: '#4F46E5',
-    borderColor: '#4338CA',
+    backgroundColor: '#5B6EE8',
+    borderColor: '#4B5DD8',
   },
   monthChipLockedWindow: {
     backgroundColor: '#FFFBEB',
@@ -1519,7 +1519,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4F46E5',
+    backgroundColor: '#5B6EE8',
     borderRadius: RADIUS.md,
     paddingVertical: 11,
   },
@@ -1533,14 +1533,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#EEF0FD',
     borderWidth: 1,
-    borderColor: '#C7D2FE',
+    borderColor: '#C7CDFB',
     borderRadius: RADIUS.md,
     paddingVertical: 10,
   },
   receiptBtnText: {
-    color: '#4F46E5',
+    color: '#5B6EE8',
     fontSize: 13,
     fontWeight: '800',
   },
@@ -1567,7 +1567,7 @@ const styles = StyleSheet.create({
   modalTitle: { fontSize: 17, fontWeight: '800', color: '#0F172A' },
   modalSummaryBox: {
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderRadius: RADIUS.lg,
     paddingVertical: 16,
     paddingHorizontal: 12,
@@ -1576,17 +1576,17 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   modalPeriodBadge: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#EEF0FD',
     borderWidth: 1,
-    borderColor: '#C7D2FE',
+    borderColor: '#C7CDFB',
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: RADIUS.full,
     marginBottom: 6,
   },
-  modalPeriodBadgeText: { fontSize: 10, fontWeight: '800', color: '#4F46E5', letterSpacing: 0.4 },
+  modalPeriodBadgeText: { fontSize: 10, fontWeight: '800', color: '#5B6EE8', letterSpacing: 0.4 },
   modalFeeType: { fontSize: 13, color: '#334155', fontWeight: '700' },
-  modalFeeAmount: { fontSize: 26, fontWeight: '900', color: '#4F46E5', marginTop: 4 },
+  modalFeeAmount: { fontSize: 26, fontWeight: '900', color: '#5B6EE8', marginTop: 4 },
   modalNextPeriodText: {
     fontSize: 11,
     fontWeight: '600',
@@ -1614,11 +1614,11 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
   },
   payMethodOptionActive: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#4F46E5',
+    backgroundColor: '#EEF0FD',
+    borderColor: '#5B6EE8',
   },
   payMethodText: { fontSize: 13, fontWeight: '600', color: '#0F172A' },
-  payMethodTextActive: { color: '#4F46E5', fontWeight: '700' },
+  payMethodTextActive: { color: '#5B6EE8', fontWeight: '700' },
   modalActionsRow: { flexDirection: 'row', gap: 10, marginTop: SPACING.lg },
 
   // Receipt Modal Styles
@@ -1653,9 +1653,9 @@ const styles = StyleSheet.create({
   },
   officialReceiptBadge: {
     marginTop: 8,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#EEF0FD',
     borderWidth: 1,
-    borderColor: '#C7D2FE',
+    borderColor: '#C7CDFB',
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: RADIUS.full,
@@ -1663,7 +1663,7 @@ const styles = StyleSheet.create({
   officialReceiptBadgeText: {
     fontSize: 9.5,
     fontWeight: '800',
-    color: '#4F46E5',
+    color: '#5B6EE8',
     letterSpacing: 0.5,
   },
   receiptMetaRow: {
@@ -1684,7 +1684,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   receiptStudentBox: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderRadius: RADIUS.md,
     padding: 12,
     borderWidth: 1,

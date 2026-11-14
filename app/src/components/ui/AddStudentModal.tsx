@@ -428,7 +428,7 @@ const styles = StyleSheet.create({
   },
   formContent: {
     padding: SPACING.md,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
   },
   fieldLabel: {
     fontSize: 12,
@@ -501,8 +501,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   genderBtnActiveMale: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#C7D2FE',
+    backgroundColor: '#EEF0FD',
+    borderColor: '#C7CDFB',
   },
   genderBtnActiveFemale: {
     backgroundColor: '#FDF2F8',

@@ -57,7 +57,7 @@ const CATEGORY_STYLE: Record<string, { icon: keyof typeof Ionicons.glyphMap; col
   transport: { icon: 'bus', color: '#EA580C', bg: '#FFF7ED', border: '#FED7AA' },
   timetable: { icon: 'time', color: '#0891B2', bg: '#ECFEFF', border: '#A5F3FC' },
   emergency: { icon: 'alert-circle', color: '#DC2626', bg: '#FEF2F2', border: '#FECACA' },
-  announcement: { icon: 'megaphone', color: '#4F46E5', bg: '#EEF2FF', border: '#C7D2FE' },
+  announcement: { icon: 'megaphone', color: '#5B6EE8', bg: '#EEF0FD', border: '#C7CDFB' },
 };
 
 export default function ParentNotificationsScreen() {
@@ -161,8 +161,8 @@ export default function ParentNotificationsScreen() {
     return {
       icon: 'information-circle' as const,
       color: COLORS.primary,
-      bg: '#EEF2FF',
-      border: '#C7D2FE',
+      bg: '#EEF0FD',
+      border: '#C7CDFB',
     };
   };
 
@@ -335,9 +335,9 @@ const styles = StyleSheet.create({
   unreadCountPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#EEF0FD',
     borderWidth: 1,
-    borderColor: '#C7D2FE',
+    borderColor: '#C7CDFB',
     borderRadius: RADIUS.full,
     paddingHorizontal: 10,
     paddingVertical: 5,
@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.lg,
   },
   notifCardUnread: {
-    borderColor: '#C7D2FE',
+    borderColor: '#C7CDFB',
     backgroundColor: '#F8FAFF',
   },
   notifRow: {

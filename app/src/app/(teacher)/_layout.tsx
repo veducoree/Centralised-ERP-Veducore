@@ -80,7 +80,7 @@ export default function TeacherLayout() {
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#F8FAFC' },
+  root: { flex: 1, backgroundColor: '#F4F5FB' },
   screen: { flex: 1 },
   activePane: { flex: 1, display: 'flex' },
   hiddenPane: { flex: 1, display: 'none' },

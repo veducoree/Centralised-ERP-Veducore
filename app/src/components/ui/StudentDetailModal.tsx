@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
   bodyContent: {
     padding: SPACING.md,
     paddingBottom: SPACING.xxl,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
   },
   loaderWrap: {
     paddingVertical: 60,
@@ -606,7 +606,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#EEF0FD',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -677,7 +677,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#EEF0FD',
   },
   gradeText: {
     fontSize: 14,

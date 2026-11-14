@@ -37,7 +37,7 @@ type RemarkCategory = 'academic' | 'behaviour' | 'attendance' | 'performance' | 
 type RemarkVisibility = 'public' | 'parents_only' | 'staff_only';
 
 const CATEGORIES: { key: RemarkCategory; label: string; bg: string; text: string; border: string }[] = [
-  { key: 'academic', label: 'Academic', bg: '#EEF2FF', text: '#4F46E5', border: '#C7D2FE' },
+  { key: 'academic', label: 'Academic', bg: '#EEF0FD', text: '#5B6EE8', border: '#C7CDFB' },
   { key: 'behaviour', label: 'Behaviour', bg: '#FEF3C7', text: '#D97706', border: '#FDE68A' },
   { key: 'attendance', label: 'Attendance', bg: '#ECFDF5', text: '#059669', border: '#A7F3D0' },
   { key: 'performance', label: 'Performance', bg: '#F3E8FF', text: '#7C3AED', border: '#DDD6FE' },
@@ -629,7 +629,7 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderRadius: RADIUS.md,
     paddingHorizontal: SPACING.sm,
     paddingVertical: 8,
@@ -755,7 +755,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: RADIUS.sm,
@@ -839,7 +839,7 @@ const styles = StyleSheet.create({
   studentSearchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderRadius: RADIUS.md,
     paddingHorizontal: 10,
     paddingVertical: 7,
@@ -858,7 +858,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     padding: 4,
     marginBottom: SPACING.sm,
   },
@@ -875,7 +875,7 @@ const styles = StyleSheet.create({
   },
   studentItemActive: {
     borderColor: COLORS.primary,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#EEF0FD',
   },
   studentItemDetails: {
     flex: 1,
@@ -911,7 +911,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: RADIUS.full,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
@@ -921,7 +921,7 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
   remarkInput: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: '#CBD5E1',
@@ -942,13 +942,13 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 10,
     borderRadius: RADIUS.md,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   visibilityCardActive: {
     borderColor: COLORS.primary,
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#EEF0FD',
   },
   visibilityTextWrap: {
     flex: 1,

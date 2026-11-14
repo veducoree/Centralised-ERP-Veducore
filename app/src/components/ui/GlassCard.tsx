@@ -25,31 +25,30 @@ export function GlassCard({
         style={cardStyle}
         onPress={onPress}
         activeOpacity={0.75}>
-        <View style={{ padding, width: '100%' }}>{children}</View>
+        <View style={[styles.inner, { padding }]}>{children}</View>
       </TouchableOpacity>
     );
   }
 
   return (
     <View style={cardStyle}>
-      <View style={{ padding, width: '100%' }}>{children}</View>
+      <View style={[styles.inner, { padding }]}>{children}</View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  inner: { width: '100%', borderRadius: RADIUS.lg, overflow: 'hidden' },
+  // Same look as the website's cards: white, 20px radius, soft brand shadow.
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    overflow: 'hidden',
   },
   shadow: {
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowColor: '#5B6EE8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
     elevation: 2,
   },
 });

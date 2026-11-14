@@ -120,7 +120,7 @@ export function Header({
               onPress={onNotificationPress}
               style={styles.iconCircleBtn}
               activeOpacity={0.75}>
-              <Ionicons name="notifications-outline" size={20} color="#0F172A" />
+              <Ionicons name="notifications-outline" size={20} color="#64748B" />
               {notificationCount > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>
@@ -152,49 +152,43 @@ export function Header({
 }
 
 const styles = StyleSheet.create({
+  // Mirrors the website navbar: white bar, hairline #E8EAF3 divider.
   container: {
     paddingHorizontal: SPACING.md,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    borderBottomColor: '#E8EAF3',
     backgroundColor: '#FFFFFF',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
+    shadowColor: '#5B6EE8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 2,
   },
   logoWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+    width: 42,
+    height: 42,
+    borderRadius: 12,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#E8EAF3',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
     overflow: 'hidden',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
   },
   headerLogo: {
     width: 30,
@@ -233,15 +227,18 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   iconCircleBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F1F5F9',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    shadowColor: '#5B6EE8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 2,
   },
   badge: {
     position: 'absolute',
@@ -266,18 +263,18 @@ const styles = StyleSheet.create({
     padding: 1,
   },
   avatarCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#EEF2FF',
-    borderWidth: 1.5,
-    borderColor: '#4F46E5',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#5B6EE8',
+    borderWidth: 0,
+    borderColor: '#5B6EE8',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarInitials: {
     fontSize: 13,
-    fontWeight: '800',
-    color: '#4F46E5',
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

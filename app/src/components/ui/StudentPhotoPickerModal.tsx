@@ -92,7 +92,7 @@ export function StudentPhotoPickerModal({
 
           <View style={styles.actionsWrap}>
             <TouchableOpacity style={styles.actionRow} onPress={handleTakePhoto} activeOpacity={0.7}>
-              <View style={[styles.iconWrap, { backgroundColor: '#EEF2FF' }]}>
+              <View style={[styles.iconWrap, { backgroundColor: '#EEF0FD' }]}>
                 <Ionicons name="camera" size={20} color={COLORS.primary} />
               </View>
               <View style={styles.actionTextWrap}>
@@ -176,7 +176,7 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: RADIUS.md,

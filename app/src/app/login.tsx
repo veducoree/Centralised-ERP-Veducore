@@ -61,7 +61,7 @@ export default function LoginScreen() {
 
       {/* Clean subtle light gradient */}
       <LinearGradient
-        colors={['#FFFFFF', '#F8FAFC', '#F1F5F9']}
+        colors={['#FFFFFF', '#F4F5FB', '#F1F5F9']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -177,7 +177,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
   },
   safeArea: {
     flex: 1,
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   inputField: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
     borderRadius: RADIUS.md,
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
     height: 52,
   },
   inputFieldFocused: {
-    borderColor: '#4F46E5',
+    borderColor: '#5B6EE8',
     backgroundColor: '#FFFFFF',
   },
   inputIcon: {

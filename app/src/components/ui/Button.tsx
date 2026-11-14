@@ -59,7 +59,7 @@ export function Button({
           colors={
             isDisabled
               ? ['#CBD5E1', '#94A3B8']
-              : ['#4F46E5', '#4338CA']
+              : ['#5B6EE8', '#4B5DD8']
           }
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
@@ -189,7 +189,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    shadowColor: '#4F46E5',
+    shadowColor: '#5B6EE8',
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.25,
     shadowRadius: 6,
@@ -231,8 +231,8 @@ const styles = StyleSheet.create({
   },
   outline: {
     borderWidth: 1.5,
-    borderColor: '#4F46E5',
-    backgroundColor: '#EEF2FF',
+    borderColor: '#5B6EE8',
+    backgroundColor: '#EEF0FD',
   },
   ghost: {},
   danger: {

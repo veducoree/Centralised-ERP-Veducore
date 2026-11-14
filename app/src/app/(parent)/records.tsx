@@ -170,8 +170,8 @@ export default function ParentRecords() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor="#4F46E5"
-              colors={['#4F46E5']}
+              tintColor="#5B6EE8"
+              colors={['#5B6EE8']}
             />
           }>
 
@@ -230,7 +230,7 @@ export default function ParentRecords() {
               </View>
               <View style={styles.summaryDivider} />
               <View style={styles.summaryItem}>
-                <Text style={[styles.summaryVal, { color: '#4F46E5' }]}>
+                <Text style={[styles.summaryVal, { color: '#5B6EE8' }]}>
                   {summaryStats.highestGrade}
                 </Text>
                 <Text style={styles.summaryLabel}>Top Grade</Text>
@@ -320,7 +320,7 @@ export default function ParentRecords() {
                     {/* Teacher Comment */}
                     {rec.teacher_comment ? (
                       <View style={styles.commentBox}>
-                        <Ionicons name="chatbubble-ellipses-outline" size={14} color="#4F46E5" style={{ marginRight: 6 }} />
+                        <Ionicons name="chatbubble-ellipses-outline" size={14} color="#5B6EE8" style={{ marginRight: 6 }} />
                         <Text style={styles.commentText}>"{rec.teacher_comment}"</Text>
                       </View>
                     ) : null}
@@ -338,8 +338,8 @@ export default function ParentRecords() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
-  centerContainer: { flex: 1, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: '#F4F5FB' },
+  centerContainer: { flex: 1, backgroundColor: '#F4F5FB', alignItems: 'center', justifyContent: 'center' },
   loadingArea: { paddingVertical: 40, alignItems: 'center', gap: 8 },
   loadingText: { color: '#64748B', fontSize: 13 },
   content: { flex: 1, backgroundColor: 'transparent' },
@@ -363,27 +363,27 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   childChipActive: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#4F46E5',
+    backgroundColor: '#EEF0FD',
+    borderColor: '#5B6EE8',
   },
   childChipName: { fontSize: 13, fontWeight: '700', color: '#64748B' },
-  childChipNameActive: { color: '#4F46E5' },
+  childChipNameActive: { color: '#5B6EE8' },
   childChipSub: { fontSize: 11, color: '#94A3B8', marginTop: 1 },
-  childChipSubActive: { color: '#4338CA' },
+  childChipSubActive: { color: '#4B5DD8' },
 
   singleChildBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#EEF0FD',
     borderRadius: RADIUS.md,
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginBottom: SPACING.sm,
     borderWidth: 1,
-    borderColor: '#E0E7FF',
+    borderColor: '#DFE3FC',
   },
-  singleChildDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#4F46E5', marginRight: 8 },
-  singleChildText: { fontSize: 12, fontWeight: '600', color: '#3730A3' },
+  singleChildDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#5B6EE8', marginRight: 8 },
+  singleChildText: { fontSize: 12, fontWeight: '600', color: '#3B4DC8' },
 
   summaryCard: {
     backgroundColor: '#FFFFFF',
@@ -419,8 +419,8 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   filterPillActive: {
-    backgroundColor: '#4F46E5',
-    borderColor: '#4F46E5',
+    backgroundColor: '#5B6EE8',
+    borderColor: '#5B6EE8',
   },
   filterPillText: { fontSize: 12, fontWeight: '600', color: '#64748B' },
   filterPillTextActive: { color: '#FFFFFF', fontWeight: '700' },
@@ -470,7 +470,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#F1F5F9',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     padding: 8,
     borderRadius: 8,
   },

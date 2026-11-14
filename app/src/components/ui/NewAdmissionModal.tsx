@@ -514,8 +514,8 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
   },
   genderChipActiveMale: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#C7D2FE',
+    backgroundColor: '#EEF0FD',
+    borderColor: '#C7CDFB',
   },
   genderChipActiveFemale: {
     backgroundColor: '#FDF2F8',

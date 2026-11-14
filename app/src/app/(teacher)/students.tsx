@@ -324,7 +324,7 @@ export default function TeacherStudents() {
               onPress={handleOpenAddStudent}
               activeOpacity={0.8}
             >
-              <View style={[styles.actionIconCircle, { backgroundColor: '#EEF2FF' }]}>
+              <View style={[styles.actionIconCircle, { backgroundColor: '#EEF0FD' }]}>
                 <Ionicons name="person-add" size={16} color={COLORS.primary} />
               </View>
               <Text style={[styles.actionCardTitle, { color: canPerformInchargeActions ? COLORS.primary : COLORS.textMuted }]} numberOfLines={1}>Add Student</Text>
@@ -611,7 +611,7 @@ const styles = StyleSheet.create({
   },
   actionCardPrimary: {
     backgroundColor: COLORS.surface,
-    borderColor: '#C7D2FE',
+    borderColor: '#C7CDFB',
   },
   actionCardSecondary: {
     backgroundColor: COLORS.surface,
@@ -731,7 +731,7 @@ const styles = StyleSheet.create({
 
   actionCardDisabled: {
     opacity: 0.65,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderColor: COLORS.borderLight,
   },
   actionLockBadge: {

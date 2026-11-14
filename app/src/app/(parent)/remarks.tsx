@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
     ...SHADOW.sm,
   },
   childChipActive: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: '#EEF0FD',
     borderColor: COLORS.primary,
   },
   childChipName: { fontSize: 13, fontWeight: '700', color: COLORS.text },

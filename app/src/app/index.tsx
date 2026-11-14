@@ -28,7 +28,7 @@ export default function Index() {
     <View style={styles.root}>
       <StatusBar style="dark" />
       <LinearGradient
-        colors={['#FFFFFF', '#F8FAFC', '#F1F5F9']}
+        colors={['#FFFFFF', '#F4F5FB', '#F1F5F9']}
         style={StyleSheet.absoluteFill}
       />
       <VeducoreLoader size="lg" />

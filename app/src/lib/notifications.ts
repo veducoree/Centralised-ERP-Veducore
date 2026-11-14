@@ -48,7 +48,7 @@ export async function setupNotifications(): Promise<boolean> {
         name: 'School updates',
         importance: mod.AndroidImportance.DEFAULT,
         sound: 'default',
-        lightColor: '#6366F1',
+        lightColor: '#7B8CF7',
       });
       await mod.setNotificationChannelAsync('important', {
         name: 'Important & urgent alerts',

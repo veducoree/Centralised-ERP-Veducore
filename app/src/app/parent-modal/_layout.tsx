@@ -8,7 +8,7 @@ export default function ParentModalLayout() {
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: '#F8FAFC' },
+          contentStyle: { backgroundColor: '#F4F5FB' },
           animation: 'slide_from_right',
         }}
       />

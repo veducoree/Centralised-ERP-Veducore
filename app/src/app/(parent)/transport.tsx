@@ -190,8 +190,8 @@ export default function ParentTransport() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor="#4F46E5"
-            colors={['#4F46E5']}
+            tintColor="#5B6EE8"
+            colors={['#5B6EE8']}
           />
         }
       >
@@ -304,7 +304,7 @@ export default function ParentTransport() {
 
                 <View style={styles.assignedMetaGrid}>
                   <View style={styles.assignedMetaItem}>
-                    <Ionicons name="bus-outline" size={15} color="#4F46E5" />
+                    <Ionicons name="bus-outline" size={15} color="#5B6EE8" />
                     <Text style={styles.assignedMetaText}>
                       {childAssignment.bus_number || 'School Bus'}
                       {childAssignment.route_name ? ` · Route: ${childAssignment.route_name}` : ''}
@@ -485,7 +485,7 @@ export default function ParentTransport() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: '#F4F5FB' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.md, paddingTop: SPACING.sm },
 
@@ -506,11 +506,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  childChipActive: { backgroundColor: '#EEF2FF', borderColor: '#4F46E5' },
+  childChipActive: { backgroundColor: '#EEF0FD', borderColor: '#5B6EE8' },
   childChipName: { fontSize: 13, fontWeight: '700', color: '#64748B' },
-  childChipNameActive: { color: '#4F46E5' },
+  childChipNameActive: { color: '#5B6EE8' },
   childChipSub: { fontSize: 11, color: '#94A3B8', marginTop: 1 },
-  childChipSubActive: { color: '#4338CA' },
+  childChipSubActive: { color: '#4B5DD8' },
 
   assignedCard: {
     backgroundColor: '#FFFFFF',
@@ -562,7 +562,7 @@ const styles = StyleSheet.create({
   },
   inactiveBadgeText: { fontSize: 10, fontWeight: '600', color: '#64748B' },
   assignedBody: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderRadius: RADIUS.md,
     padding: 12,
     borderWidth: 1,
@@ -626,7 +626,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: RADIUS.full,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
@@ -648,7 +648,7 @@ const styles = StyleSheet.create({
   stopOptionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderRadius: RADIUS.md,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
@@ -719,7 +719,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderWidth: 1,
     borderColor: '#DBEAFE',
     borderRadius: RADIUS.md,

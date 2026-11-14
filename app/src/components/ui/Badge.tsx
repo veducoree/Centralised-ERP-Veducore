@@ -25,7 +25,7 @@ const BADGE_COLORS: Record<BadgeVariant, { bg: string; border: string; text: str
   overdue:  { bg: '#FEF2F2', border: '#FECACA', text: '#991B1B' },
   active:   { bg: '#ECFDF5', border: '#A7F3D0', text: '#065F46' },
   inactive: { bg: '#F1F5F9', border: '#E2E8F0', text: '#475569' },
-  info:     { bg: '#EEF2FF', border: '#C7D2FE', text: '#3730A3' },
+  info:     { bg: '#EEF0FD', border: '#C7CDFB', text: '#3B4DC8' },
   warning:  { bg: '#FFFBEB', border: '#FDE68A', text: '#92400E' },
   error:    { bg: '#FEF2F2', border: '#FECACA', text: '#991B1B' },
   success:  { bg: '#ECFDF5', border: '#A7F3D0', text: '#065F46' },

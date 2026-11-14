@@ -86,7 +86,7 @@ export default function ParentLayout() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  container: { flex: 1, backgroundColor: '#F4F5FB' },
   screen: { flex: 1 },
   activePane: { flex: 1, display: 'flex' },
   hiddenPane: { flex: 1, display: 'none' },

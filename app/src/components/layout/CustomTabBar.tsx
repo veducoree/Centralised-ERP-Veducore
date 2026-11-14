@@ -7,7 +7,6 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { GLASS } from '@/lib/utils';
 
 export interface TabItem {
   name: string;
@@ -24,11 +23,10 @@ interface CustomTabBarProps {
 
 export function CustomTabBar({ tabs, activeTab, onTabPress }: CustomTabBarProps) {
   const insets = useSafeAreaInsets();
-  // Proper bottom padding: use safe area inset (iPhone home bar) or minimum 10px
   const bottomPad = insets.bottom > 0 ? insets.bottom : 10;
 
   return (
-    <View style={[styles.container, { paddingBottom: bottomPad }]}>
+    <View style={[styles.container, { paddingBottom: bottomPad }]} accessibilityRole="tablist">
       {tabs.map((tab) => {
         const focused = activeTab === tab.name;
         return (
@@ -36,12 +34,16 @@ export function CustomTabBar({ tabs, activeTab, onTabPress }: CustomTabBarProps)
             key={tab.name}
             style={styles.tab}
             onPress={() => onTabPress(tab.name)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: focused }}
+            accessibilityLabel={tab.label}
             activeOpacity={0.72}>
-            <View style={styles.iconWrap}>
+            {/* Same active treatment as the website sidebar: tinted pill + brand colour */}
+            <View style={[styles.pill, focused && styles.pillFocused]}>
               <Ionicons
                 name={focused ? tab.iconFocused : tab.icon}
-                size={23}
-                color={focused ? '#4F46E5' : '#94A3B8'}
+                size={22}
+                color={focused ? '#5B6EE8' : '#94A3B8'}
               />
             </View>
             <Text
@@ -50,9 +52,6 @@ export function CustomTabBar({ tabs, activeTab, onTabPress }: CustomTabBarProps)
               ellipsizeMode="tail">
               {tab.label}
             </Text>
-            <View style={styles.dotWrap}>
-              <View style={[styles.dot, focused && styles.dotFocused]} />
-            </View>
           </TouchableOpacity>
         );
       })}
@@ -64,52 +63,41 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     backgroundColor: '#FFFFFF',
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
     paddingTop: 8,
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 6,
+    paddingHorizontal: 6,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    shadowColor: '#5B6EE8',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 12,
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 2,
-    position: 'relative',
   },
-  iconWrap: {
-    height: 28,
+  pill: {
+    width: 52,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 2,
+    marginBottom: 3,
+  },
+  pillFocused: {
+    backgroundColor: '#EEF0FD',
   },
   label: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
     color: '#94A3B8',
-    letterSpacing: 0.2,
     textAlign: 'center',
   },
   labelFocused: {
-    color: '#4F46E5',
+    color: '#5B6EE8',
     fontWeight: '700',
-  },
-  dotWrap: {
-    height: 5,
-    marginTop: 3,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'transparent',
-  },
-  dotFocused: {
-    backgroundColor: '#4F46E5',
   },
 });

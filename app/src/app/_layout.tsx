@@ -39,7 +39,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (Platform.OS === 'android') {
       (RNStatusBar as any).setTranslucent?.(true);
-      (RNStatusBar as any).setBackgroundColor?.('#F8FAFC', false);
+      (RNStatusBar as any).setBackgroundColor?.('#F4F5FB', false);
       RNStatusBar.setBarStyle('dark-content', false);
     }
     // Initialize notification channels and request device permissions
@@ -47,14 +47,14 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <SafeAreaProvider style={{ flex: 1, backgroundColor: '#F8FAFC' }}>
+    <SafeAreaProvider style={{ flex: 1, backgroundColor: '#F4F5FB' }}>
       <AuthProvider>
         <PushBridge />
         <StatusBar style="dark" />
         <Stack
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: '#F8FAFC' },
+            contentStyle: { backgroundColor: '#F4F5FB' },
             animation: 'fade',
           }}>
           <Stack.Screen name="index" />

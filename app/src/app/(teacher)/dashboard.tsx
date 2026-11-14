@@ -1,926 +1,350 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-} from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { View, Text, ScrollView, RefreshControl, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
 import {
-  fetchSchool,
-  fetchTeacherByUserId,
-  fetchTeacherAssignments,
-  fetchRemarks,
-  fetchNotifications,
-  fetchStudents,
+  fetchTeacherByUserId, fetchTeacherAssignments, fetchTeacherScheduleByTeacher, fetchSubstitutions,
+  fetchMyNotifications, fetchMyAttendanceSections, fetchStudentsBySection, fetchAttendance,
+  fetchMyStaffAttendance, markMyAttendance, type StaffAttendanceRow,
 } from '@/services/api';
-import { COLORS, SPACING, RADIUS, SHADOW, formatDate } from '@/lib/utils';
+import { COLORS, SPACING, RADIUS } from '@/lib/utils';
+import { toISODate } from '@/lib/timetable';
 import { GlassCard } from '@/components/ui/GlassCard';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { Badge } from '@/components/ui/Badge';
 import { MobileDashboardSkeleton } from '@/components/ui/Skeleton';
 import { Header } from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useTabNavigation } from '@/context/TabNavigationContext';
-import type {
-  School,
-  Teacher,
-  ClassAssignment,
-  Remark,
-  Notification,
-} from '@/types';
+import type { Teacher, TeacherSchedule, TimetableSubstitution, Notification } from '@/types';
 
-interface AssignmentItem extends ClassAssignment {
-  className?: string;
-  sectionName?: string;
-  subjectName?: string;
-  studentCount?: number;
-}
-
-interface RemarkItem extends Remark {
-  studentName?: string;
-}
-
-function getGreeting(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 17) return 'Good afternoon';
-  return 'Good evening';
-}
-
-const REMARK_CATEGORY_STYLES: Record<string, { bg: string; color: string; border: string }> = {
-  academic: { bg: '#F0F9FF', color: '#0369A1', border: '#BAE6FD' },
-  behaviour: { bg: '#FFFBEB', color: '#B45309', border: '#FDE68A' },
-  attendance: { bg: '#FEF2F2', color: '#B91C1C', border: '#FECACA' },
-  performance: { bg: '#ECFDF5', color: '#047857', border: '#A7F3D0' },
-  general: { bg: '#F5F3FF', color: '#6D28D9', border: '#DDD6FE' },
+const hhmm = (t: string | null | undefined) => (t ?? '').slice(0, 5);
+const time12 = (t: string | null | undefined) => {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
 };
+function greeting() {
+  const h = new Date().getHours();
+  return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+}
 
-const CYCLE_DAYS = [
-  { day: 1, label: 'Mon', code: 'Day 1' },
-  { day: 2, label: 'Tue', code: 'Day 2' },
-  { day: 3, label: 'Wed', code: 'Day 3' },
-  { day: 4, label: 'Thu', code: 'Day 4' },
-  { day: 5, label: 'Fri', code: 'Day 5' },
-  { day: 6, label: 'Sat', code: 'Day 6' },
-  { day: 0, label: 'Sun', code: 'Holiday' },
-];
+interface ClassStatus { sectionId: string; label: string; students: number; marked: number }
 
 export default function TeacherDashboard() {
-  const { user, profile, school: authSchool, refreshProfile } = useAuth();
+  const { user, profile, school, refreshProfile } = useAuth();
   const { setActiveTab } = useTabNavigation();
   const router = useRouter();
+  const today = toISODate(new Date());
+  const weekday = new Date().getDay();
 
   const [teacher, setTeacher] = useState<Teacher | null>(null);
-  const [school, setSchool] = useState<School | null>(authSchool);
-  const [assignments, setAssignments] = useState<AssignmentItem[]>([]);
-  const [recentRemarks, setRecentRemarks] = useState<RemarkItem[]>([]);
-  const [announcements, setAnnouncements] = useState<Notification[]>([]);
-  const [studentCount, setStudentCount] = useState(0);
-  const [unreadNotifs, setUnreadNotifs] = useState(0);
-  const [remarksTotal, setRemarksTotal] = useState(0);
+  const [slots, setSlots] = useState<TeacherSchedule[]>([]);
+  const [duties, setDuties] = useState<TimetableSubstitution[]>([]);
+  const [notices, setNotices] = useState<Notification[]>([]);
+  const [unread, setUnread] = useState(0);
+  const [classCount, setClassCount] = useState(0);
+  const [myClass, setMyClass] = useState<ClassStatus | null>(null);
+  const [me, setMe] = useState<StaffAttendanceRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [marking, setMarking] = useState(false);
 
-  useEffect(() => {
-    if (authSchool) {
-      setSchool(authSchool);
-    }
-  }, [authSchool]);
-
-  // Day Order & Working Day calculation
-  const today = new Date();
-  const dayOfWeekIndex = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-  const isSunday = dayOfWeekIndex === 0;
-  const isHoliday = isSunday;
-  const dayOrderNumber = isHoliday ? null : dayOfWeekIndex; // Day 1 to Day 6
-  const weekDayName = today.toLocaleDateString('en-US', { weekday: 'long' });
-  const fullDateFormatted = today.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-
-  const loadData = useCallback(async (forceRefresh = false) => {
+  const load = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const foundTeacher = await fetchTeacherByUserId(user.id, user.email || profile?.email);
-      const schoolIdToFetch = foundTeacher?.school_id || profile?.school_id;
-      if (!foundTeacher) {
-        if (schoolIdToFetch) {
-          const fallbackSchool = await fetchSchool(schoolIdToFetch, forceRefresh).catch(() => null);
-          if (fallbackSchool) setSchool(fallbackSchool);
-        }
-        return;
-      }
-      setTeacher(foundTeacher);
-
-      const [classAssignments, remarks, notifications, students, fetchedSchool] = await Promise.all([
-        fetchTeacherAssignments(foundTeacher.id),
-        fetchRemarks({ teacherId: foundTeacher.id }),
-        fetchNotifications(user.id, foundTeacher.school_id),
-        fetchStudents(foundTeacher.school_id),
-        fetchSchool(foundTeacher.school_id, forceRefresh).catch(() => null),
+      const t = await fetchTeacherByUserId(user.id, user.email || profile?.email);
+      if (!t) return;
+      setTeacher(t);
+      const [assignments, schedule, subs, notifs, mySections, myRows] = await Promise.all([
+        fetchTeacherAssignments(t.id),
+        fetchTeacherScheduleByTeacher(t.id).catch(() => [] as TeacherSchedule[]),
+        fetchSubstitutions({ substituteTeacherId: t.id, from: today, to: today }).catch(() => [] as TimetableSubstitution[]),
+        fetchMyNotifications(30).catch(() => [] as Notification[]),
+        fetchMyAttendanceSections().catch(() => []),
+        fetchMyStaffAttendance(t.id, today, today).catch(() => [] as StaffAttendanceRow[]),
       ]);
+      setClassCount(new Set(assignments.map(a => a.section_id)).size);
+      setSlots(schedule.filter(s => s.day_of_week === weekday).sort((a, b) => a.start_time.localeCompare(b.start_time)));
+      setDuties(subs);
+      setNotices(notifs.slice(0, 3));
+      setUnread(notifs.filter(n => !n.is_read).length);
+      setMe(myRows[0] ?? null);
 
-      if (fetchedSchool) {
-        setSchool(fetchedSchool);
+      const own = mySections.find(s => s.is_class_teacher) ?? null;
+      if (own) {
+        const [students, att] = await Promise.all([
+          fetchStudentsBySection(own.section_id).catch(() => []),
+          fetchAttendance({ sectionId: own.section_id, date: today }).catch(() => []),
+        ]);
+        setMyClass({ sectionId: own.section_id, label: own.label, students: students.length, marked: att.length });
+      } else {
+        setMyClass(null);
       }
-
-      // Assignments with details
-      const assignmentItems: AssignmentItem[] = classAssignments.map(ca => ({
-        ...ca,
-        className: (ca as any).class?.name ?? '',
-        sectionName: (ca as any).section?.name ?? '',
-        subjectName: (ca as any).subject?.name ?? 'General',
-        studentCount: students.filter(st => st.section_id === ca.section_id).length,
-      }));
-      setAssignments(assignmentItems);
-
-      const sectionIds = [...new Set(classAssignments.map(ca => ca.section_id))];
-      setStudentCount(students.filter(st => sectionIds.includes(st.section_id)).length);
-
-      // Remarks
-      const sortedRemarks = [...remarks].sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      );
-      setRemarksTotal(remarks.length);
-      const remarkItems: RemarkItem[] = sortedRemarks.slice(0, 4).map(r => ({
-        ...r,
-        studentName: (r as any).student?.full_name ?? 'Student',
-      }));
-      setRecentRemarks(remarkItems);
-
-      // Announcements / Notifications
-      setAnnouncements(notifications.slice(0, 3));
-      setUnreadNotifs(notifications.filter(n => !n.is_read).length);
     } catch (err) {
       console.error('Teacher dashboard load error', err);
     }
-  }, [user?.id, user?.email, profile?.email, profile?.school_id]);
+  }, [user?.id, user?.email, profile?.email, today, weekday]);
 
-  useEffect(() => {
-    loadData().finally(() => setLoading(false));
-  }, [loadData]);
+  useEffect(() => { load().finally(() => setLoading(false)); }, [load]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([loadData(true), refreshProfile()]);
+    await Promise.all([load(), refreshProfile()]);
     setRefreshing(false);
-  }, [loadData, refreshProfile]);
+  }, [load, refreshProfile]);
 
-  const inchargeAssignment = useMemo(() => {
-    return assignments.find(
-      a => a.is_class_teacher || a.subject_id === null || !(a as any).subject_id
-    );
-  }, [assignments]);
+  const markPresent = async () => {
+    setMarking(true);
+    try {
+      const r = await markMyAttendance(false);
+      setMe(r);
+    } catch (e) {
+      Alert.alert('Could not mark', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setMarking(false);
+    }
+  };
 
-  const activeSchool = school || authSchool;
-  const headerSchoolName = activeSchool?.name || '';
-  const headerLogoUrl = activeSchool?.logo_url ?? null;
+  const now = hhmm(new Date().toTimeString());
+  const nowSlotId = useMemo(() => slots.find(s => hhmm(s.start_time) <= now && now < hhmm(s.end_time))?.id, [slots, now]);
+
+  const header = (
+    <Header
+      title={school?.name || ''}
+      logoUrl={school?.logo_url ?? null}
+      showNotificationBell
+      notificationCount={unread}
+      onNotificationPress={() => router.push('/teacher-modal/notifications' as never)}
+      showProfile
+      onProfilePress={() => router.push('/teacher-modal/profile' as never)}
+    />
+  );
 
   if (loading) {
     return (
       <View style={styles.container}>
         <StatusBar style="dark" />
-        <View style={styles.content}>
-          <Header
-            title={headerSchoolName}
-            logoUrl={headerLogoUrl}
-            showNotificationBell
-            notificationCount={unreadNotifs}
-            onNotificationPress={() => router.push('/teacher-modal/notifications' as never)}
-            showProfile
-            onProfilePress={() => router.push('/teacher-modal/profile' as never)}
-          />
-          <MobileDashboardSkeleton />
-        </View>
+        {header}
+        <MobileDashboardSkeleton />
       </View>
     );
   }
 
-  const teacherName = teacher?.full_name ?? (user as any)?.user_metadata?.full_name ?? 'Teacher';
+  const firstName = (teacher?.full_name || profile?.full_name || '').split(' ')[0];
+  const quick = [
+    { label: 'Attendance', icon: 'checkbox' as const, tint: '#22C08A', bg: '#E6F8F1', onPress: () => setActiveTab('attendance') },
+    { label: 'Marks', icon: 'stats-chart' as const, tint: '#5B6EE8', bg: '#EEF0FD', onPress: () => setActiveTab('marks') },
+    { label: 'Remarks', icon: 'chatbubble-ellipses' as const, tint: '#F59E0B', bg: '#FEF3E0', onPress: () => router.push('/teacher-modal/remarks' as never) },
+    { label: 'Leave', icon: 'airplane' as const, tint: '#EC4899', bg: '#FDE7F3', onPress: () => router.push('/teacher-modal/my-attendance' as never) },
+  ];
 
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
-      <View style={styles.content}>
-        <Header
-          title={headerSchoolName}
-          logoUrl={headerLogoUrl}
-          showNotificationBell
-          notificationCount={unreadNotifs}
-          onNotificationPress={() => router.push('/teacher-modal/notifications' as never)}
-          showProfile
-          onProfilePress={() => router.push('/teacher-modal/profile' as never)}
-        />
+      {header}
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />}>
 
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={COLORS.primary}
-              colors={[COLORS.primary]}
-            />
-          }>
+        {/* Greeting */}
+        <View style={styles.hero}>
+          <Text style={styles.heroDate}>{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</Text>
+          <Text style={styles.heroTitle}>{greeting()}{firstName ? `, ${firstName}` : ''}</Text>
+          <View style={styles.heroChips}>
+            <View style={styles.heroChip}><Ionicons name="book" size={13} color="#FFFFFF" /><Text style={styles.heroChipText}>{classCount} classes</Text></View>
+            <View style={styles.heroChip}><Ionicons name="time" size={13} color="#FFFFFF" /><Text style={styles.heroChipText}>{slots.length + duties.length} periods today</Text></View>
+          </View>
+        </View>
 
-          {/* Hero Welcome Banner */}
-          <GlassCard style={styles.welcomeCard} padding={SPACING.md}>
-            <View style={styles.welcomeRow}>
-              <View style={styles.welcomeTextBlock}>
-                <Text style={styles.welcomeGreeting}>{getGreeting()},</Text>
-                <Text style={styles.welcomeName}>{teacherName} 👋</Text>
-                <Text style={styles.welcomeSub}>
-                  {weekDayName} · {fullDateFormatted}
-                </Text>
-              </View>
-              <View style={styles.welcomeIconCircle}>
-                <Ionicons name="school-outline" size={26} color={COLORS.primary} />
-              </View>
+        {/* My attendance */}
+        <GlassCard padding={SPACING.md} style={styles.card}>
+          <View style={styles.rowCenter}>
+            <View style={[styles.iconTile, { backgroundColor: me ? '#E6F8F1' : '#FEF3E0' }]}>
+              <Ionicons name={me ? 'checkmark-circle' : 'finger-print'} size={22} color={me ? '#22C08A' : '#F59E0B'} />
             </View>
-
-            <View style={styles.welcomeDivider} />
-
-            {/* 3 Main Stat Metrics */}
-            <View style={styles.welcomeStatsRow}>
-              <View style={styles.welcomeStat}>
-                <Text style={styles.welcomeStatVal}>{studentCount}</Text>
-                <Text style={styles.welcomeStatLabel}>Assigned Students</Text>
-              </View>
-              <View style={styles.welcomeStatDivider} />
-              <View style={styles.welcomeStat}>
-                <Text style={[styles.welcomeStatVal, { color: COLORS.primary }]}>{assignments.length}</Text>
-                <Text style={styles.welcomeStatLabel}>Assigned Classes</Text>
-              </View>
-              <View style={styles.welcomeStatDivider} />
-              <View style={styles.welcomeStat}>
-                <Text style={styles.welcomeStatVal}>{remarksTotal}</Text>
-                <Text style={styles.welcomeStatLabel}>My Remarks</Text>
-              </View>
-            </View>
-          </GlassCard>
-
-          {/* Day Order & Working / Holiday Status Card */}
-          <GlassCard style={styles.dayOrderCard} padding={SPACING.md}>
-            <View style={styles.dayOrderHeader}>
-              <View style={styles.dayOrderInfoBlock}>
-                <View style={styles.statusPillsRow}>
-                  <View style={[
-                    styles.workingBadge,
-                    isHoliday ? styles.holidayBadge : styles.workingDayBadge,
-                  ]}>
-                    <View style={[
-                      styles.statusDot,
-                      isHoliday ? styles.holidayDot : styles.workingDayDot,
-                    ]} />
-                    <Text style={[
-                      styles.workingBadgeText,
-                      isHoliday ? styles.holidayBadgeText : styles.workingDayBadgeText,
-                    ]}>
-                      {isHoliday ? 'Holiday / Off' : 'Working Day'}
-                    </Text>
-                  </View>
-
-                  <View style={styles.timingPill}>
-                    <Ionicons name="time-outline" size={12} color="#64748B" />
-                    <Text style={styles.timingPillText}>08:00 AM – 02:30 PM</Text>
-                  </View>
-                </View>
-
-                <Text style={styles.dayOrderTitle}>
-                  {isHoliday ? 'Weekly Off · Holiday' : `Day Order: Day ${dayOrderNumber}`}
-                </Text>
-                <Text style={styles.dayOrderDesc}>
-                  {isHoliday
-                    ? 'No scheduled classes today. Staff prep & planning day.'
-                    : `Academic timetable operating on Day ${dayOrderNumber} schedule.`}
-                </Text>
-              </View>
-
-              <View style={[styles.dayOrderPillBadge, isHoliday && styles.dayOrderPillHoliday]}>
-                <Text style={[styles.dayOrderPillNum, isHoliday && styles.dayOrderPillHolidayNum]}>
-                  {isHoliday ? 'OFF' : `D${dayOrderNumber}`}
-                </Text>
-                <Text style={styles.dayOrderPillSub}>
-                  {isHoliday ? 'Sunday' : 'Cycle'}
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.timetableLink}
-              onPress={() => router.push('/teacher-modal/schedule' as never)}
-              activeOpacity={0.8}>
-              <Ionicons name="calendar-outline" size={16} color={COLORS.primary} />
-              <Text style={styles.timetableLinkText}>My Timetable & Substitution Duties</Text>
-              <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.timetableLink}
-              onPress={() => router.push('/teacher-modal/my-attendance' as never)}
-              activeOpacity={0.8}>
-              <Ionicons name="finger-print-outline" size={16} color={COLORS.primary} />
-              <Text style={styles.timetableLinkText}>My Attendance & Leave</Text>
-              <Ionicons name="chevron-forward" size={16} color={COLORS.primary} />
-            </TouchableOpacity>
-
-            {/* 7-Day Cycle Strip */}
-            <View style={styles.cycleStrip}>
-              {CYCLE_DAYS.map(item => {
-                const isCurrent = item.day === dayOfWeekIndex;
-                const isItemSun = item.day === 0;
-
-                return (
-                  <View
-                    key={item.label}
-                    style={[
-                      styles.cycleDayItem,
-                      isCurrent && (isItemSun ? styles.cycleDayActiveHoliday : styles.cycleDayActive),
-                    ]}>
-                    <Text
-                      style={[
-                        styles.cycleDayName,
-                        isCurrent && (isItemSun ? styles.cycleDayActiveText : styles.cycleDayActiveText),
-                      ]}>
-                      {item.label}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.cycleDayCode,
-                        isCurrent && (isItemSun ? styles.cycleDayActiveSub : styles.cycleDayActiveSub),
-                      ]}>
-                      {item.code}
-                    </Text>
-                  </View>
-                );
-              })}
-            </View>
-          </GlassCard>
-
-          {/* Daily Attendance Priority Action Card */}
-          <GlassCard style={styles.attendanceActionCard} padding={SPACING.md}>
-            <View style={styles.attendanceActionRow}>
-              <View style={styles.attendanceIconBox}>
-                <Ionicons name="checkmark-done-circle" size={26} color="#059669" />
-              </View>
-              <View style={styles.attendanceActionText}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={styles.attendanceActionTitle}>Daily Attendance</Text>
-                  {inchargeAssignment && (
-                    <Badge variant="success" label="Incharge" size="sm" />
-                  )}
-                </View>
-                <Text style={styles.attendanceActionSub}>
-                  {inchargeAssignment
-                    ? `Class Incharge for ${inchargeAssignment.className} – ${inchargeAssignment.sectionName}`
-                    : `Record attendance roll-call for assigned classes`}
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.markAttendanceBtn}
-              onPress={() => setActiveTab('attendance')}
-              activeOpacity={0.82}>
-              <Ionicons name="checkbox-outline" size={18} color="#FFFFFF" />
-              <Text style={styles.markAttendanceBtnText}>
-                {inchargeAssignment ? 'Mark Incharge Attendance ›' : 'Take Attendance ›'}
+            <View style={styles.flex1}>
+              <Text style={styles.cardLabel}>My attendance</Text>
+              <Text style={styles.cardValue}>
+                {me ? `${me.status === 'late' ? 'Late' : me.status === 'leave' ? 'On leave' : me.status === 'half_day' ? 'Half day' : 'Present'}${me.check_in ? ` · ${time12(me.check_in)}` : ''}` : 'Not marked yet'}
               </Text>
-            </TouchableOpacity>
-          </GlassCard>
+            </View>
+            {!me ? (
+              <TouchableOpacity style={styles.primaryBtn} onPress={markPresent} disabled={marking} activeOpacity={0.85}>
+                {marking ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnText}>Mark present</Text>}
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity onPress={() => router.push('/teacher-modal/my-attendance' as never)} hitSlop={8}>
+                <Ionicons name="chevron-forward" size={20} color={COLORS.textLight} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </GlassCard>
 
-          {/* My Assigned Classes */}
-          <View style={styles.sectionHeader}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.sectionTitle}>My Assigned Classes</Text>
-              <View style={styles.countPill}>
-                <Text style={styles.countPillText}>{assignments.length}</Text>
+        {/* Class teacher */}
+        {myClass && (
+          <GlassCard padding={SPACING.md} style={styles.card} onPress={() => setActiveTab('attendance')}>
+            <View style={styles.rowCenter}>
+              <View style={[styles.iconTile, { backgroundColor: '#EEF0FD' }]}>
+                <Ionicons name="people" size={20} color="#5B6EE8" />
+              </View>
+              <View style={styles.flex1}>
+                <Text style={styles.cardLabel}>Class teacher · {myClass.label}</Text>
+                <Text style={styles.cardValue}>
+                  {myClass.marked === 0 ? "Today's attendance not taken" : myClass.marked < myClass.students ? `${myClass.marked}/${myClass.students} marked` : 'Attendance done'}
+                </Text>
+              </View>
+              <View style={[styles.statusPill, { backgroundColor: myClass.marked >= myClass.students && myClass.students > 0 ? '#E6F8F1' : '#FEF3E0' }]}>
+                <Text style={[styles.statusPillText, { color: myClass.marked >= myClass.students && myClass.students > 0 ? '#15803D' : '#B45309' }]}>
+                  {myClass.marked >= myClass.students && myClass.students > 0 ? 'Done' : 'Take now'}
+                </Text>
               </View>
             </View>
-            <TouchableOpacity onPress={() => setActiveTab('my-classes')}>
-              <Text style={styles.viewAllLink}>View All ›</Text>
-            </TouchableOpacity>
-          </View>
+          </GlassCard>
+        )}
 
-          {assignments.length === 0 ? (
-            <GlassCard style={styles.emptyCard} padding={SPACING.md}>
-              <EmptyState icon="book-outline" title="No classes assigned" />
-            </GlassCard>
-          ) : (
-            <GlassCard padding={0} style={styles.assignCard}>
-              {assignments.map((item, index) => (
-                <TouchableOpacity
-                  key={item.id}
-                  onPress={() => setActiveTab('my-classes')}
-                  activeOpacity={0.75}
-                  style={[
-                    styles.assignItem,
-                    index < assignments.length - 1 && styles.divider,
-                  ]}>
-                  <View style={styles.assignIconCircle}>
-                    <Ionicons name="book-outline" size={18} color={COLORS.primary} />
-                  </View>
-                  <View style={styles.assignDetails}>
-                    <Text style={styles.assignClass}>
-                      {item.className} – Section {item.sectionName}
-                    </Text>
-                    <Text style={styles.assignSub}>{item.subjectName}</Text>
-                  </View>
-                  <View style={styles.assignCount}>
-                    <Ionicons name="people-outline" size={14} color={COLORS.textMuted} />
-                    <Text style={styles.assignCountText}>{item.studentCount} students</Text>
-                  </View>
-                  {item.is_class_teacher && (
-                    <Badge variant="success" label="Incharge" size="sm" />
-                  )}
-                  <Ionicons name="chevron-forward" size={16} color={COLORS.textLight} />
-                </TouchableOpacity>
-              ))}
-            </GlassCard>
-          )}
-
-          {/* Exam Marks & Student Record Direct Actions */}
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Examinations & Records</Text>
-          </View>
-          <View style={styles.dualActionsRow}>
-            <TouchableOpacity
-              style={styles.dualActionCard}
-              onPress={() => setActiveTab('marks')}
-              activeOpacity={0.8}>
-              <View style={[styles.dualActionIcon, { backgroundColor: '#EEF2FF' }]}>
-                <Ionicons name="stats-chart" size={20} color="#4F46E5" />
+        {/* Quick actions */}
+        <View style={styles.quickGrid}>
+          {quick.map(q => (
+            <TouchableOpacity key={q.label} style={styles.quickItem} onPress={q.onPress} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel={q.label}>
+              <View style={[styles.quickIcon, { backgroundColor: q.bg }]}>
+                <Ionicons name={q.icon} size={22} color={q.tint} />
               </View>
-              <Text style={styles.dualActionTitle}>Enter Marks</Text>
-              <Text style={styles.dualActionSub}>Record unit test & terminal marks</Text>
+              <Text style={styles.quickLabel}>{q.label}</Text>
             </TouchableOpacity>
+          ))}
+        </View>
 
-            <TouchableOpacity
-              style={styles.dualActionCard}
-              onPress={() => setActiveTab('students')}
-              activeOpacity={0.8}>
-              <View style={[styles.dualActionIcon, { backgroundColor: '#F0FDF4' }]}>
-                <Ionicons name="people" size={20} color="#16A34A" />
-              </View>
-              <Text style={styles.dualActionTitle}>Student Dossiers</Text>
-              <Text style={styles.dualActionSub}>Enrolment, profiles & admissions</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Recent Student Remarks */}
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Recent Remarks</Text>
-            <TouchableOpacity onPress={() => router.push('/teacher-modal/remarks' as never)}>
-              <Text style={styles.viewAllLink}>Add / View ({remarksTotal}) ›</Text>
-            </TouchableOpacity>
-          </View>
-          {recentRemarks.length === 0 ? (
-            <GlassCard style={styles.emptyCard} padding={SPACING.md}>
-              <EmptyState icon="chatbubble-outline" title="No remarks added yet" />
-            </GlassCard>
+        {/* Today's classes */}
+        <View style={styles.sectionHead}>
+          <Text style={styles.sectionTitle}>Today's classes</Text>
+          <TouchableOpacity onPress={() => router.push('/teacher-modal/schedule' as never)} hitSlop={8}>
+            <Text style={styles.link}>Timetable</Text>
+          </TouchableOpacity>
+        </View>
+        <GlassCard padding={0} style={styles.card}>
+          {slots.length === 0 && duties.length === 0 ? (
+            <View style={styles.empty}>
+              <Ionicons name="cafe-outline" size={26} color={COLORS.textLight} />
+              <Text style={styles.emptyText}>No classes scheduled today</Text>
+            </View>
           ) : (
-            <View style={styles.remarksList}>
-              {recentRemarks.map(item => {
-                const catTheme = REMARK_CATEGORY_STYLES[item.category] || REMARK_CATEGORY_STYLES.general;
+            <>
+              {slots.map((s, i) => {
+                const live = s.id === nowSlotId;
                 return (
-                  <GlassCard key={item.id} padding={SPACING.md} style={styles.remarkCard}>
-                    <View style={styles.remarkHeader}>
-                      <Text style={styles.remarkStudent} numberOfLines={1}>
-                        {item.studentName}
-                      </Text>
-                      <View style={[styles.remarkCatBadge, { backgroundColor: catTheme.bg, borderColor: catTheme.border }]}>
-                        <Text style={[styles.remarkCatText, { color: catTheme.color }]}>
-                          {item.category.toUpperCase()}
-                        </Text>
-                      </View>
+                  <View key={s.id} style={[styles.slotRow, i > 0 && styles.divider, live && styles.slotLive]}>
+                    <View style={styles.slotTime}>
+                      <Text style={[styles.slotStart, live && { color: '#5B6EE8' }]}>{time12(s.start_time)}</Text>
+                      <Text style={styles.slotEnd}>{time12(s.end_time)}</Text>
                     </View>
-                    <Text style={styles.remarkText} numberOfLines={2}>
-                      {item.remark}
-                    </Text>
-                    <Text style={styles.remarkDate}>{formatDate(item.created_at)}</Text>
-                  </GlassCard>
+                    <View style={[styles.slotBar, { backgroundColor: live ? '#5B6EE8' : '#E8EAF3' }]} />
+                    <View style={styles.flex1}>
+                      <Text style={styles.slotSubject}>{s.subject?.name ?? 'Class'}</Text>
+                      <Text style={styles.slotMeta}>{s.class?.name}{s.section?.name ? ` - ${s.section.name}` : ''}{s.room_number ? ` · Room ${s.room_number}` : ''}</Text>
+                    </View>
+                    {live && <View style={styles.livePill}><Text style={styles.livePillText}>NOW</Text></View>}
+                  </View>
                 );
               })}
-            </View>
-          )}
-
-          {/* School Announcements & Circulars */}
-          {announcements.length > 0 && (
-            <>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>School Notice Board</Text>
-                <TouchableOpacity onPress={() => router.push('/teacher-modal/notifications' as never)}>
-                  <Text style={styles.viewAllLink}>All Notices ›</Text>
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.noticesList}>
-                {announcements.map(item => (
-                  <GlassCard key={item.id} padding={SPACING.md} style={styles.noticeCard}>
-                    <View style={styles.noticeRow}>
-                      <View style={styles.noticeIconCircle}>
-                        <Ionicons name="megaphone-outline" size={18} color="#2563EB" />
-                      </View>
-                      <View style={styles.noticeContent}>
-                        <Text style={styles.noticeTitle} numberOfLines={1}>{item.title}</Text>
-                        <Text style={styles.noticeMsg} numberOfLines={2}>{item.message}</Text>
-                        <Text style={styles.noticeDate}>{formatDate(item.created_at)}</Text>
-                      </View>
-                    </View>
-                  </GlassCard>
-                ))}
-              </View>
+              {duties.map((d, i) => (
+                <View key={d.id} style={[styles.slotRow, (slots.length > 0 || i > 0) && styles.divider]}>
+                  <View style={styles.slotTime}>
+                    <Text style={styles.slotStart}>{time12(d.start_time)}</Text>
+                    <Text style={styles.slotEnd}>{time12(d.end_time)}</Text>
+                  </View>
+                  <View style={[styles.slotBar, { backgroundColor: '#F59E0B' }]} />
+                  <View style={styles.flex1}>
+                    <Text style={styles.slotSubject}>{d.subject?.name ?? 'Substitution'}</Text>
+                    <Text style={styles.slotMeta}>{d.class?.name}{d.section?.name ? ` - ${d.section.name}` : ''} · Substitution</Text>
+                  </View>
+                </View>
+              ))}
             </>
           )}
+        </GlassCard>
 
-          <View style={{ height: SPACING.xxl }} />
-        </ScrollView>
-      </View>
+        {/* Notices */}
+        <View style={styles.sectionHead}>
+          <Text style={styles.sectionTitle}>Notices</Text>
+          <TouchableOpacity onPress={() => router.push('/teacher-modal/notifications' as never)} hitSlop={8}>
+            <Text style={styles.link}>See all</Text>
+          </TouchableOpacity>
+        </View>
+        <GlassCard padding={0} style={styles.card}>
+          {notices.length === 0 ? (
+            <View style={styles.empty}>
+              <Ionicons name="notifications-off-outline" size={26} color={COLORS.textLight} />
+              <Text style={styles.emptyText}>You're all caught up</Text>
+            </View>
+          ) : notices.map((n, i) => (
+            <TouchableOpacity key={n.id} style={[styles.noticeRow, i > 0 && styles.divider]} activeOpacity={0.7}
+              onPress={() => router.push('/teacher-modal/notifications' as never)}>
+              <View style={[styles.dot, { backgroundColor: n.is_read ? 'transparent' : '#5B6EE8' }]} />
+              <View style={styles.flex1}>
+                <Text style={styles.noticeTitle} numberOfLines={1}>{n.title}</Text>
+                <Text style={styles.noticeBody} numberOfLines={2}>{n.message}</Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </GlassCard>
+
+        <View style={{ height: SPACING.xl }} />
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  timetableLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: SPACING.sm,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: RADIUS.md,
-    backgroundColor: '#EEF2FF',
-    borderWidth: 1,
-    borderColor: '#E0E7FF',
-  },
-  timetableLinkText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  container: { flex: 1, backgroundColor: COLORS.canvas },
-  centerContainer: { flex: 1, backgroundColor: COLORS.canvas, alignItems: 'center', justifyContent: 'center' },
-  content: { flex: 1 },
-  scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: SPACING.md, paddingTop: SPACING.sm },
+  container: { flex: 1, backgroundColor: COLORS.bg },
+  content: { padding: SPACING.md, paddingBottom: SPACING.xl },
+  flex1: { flex: 1, minWidth: 0 },
+  rowCenter: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 
-  welcomeCard: {
-    borderRadius: RADIUS.lg,
-    marginBottom: SPACING.sm + 4,
-  },
-  welcomeRow: { flexDirection: 'row', alignItems: 'center' },
-  welcomeTextBlock: { flex: 1 },
-  welcomeGreeting: { fontSize: 13, color: COLORS.textMuted, fontWeight: '500' },
-  welcomeName: { fontSize: 20, fontWeight: '800', color: COLORS.text, marginTop: 2 },
-  welcomeSub: { fontSize: 12, color: COLORS.textMuted, marginTop: 4 },
-  welcomeIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#EEF2FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  welcomeDivider: { height: 1, backgroundColor: COLORS.borderLight, marginVertical: SPACING.sm + 2 },
-  welcomeStatsRow: { flexDirection: 'row', alignItems: 'center' },
-  welcomeStat: { flex: 1, alignItems: 'center' },
-  welcomeStatVal: { fontSize: 18, fontWeight: '800', color: COLORS.text },
-  welcomeStatLabel: { fontSize: 11, color: COLORS.textMuted, marginTop: 2, textAlign: 'center', fontWeight: '500' },
-  welcomeStatDivider: { width: 1, height: 28, backgroundColor: COLORS.borderLight },
+  hero: { backgroundColor: '#5B6EE8', borderRadius: RADIUS.lg, padding: SPACING.md + 2, marginBottom: SPACING.md },
+  heroDate: { color: 'rgba(255,255,255,0.8)', fontSize: 12 },
+  heroTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700', marginTop: 2 },
+  heroChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+  heroChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  heroChipText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
 
-  // Day Order & Working Status Card
-  dayOrderCard: {
-    borderRadius: RADIUS.lg,
-    marginBottom: SPACING.sm + 4,
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-  },
-  dayOrderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  dayOrderInfoBlock: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  statusPillsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 6,
-  },
-  workingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: RADIUS.full,
-    borderWidth: 1,
-    gap: 5,
-  },
-  workingDayBadge: {
-    backgroundColor: '#ECFDF5',
-    borderColor: '#A7F3D0',
-  },
-  holidayBadge: {
-    backgroundColor: '#FFF1F2',
-    borderColor: '#FECDD3',
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  workingDayDot: {
-    backgroundColor: '#059669',
-  },
-  holidayDot: {
-    backgroundColor: '#E11D48',
-  },
-  workingBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  workingDayBadgeText: {
-    color: '#065F46',
-  },
-  holidayBadgeText: {
-    color: '#9F1239',
-  },
-  timingPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: RADIUS.full,
-    gap: 4,
-  },
-  timingPillText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  dayOrderTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#0F172A',
-    letterSpacing: -0.3,
-  },
-  dayOrderDesc: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-    lineHeight: 16,
-  },
-  dayOrderPillBadge: {
-    width: 58,
-    height: 58,
-    borderRadius: 16,
-    backgroundColor: '#EEF2FF',
-    borderWidth: 1.5,
-    borderColor: '#C7D2FE',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dayOrderPillHoliday: {
-    backgroundColor: '#FFF1F2',
-    borderColor: '#FECDD3',
-  },
-  dayOrderPillNum: {
-    fontSize: 18,
-    fontWeight: '900',
-    color: '#4F46E5',
-    letterSpacing: -0.5,
-  },
-  dayOrderPillHolidayNum: {
-    color: '#E11D48',
-  },
-  dayOrderPillSub: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#64748B',
-    textTransform: 'uppercase',
-  },
+  card: { marginBottom: SPACING.md },
+  iconTile: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  cardLabel: { fontSize: 12, color: COLORS.textMuted },
+  cardValue: { fontSize: 15, fontWeight: '700', color: COLORS.text, marginTop: 2 },
+  primaryBtn: { backgroundColor: '#5B6EE8', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, minWidth: 110, alignItems: 'center' },
+  primaryBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
+  statusPill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
+  statusPillText: { fontSize: 12, fontWeight: '700' },
 
-  cycleStrip: {
-    flexDirection: 'row',
-    gap: 4,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
-  },
-  cycleDayItem: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: '#F8FAFC',
-  },
-  cycleDayActive: {
-    backgroundColor: '#4F46E5',
-  },
-  cycleDayActiveHoliday: {
-    backgroundColor: '#E11D48',
-  },
-  cycleDayName: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  cycleDayCode: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: '#94A3B8',
-    marginTop: 1,
-  },
-  cycleDayActiveText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-  },
-  cycleDayActiveSub: {
-    color: '#E0E7FF',
-    fontWeight: '700',
-  },
+  quickGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.md },
+  quickItem: { width: '23%', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: RADIUS.lg, paddingVertical: 14,
+    shadowColor: '#5B6EE8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 14, elevation: 2 },
+  quickIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
+  quickLabel: { fontSize: 12, fontWeight: '600', color: COLORS.text },
 
-  // Attendance Priority Card
-  attendanceActionCard: {
-    borderRadius: RADIUS.lg,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#D1FAE5',
-    marginBottom: SPACING.sm + 4,
-    ...SHADOW.sm,
-  },
-  attendanceActionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
-  },
-  attendanceIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: '#ECFDF5',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  attendanceActionText: {
-    flex: 1,
-  },
-  attendanceActionTitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  attendanceActionSub: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  markAttendanceBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#059669',
-    paddingVertical: 11,
-    borderRadius: RADIUS.md,
-    gap: 6,
-    ...SHADOW.sm,
-  },
-  markAttendanceBtnText: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: 0.2,
-  },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.sm, marginTop: 4 },
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text },
+  link: { fontSize: 13, fontWeight: '600', color: '#5B6EE8' },
 
-  // Dual Action Cards
-  dualActionsRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: SPACING.xs,
-  },
-  dualActionCard: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    padding: 12,
-    ...SHADOW.sm,
-  },
-  dualActionIcon: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  dualActionTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#0F172A',
-  },
-  dualActionSub: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 2,
-    lineHeight: 14,
-  },
+  divider: { borderTopWidth: 1, borderTopColor: '#F1F2F8' },
+  slotRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: SPACING.md, paddingVertical: 12 },
+  slotLive: { backgroundColor: '#F8F9FF' },
+  slotTime: { width: 64 },
+  slotStart: { fontSize: 13, fontWeight: '700', color: COLORS.text },
+  slotEnd: { fontSize: 11, color: COLORS.textLight, marginTop: 1 },
+  slotBar: { width: 3, alignSelf: 'stretch', borderRadius: 2 },
+  slotSubject: { fontSize: 14, fontWeight: '600', color: COLORS.text },
+  slotMeta: { fontSize: 12, color: COLORS.textMuted, marginTop: 1 },
+  livePill: { backgroundColor: '#5B6EE8', borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
+  livePillText: { color: '#FFFFFF', fontSize: 10, fontWeight: '800' },
 
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.text,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.xs + 4,
-    marginTop: SPACING.md,
-  },
-  viewAllLink: { fontSize: 13, fontWeight: '700', color: COLORS.primary },
-  countPill: {
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 7,
-    paddingVertical: 1,
-    borderRadius: RADIUS.full,
-  },
-  countPillText: { fontSize: 11, fontWeight: '700', color: COLORS.primary },
+  noticeRow: { flexDirection: 'row', gap: 10, paddingHorizontal: SPACING.md, paddingVertical: 12 },
+  dot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
+  noticeTitle: { fontSize: 14, fontWeight: '600', color: COLORS.text },
+  noticeBody: { fontSize: 12, color: COLORS.textMuted, marginTop: 2, lineHeight: 17 },
 
-  remarksList: { gap: 8 },
-  remarkCard: { borderRadius: RADIUS.lg },
-  remarkHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  remarkStudent: { fontSize: 14, fontWeight: '700', color: COLORS.text, flex: 1 },
-  remarkCatBadge: { paddingHorizontal: 7, paddingVertical: 2, borderRadius: RADIUS.sm, borderWidth: 1 },
-  remarkCatText: { fontSize: 9, fontWeight: '800', letterSpacing: 0.4 },
-  remarkText: { fontSize: 13, color: COLORS.textMuted, lineHeight: 18 },
-  remarkDate: { fontSize: 11, color: COLORS.textLight, marginTop: 4 },
-
-  assignCard: { borderRadius: RADIUS.lg },
-  assignItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.md,
-    gap: SPACING.sm,
-  },
-  assignIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: RADIUS.md,
-    backgroundColor: '#EEF2FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  assignDetails: { flex: 1 },
-  assignClass: { fontSize: 14, fontWeight: '700', color: COLORS.text },
-  assignSub: { fontSize: 12, color: COLORS.textMuted, marginTop: 1 },
-  assignCount: { flexDirection: 'row', alignItems: 'center', gap: 4, marginRight: 6 },
-  assignCountText: { fontSize: 12, fontWeight: '600', color: COLORS.textMuted },
-
-  noticesList: { gap: 8 },
-  noticeCard: { borderRadius: RADIUS.lg },
-  noticeRow: { flexDirection: 'row', gap: 12 },
-  noticeIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#EFF6FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  noticeContent: { flex: 1 },
-  noticeTitle: { fontSize: 14, fontWeight: '700', color: '#0F172A' },
-  noticeMsg: { fontSize: 12, color: '#64748B', marginTop: 2, lineHeight: 16 },
-  noticeDate: { fontSize: 10, color: '#94A3B8', marginTop: 4 },
-
-  divider: { borderBottomWidth: 1, borderBottomColor: COLORS.borderLight },
-  emptyCard: { minHeight: 100, justifyContent: 'center' },
+  empty: { alignItems: 'center', paddingVertical: SPACING.lg, gap: 6 },
+  emptyText: { fontSize: 13, color: COLORS.textMuted },
 });

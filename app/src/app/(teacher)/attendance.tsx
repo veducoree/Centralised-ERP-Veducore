@@ -744,7 +744,7 @@ const styles = StyleSheet.create({
   lockedNoticeCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADIUS.md,
@@ -800,7 +800,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 8,
     borderRadius: RADIUS.md,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#F4F5FB',
     borderWidth: 1,
     borderColor: COLORS.borderLight,
   },
