@@ -5,7 +5,7 @@ import {
   IndianRupee, FileText, Bell, Settings, LogOut,
   X, UserCircle, ChevronDown, Shield, User,
   Megaphone, UserPlus, ClipboardCheck, CalendarDays, Bus,
-  LayoutGrid, GripVertical, RotateCcw, Pencil, Check, ChevronRight, ChevronLeft, UserRound, Boxes, Library, CalendarClock, CalendarRange, UserCog, ArrowUpCircle, CalendarCheck2,
+  LayoutGrid, GripVertical, RotateCcw, Pencil, Check, ChevronRight, ChevronLeft, UserRound, Boxes, Library, CalendarClock, CalendarRange, UserCog, ArrowUpCircle, CalendarCheck2, LifeBuoy,
 } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
@@ -19,6 +19,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '@/auth/AuthContext';
 import { fetchSchool, getCachedSchoolSync } from '@/services/api';
 import { NotificationBell } from './NotificationBell';
+import { PlatformBanner } from './PlatformNotices';
 import { portalName, schoolBranding } from '@/lib/branding';
 import { usePermissions } from '@/auth/PermissionsContext';
 import { cn, getInitials } from '@/lib/utils';
@@ -56,6 +57,7 @@ export const adminNav: NavItem[] = [
   { label: 'Promotion',          path: '/admin/promotion',     icon: <ArrowUpCircle className="h-5 w-5" /> },
   { label: 'Notifications',      path: '/admin/notifications', icon: <Bell className="h-5 w-5" /> },
   { label: 'Staff & Roles',      path: '/admin/staff',         icon: <UserCog className="h-5 w-5" /> },
+  { label: 'Help & Support',     path: '/admin/support',       icon: <LifeBuoy className="h-5 w-5" /> },
   { label: 'All Modules',        path: '/admin/all-modules',   icon: <Boxes className="h-5 w-5" /> },
 ];
 
@@ -558,6 +560,7 @@ export function DashboardLayout({
       <div className="min-h-screen pl-[64px] pt-[72px]">
         {/* Page content */}
         <main className="px-4 pb-10 pt-4 sm:px-8">
+          <PlatformBanner />
           {children}
         </main>
       </div>

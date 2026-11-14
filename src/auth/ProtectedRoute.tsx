@@ -5,6 +5,7 @@ import type { UserRole } from '@/types';
 import { LoadingSpinner } from '@/components/ui/Primitives';
 import { usePermissions } from '@/auth/PermissionsContext';
 import { adminNav } from '@/components/layout/DashboardLayout';
+import { SchoolSuspendedScreen } from '@/components/layout/PlatformNotices';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -13,7 +14,7 @@ interface ProtectedRouteProps {
 
 export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
   const { session, profile, loading } = useAuth();
-  const { loaded: permsLoaded, canPath } = usePermissions();
+  const { loaded: permsLoaded, canPath, suspended } = usePermissions();
   const location = useLocation();
 
   if (loading) return <LoadingSpinner size="lg" />;
@@ -33,9 +34,13 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     return <Navigate to="/login" replace />;
   }
 
+  if (!permsLoaded) return <LoadingSpinner size="lg" />;
+
+  // Suspended by Veducore: the database already hides the school's data.
+  if (suspended) return <SchoolSuspendedScreen />;
+
   // Staff roles: only modules the role allows.
   if (profile.role === 'admin') {
-    if (!permsLoaded) return <LoadingSpinner size="lg" />;
     if (!canPath(location.pathname)) {
       const fallback = adminNav.find((i) => canPath(i.path))?.path ?? '/admin/profile';
       return <Navigate to={fallback} replace />;

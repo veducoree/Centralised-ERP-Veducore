@@ -232,6 +232,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
 
           if (!error && data?.user) {
+            // Suspended by Veducore: the database hides the school's data, so
+            // say why instead of showing an empty app.
+            const { data: platform } = await supabase.rpc('school_platform_status');
+            if ((platform as { status?: string } | null)?.status === 'Inactive') {
+              await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+              const reason = (platform as { suspension_reason?: string | null }).suspension_reason;
+              return {
+                error: `Your school's Veducore access is paused.${reason ? ` ${reason}` : ''} Please contact the school office.`,
+              };
+            }
             currentUserIdRef.current = data.user.id;
             const { profile, school } = await fetchProfileAndSchool(data.user.id, data.user.email, true);
             setState({

@@ -44,6 +44,7 @@ const ProfilePage = lazy(() => import('@/pages/shared/ProfilePage'));
 const StudentDetailPage = lazy(() => import('@/pages/admin/StudentDetailPage'));
 const NewAdmissionPage = lazy(() => import('@/pages/admin/NewAdmissionPage'));
 const AllModulesPage = lazy(() => import('@/pages/admin/AllModulesPage'));
+const AdminSupport = lazy(() => import('@/pages/admin/AdminSupport'));
 
 // Teacher pages
 const TeacherDashboard = lazy(() => import('@/pages/teacher/TeacherDashboard'));
@@ -176,6 +177,7 @@ function App() {
             <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={['admin']}><AdminNotifications /></ProtectedRoute>} />
             <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['admin']}><AdminSettings /></ProtectedRoute>} />
             <Route path="/admin/profile" element={<ProtectedRoute allowedRoles={['admin']}><ProfilePage /></ProtectedRoute>} />
+            <Route path="/admin/support" element={<ProtectedRoute allowedRoles={['admin']}><AdminSupport /></ProtectedRoute>} />
             <Route path="/admin/all-modules" element={<ProtectedRoute allowedRoles={['admin']}><AllModulesPage /></ProtectedRoute>} />
 
             {/* Teacher routes */}

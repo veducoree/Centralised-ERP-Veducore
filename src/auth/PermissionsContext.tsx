@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useAuth } from '@/auth/AuthContext';
 import { fetchMyPermissions } from '@/services/api';
+import { fetchSchoolPlatformStatus, type SchoolPlatformStatus } from '@/services/platformApi';
 import type { MyPermissions, PermissionLevel } from '@/types';
 
 /** Admin modules a staff role can be granted, in display order. */
@@ -58,6 +59,10 @@ export function moduleForPath(path: string): string | null {
 
 interface PermissionsValue {
   loaded: boolean;
+  /** Veducore-controlled state of the user's school (suspension, modules, plan). */
+  platform: SchoolPlatformStatus | null;
+  /** The school has been suspended by Veducore. */
+  suspended: boolean;
   owner: boolean;
   roleName: string | null;
   can: (module: string, level?: Exclude<PermissionLevel, 'none'>) => boolean;
@@ -70,7 +75,18 @@ const PermissionsContext = createContext<PermissionsValue | null>(null);
 export function PermissionsProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
   const [perms, setPerms] = useState<MyPermissions | null>(null);
+  const [platform, setPlatform] = useState<SchoolPlatformStatus | null>(null);
   const isAdmin = profile?.role === 'admin';
+  const profileLoaded = !!profile?.id;
+
+  const refreshPlatform = useCallback(async () => {
+    try {
+      setPlatform(await fetchSchoolPlatformStatus());
+    } catch {
+      // Before migration 038 the RPC doesn't exist; treat as no restrictions.
+      setPlatform({});
+    }
+  }, []);
 
   const refresh = useCallback(async () => {
     if (!isAdmin) { setPerms({}); return; }
@@ -84,21 +100,38 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setPerms(null);
-    if (profile?.id) refresh();
-  }, [profile?.id, refresh]);
+    setPlatform(null);
+    if (profile?.id) {
+      refresh();
+      refreshPlatform();
+    }
+  }, [profile?.id, refresh, refreshPlatform]);
+
+  // Pick up suspension or module changes made by Veducore without a reload.
+  useEffect(() => {
+    if (!profile?.id) return;
+    const onFocus = () => { refreshPlatform(); };
+    window.addEventListener('focus', onFocus);
+    const t = window.setInterval(onFocus, 5 * 60_000);
+    return () => { window.removeEventListener('focus', onFocus); window.clearInterval(t); };
+  }, [profile?.id, refreshPlatform]);
 
   const value = useMemo<PermissionsValue>(() => {
     const owner = !!perms?.owner;
     const modules = perms?.modules ?? {};
+    const disabled = platform?.disabled_modules ?? [];
     const can: PermissionsValue['can'] = (module, level = 'view') => {
       if (!isAdmin) return false;
+      if (disabled.includes(module)) return false;
       if (owner) return true;
       if (module === 'staff') return false;
       const l = modules[module];
       return l === 'edit' || (level === 'view' && l === 'view');
     };
     return {
-      loaded: !isAdmin || perms !== null,
+      loaded: !profileLoaded || ((!isAdmin || perms !== null) && platform !== null),
+      platform,
+      suspended: platform?.status === 'Inactive',
       owner,
       roleName: owner ? 'Owner' : perms?.role ?? null,
       can,
@@ -106,9 +139,9 @@ export function PermissionsProvider({ children }: { children: ReactNode }) {
         const m = moduleForPath(path);
         return m === null || can(m, 'view');
       },
-      refresh,
+      refresh: async () => { await Promise.all([refresh(), refreshPlatform()]); },
     };
-  }, [perms, isAdmin, refresh]);
+  }, [perms, isAdmin, refresh, refreshPlatform, platform, profileLoaded]);
 
   return <PermissionsContext.Provider value={value}>{children}</PermissionsContext.Provider>;
 }
