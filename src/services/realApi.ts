@@ -3519,7 +3519,7 @@ export async function fetchExamScheduleFor(examIds: string[]) {
 // ==========================================
 // Online payments (Razorpay via the `payments` edge function)
 // ==========================================
-export interface GatewayStatus { active: boolean; key_id?: string; mode?: 'live' | 'test'; route_linked?: boolean; verified_at?: string; key_hint?: string }
+export interface GatewayStatus { active: boolean; key_id?: string; mode?: 'live' | 'test'; verified_at?: string; key_hint?: string }
 
 export interface CreatedPayment {
   online_payment_id: string;
@@ -3527,17 +3527,16 @@ export interface CreatedPayment {
   order_id: string | null;
   link_url: string | null;
   amount: number; // paise
-  breakdown: { fee: number; convenience_with_gst: number; total: number }; // paise
+  breakdown: { fee: number; convenience: number; gst: number; total: number }; // paise
   description: string;
 }
 
 /** Same formula as the server (display only; the server decides the real amount). */
 export function onlineCharges(feeRupees: number) {
   const fee = Math.round(feeRupees * 100);
-  const convenience = Math.round(fee * 0.02);
-  const gst = Math.round(convenience * 0.18);
-  const extra = convenience + gst + 500;
-  return { fee: fee / 100, extra: extra / 100, total: (fee + extra) / 100 };
+  const convenience = Math.round(fee * 0.02);   // 2% convenience fee
+  const gst = Math.round(convenience * 0.18);   // 18% GST on the convenience fee
+  return { fee: fee / 100, convenience: convenience / 100, gst: gst / 100, total: (fee + convenience + gst) / 100 };
 }
 
 async function paymentsCall<T>(payload: Record<string, unknown>): Promise<T> {
@@ -3632,7 +3631,7 @@ export interface OnlinePaymentRow {
   id: string;
   student_id: string;
   channel: 'checkout' | 'link';
-  fee_amount: number; convenience_fee: number; gst_amount: number; platform_fee: number; total_amount: number; // paise
+  fee_amount: number; convenience_fee: number; gst_amount: number; total_amount: number; // paise
   status: 'created' | 'processing' | 'paid' | 'failed' | 'expired';
   receipt_number: string | null;
   razorpay_payment_id: string | null;
@@ -3649,19 +3648,24 @@ export const reconcilePayments = () => paymentsCall<{ applied: number; pending: 
 
 export async function fetchOnlinePayments(schoolId: string, limit = 200) {
   const { data, error } = await supabase.from('online_payments')
-    .select('id, student_id, channel, fee_amount, convenience_fee, gst_amount, platform_fee, total_amount, status, receipt_number, razorpay_payment_id, unapplied_amount, refund_status, error, created_at, paid_at, student:students(full_name, admission_number)')
+    .select('id, student_id, channel, fee_amount, convenience_fee, gst_amount, total_amount, status, receipt_number, razorpay_payment_id, unapplied_amount, refund_status, error, created_at, paid_at, student:students(full_name, admission_number)')
     .eq('school_id', schoolId).order('created_at', { ascending: false }).limit(limit);
   if (error) throw error;
   return (data ?? []) as unknown as OnlinePaymentRow[];
 }
 
-/** Convenience charge (₹) a parent paid on top of the fee, for receipts. */
+/** Convenience fee + GST (₹) a parent paid on top of the fee, for receipts. */
 export async function fetchConvenienceForReceipt(receiptNumber: string) {
   if (!receiptNumber?.startsWith('ONL-')) return null;
   const { data } = await supabase.from('online_payments')
-    .select('fee_amount, total_amount').eq('receipt_number', receiptNumber).maybeSingle();
+    .select('fee_amount, convenience_fee, gst_amount, total_amount').eq('receipt_number', receiptNumber).maybeSingle();
   if (!data) return null;
-  return { fee: Number(data.fee_amount) / 100, extra: (Number(data.total_amount) - Number(data.fee_amount)) / 100, total: Number(data.total_amount) / 100 };
+  return {
+    fee: Number(data.fee_amount) / 100,
+    convenience: Number(data.convenience_fee) / 100,
+    gst: Number(data.gst_amount) / 100,
+    total: Number(data.total_amount) / 100,
+  };
 }
 
 export async function markPaymentRefunded(id: string) {

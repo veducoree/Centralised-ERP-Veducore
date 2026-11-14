@@ -10,9 +10,8 @@
 //   reconcile       check every unfinished payment the caller can see (last 72h), apply paid ones
 //
 // Money is always computed here in paise; nothing from the client is trusted:
-//   fee + 2% convenience + 18% GST on that + ₹5 platform fee.
-// The ₹5 is transferred to Veducore with Razorpay Route when the school has a
-// linked account configured; otherwise it is recorded for settlement.
+//   fee + 2% convenience fee + 18% GST on the convenience fee.
+// Everything is collected into the school's own Razorpay account.
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2.57.4";
 
 const cors = {
@@ -21,7 +20,6 @@ const cors = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 const RZP = "https://api.razorpay.com/v1";
-const PLATFORM_FEE_PAISE = 500;
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "Content-Type": "application/json" } });
@@ -32,7 +30,7 @@ class HttpError extends Error {
 function breakdown(feePaise: number) {
   const convenience = Math.round(feePaise * 0.02);
   const gst = Math.round(convenience * 0.18);
-  return { fee: feePaise, convenience, gst, platform: PLATFORM_FEE_PAISE, total: feePaise + convenience + gst + PLATFORM_FEE_PAISE };
+  return { fee: feePaise, convenience, gst, total: feePaise + convenience + gst };
 }
 
 async function rzp(keyId: string, secret: string, path: string, init: RequestInit = {}) {
@@ -69,7 +67,7 @@ async function canManageFees(admin: SupabaseClient, c: Caller, modules: string[]
 async function getGateway(admin: SupabaseClient, schoolId: string) {
   const { data } = await admin.from("payment_gateways").select("*").eq("school_id", schoolId).maybeSingle();
   if (!data || !data.is_active) throw new HttpError(400, "Online payment is not enabled for this school yet.");
-  return data as { key_id: string; key_secret: string; veducore_account_id: string | null };
+  return data as { key_id: string; key_secret: string };
 }
 
 /** May the caller see/pay for this payment's student? */
@@ -214,7 +212,7 @@ Deno.serve(async (req) => {
             online_payment_id: reuse.id, key_id: gw.key_id,
             order_id: reuse.razorpay_order_id ?? null, link_url: reuse.link_url ?? null,
             amount: Number(reuse.total_amount),
-            breakdown: { fee: Number(reuse.fee_amount), convenience_with_gst: Number(reuse.convenience_fee) + Number(reuse.gst_amount) + Number(reuse.platform_fee), total: Number(reuse.total_amount) },
+            breakdown: { fee: Number(reuse.fee_amount), convenience: Number(reuse.convenience_fee), gst: Number(reuse.gst_amount), total: Number(reuse.total_amount) },
             description: `Fees: ${st?.full_name ?? "Student"} (${st?.admission_number ?? ""})`,
           });
         }
@@ -232,51 +230,40 @@ Deno.serve(async (req) => {
         id, school_id: caller.school_id, student_id: studentId, initiated_by: caller.id, channel,
         allocations, next_due_dates: typeof body.next_due_dates === "object" && body.next_due_dates ? body.next_due_dates : {},
         admission_receipt_id: admissionReceiptId,
-        fee_amount: b.fee, convenience_fee: b.convenience, gst_amount: b.gst, platform_fee: b.platform, total_amount: b.total,
+        fee_amount: b.fee, convenience_fee: b.convenience, gst_amount: b.gst, total_amount: b.total,
       });
       if (insErr) throw new HttpError(500, insErr.message);
 
       const { data: student } = await admin.from("students").select("full_name, admission_number").eq("id", studentId).maybeSingle();
       const description = `Fees: ${student?.full_name ?? "Student"} (${student?.admission_number ?? ""})`.slice(0, 250);
       const notes = { online_payment_id: id, school_id: caller.school_id, student_id: studentId };
-      const transfers = gw.veducore_account_id
-        ? [{ account: gw.veducore_account_id, amount: b.platform, currency: "INR", notes: { purpose: "veducore_platform_fee" }, on_hold: false }]
-        : null;
-
-      let transfer: "route" | "pending_settlement" = transfers ? "route" : "pending_settlement";
       let update: Record<string, unknown> = {};
       if (channel === "checkout") {
-        const base = { amount: b.total, currency: "INR", receipt: `vdc_${id.slice(0, 30)}`, notes, payment_capture: 1 };
-        let r = await rzp(gw.key_id, gw.key_secret, "/orders", { method: "POST", body: JSON.stringify(transfers ? { ...base, transfers } : base) });
-        if (!r.ok && transfers) { // Route not enabled on this account → record for settlement
-          r = await rzp(gw.key_id, gw.key_secret, "/orders", { method: "POST", body: JSON.stringify(base) });
-          transfer = "pending_settlement";
-        }
-        if (!r.ok) {
-          await admin.from("online_payments").update({ status: "failed", error: JSON.stringify(r.body).slice(0, 500) }).eq("id", id);
-          throw new HttpError(502, "Razorpay could not start the payment. Try again.");
-        }
-        update = { razorpay_order_id: r.body.id, platform_transfer: transfer };
-      } else {
-        const base = {
-          amount: b.total, currency: "INR", description, reference_id: id.slice(0, 40), notes,
-          expire_by: Math.floor(Date.now() / 1000) + 30 * 60,
-          reminder_enable: false, notify: { sms: false, email: false },
-          // Login usernames map to placeholder addresses (…@veducore.internal); send only real emails.
-          customer: caller.email && !/\.(internal|veducore)$/i.test(caller.email) ? { email: caller.email } : undefined,
-        };
-        let r = await rzp(gw.key_id, gw.key_secret, "/payment_links", {
-          method: "POST", body: JSON.stringify(transfers ? { ...base, options: { order: { transfers } } } : base),
+        const r = await rzp(gw.key_id, gw.key_secret, "/orders", {
+          method: "POST",
+          body: JSON.stringify({ amount: b.total, currency: "INR", receipt: `vdc_${id.slice(0, 30)}`, notes, payment_capture: 1 }),
         });
-        if (!r.ok && transfers) {
-          r = await rzp(gw.key_id, gw.key_secret, "/payment_links", { method: "POST", body: JSON.stringify(base) });
-          transfer = "pending_settlement";
-        }
         if (!r.ok) {
           await admin.from("online_payments").update({ status: "failed", error: JSON.stringify(r.body).slice(0, 500) }).eq("id", id);
           throw new HttpError(502, "Razorpay could not start the payment. Try again.");
         }
-        update = { razorpay_link_id: r.body.id, link_url: r.body.short_url, platform_transfer: transfer };
+        update = { razorpay_order_id: r.body.id };
+      } else {
+        const r = await rzp(gw.key_id, gw.key_secret, "/payment_links", {
+          method: "POST",
+          body: JSON.stringify({
+            amount: b.total, currency: "INR", description, reference_id: id.slice(0, 40), notes,
+            expire_by: Math.floor(Date.now() / 1000) + 30 * 60,
+            reminder_enable: false, notify: { sms: false, email: false },
+            // Login usernames map to placeholder addresses (…@veducore.internal); send only real emails.
+            customer: caller.email && !/\.(internal|veducore)$/i.test(caller.email) ? { email: caller.email } : undefined,
+          }),
+        });
+        if (!r.ok) {
+          await admin.from("online_payments").update({ status: "failed", error: JSON.stringify(r.body).slice(0, 500) }).eq("id", id);
+          throw new HttpError(502, "Razorpay could not start the payment. Try again.");
+        }
+        update = { razorpay_link_id: r.body.id, link_url: r.body.short_url };
       }
       await admin.from("online_payments").update(update).eq("id", id);
 
@@ -286,7 +273,7 @@ Deno.serve(async (req) => {
         order_id: update.razorpay_order_id ?? null,
         link_url: update.link_url ?? null,
         amount: b.total,
-        breakdown: { fee: b.fee, convenience_with_gst: b.convenience + b.gst + b.platform, total: b.total },
+        breakdown: { fee: b.fee, convenience: b.convenience, gst: b.gst, total: b.total },
         description,
       });
     }

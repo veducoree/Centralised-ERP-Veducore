@@ -481,7 +481,7 @@ export default function ParentFees() {
       `Total Paid : ${formatCurrency(fee.paid_amount)}`,
       `Balance Due: ${formatCurrency(fee.remaining_amount)}`,
       `Pay Mode   : ${pMethod}`,
-      ...(online ? [`Convenience: ${formatCurrency(online.extra)} (incl. GST)`, `Paid Online: ${formatCurrency(online.total)}`] : []),
+      ...(online ? [`Conv. Fee 2%: ${formatCurrency(online.convenience)}`, `GST 18%    : ${formatCurrency(online.gst)}`, `Paid Online: ${formatCurrency(online.total)}`] : []),
       `Status     : ${Number(fee.remaining_amount) <= 0 ? 'PAID IN FULL' : 'PARTIALLY PAID'}`,
       `================================`,
     ].join('\n');
@@ -1106,7 +1106,8 @@ export default function ParentFees() {
                     return (
                       <View style={styles.breakdownBox}>
                         <View style={styles.breakdownRow}><Text style={styles.breakdownLabel}>Fee</Text><Text style={styles.breakdownValue}>{formatCurrency(c.fee)}</Text></View>
-                        <View style={styles.breakdownRow}><Text style={styles.breakdownLabel}>Convenience fee (incl. GST)</Text><Text style={styles.breakdownValue}>{formatCurrency(c.extra)}</Text></View>
+                        <View style={styles.breakdownRow}><Text style={styles.breakdownLabel}>Convenience fee (2%)</Text><Text style={styles.breakdownValue}>{formatCurrency(c.convenience)}</Text></View>
+                        <View style={styles.breakdownRow}><Text style={styles.breakdownLabel}>GST (18% on convenience fee)</Text><Text style={styles.breakdownValue}>{formatCurrency(c.gst)}</Text></View>
                         <View style={[styles.breakdownRow, styles.breakdownTotalRow]}><Text style={styles.breakdownTotal}>Total</Text><Text style={styles.breakdownTotal}>{formatCurrency(c.total)}</Text></View>
                         <Text style={styles.breakdownHint}>Pay by UPI, card or net banking on the secure Razorpay page. No extra charge at the school office.</Text>
                       </View>

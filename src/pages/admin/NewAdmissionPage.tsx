@@ -866,7 +866,7 @@ function Step5Fees({ formData, errors, update, schoolId, academicYear, canCollec
             {isRazorpay && (
               <div className="sm:col-span-2 rounded-xl bg-brand-50 px-4 py-3 text-sm text-brand-800">
                 After you confirm the admission, the Razorpay window opens for the parent to pay by UPI / card.
-                They pay {formatCurrency(onlineCharges(parseFloat(fees.amount_paying) || 0).total, '₹')} (incl. convenience fee & GST);
+                They pay {formatCurrency(onlineCharges(parseFloat(fees.amount_paying) || 0).total, '₹')} (fee + 2% convenience fee + 18% GST on it);
                 {' '}{formatCurrency(parseFloat(fees.amount_paying) || 0, '₹')} is credited to the fees.
               </div>
             )}

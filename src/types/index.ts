@@ -402,25 +402,6 @@ export interface FeeStructure {
 }
 
 export type PaymentPlan = 'full' | 'emi' | 'quarterly';
-export type OnlinePaymentStatus = 'pending' | 'completed' | 'failed';
-
-// Reserved for future DB implementation — online_payments table not yet created
-export interface OnlinePayment {
-  id: string;
-  school_id: string;
-  fee_id: string;
-  student_id: string;
-  razorpay_order_id: string | null;
-  razorpay_payment_id: string | null;
-  amount: number;
-  school_amount: number;
-  platform_fee: number;
-  status: OnlinePaymentStatus;
-  payment_plan: PaymentPlan;
-  installment_number: number | null;
-  created_at: string;
-  updated_at: string;
-}
 
 export interface TransportStop {
   id: string;

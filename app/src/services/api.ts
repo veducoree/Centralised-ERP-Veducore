@@ -759,10 +759,9 @@ export async function fetchExamScheduleFor(examIds: string[]) {
 // ==========================================
 export function onlineCharges(feeRupees: number) {
   const fee = Math.round(feeRupees * 100);
-  const convenience = Math.round(fee * 0.02);
-  const gst = Math.round(convenience * 0.18);
-  const extra = convenience + gst + 500;
-  return { fee: fee / 100, extra: extra / 100, total: (fee + extra) / 100 };
+  const convenience = Math.round(fee * 0.02);   // 2% convenience fee
+  const gst = Math.round(convenience * 0.18);   // 18% GST on the convenience fee
+  return { fee: fee / 100, convenience: convenience / 100, gst: gst / 100, total: (fee + convenience + gst) / 100 };
 }
 
 async function paymentsCall<T>(payload: Record<string, unknown>): Promise<T> {
@@ -788,12 +787,12 @@ export const createPaymentLink = (params: { allocations: { fee_id: string; amoun
 
 export const reconcilePayments = () => paymentsCall<{ applied: number; pending: number }>({ action: 'reconcile' });
 
-/** Convenience charge (₹) paid on top of the fee for an online receipt. */
+/** Convenience fee + GST (₹) paid on top of the fee for an online receipt. */
 export async function fetchConvenienceForReceipt(receiptNumber: string | null | undefined) {
   if (!receiptNumber?.startsWith('ONL-')) return null;
-  const { data } = await supabase.from('online_payments').select('fee_amount, total_amount').eq('receipt_number', receiptNumber).maybeSingle();
+  const { data } = await supabase.from('online_payments').select('convenience_fee, gst_amount, total_amount').eq('receipt_number', receiptNumber).maybeSingle();
   if (!data) return null;
-  return { extra: (Number(data.total_amount) - Number(data.fee_amount)) / 100, total: Number(data.total_amount) / 100 };
+  return { convenience: Number(data.convenience_fee) / 100, gst: Number(data.gst_amount) / 100, total: Number(data.total_amount) / 100 };
 }
 
 export const checkOnlinePayment = (onlinePaymentId: string) =>

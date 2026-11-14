@@ -692,7 +692,8 @@ export default function AdminFees() {
                         <th className="px-4 py-2.5 font-medium">Date</th>
                         <th className="px-4 py-2.5 font-medium">Student</th>
                         <th className="px-4 py-2.5 text-right font-medium">Fee</th>
-                        <th className="px-4 py-2.5 text-right font-medium">Convenience (incl. GST)</th>
+                        <th className="px-4 py-2.5 text-right font-medium">Convenience (2%)</th>
+                        <th className="px-4 py-2.5 text-right font-medium">GST</th>
                         <th className="px-4 py-2.5 text-right font-medium">Paid</th>
                         <th className="px-4 py-2.5 font-medium">Status</th>
                         <th className="px-4 py-2.5 font-medium">Receipt</th>
@@ -704,7 +705,8 @@ export default function AdminFees() {
                           <td className="px-4 py-2.5 text-xs text-slate-500">{new Date(p.paid_at ?? p.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</td>
                           <td className="px-4 py-2.5"><p className="font-medium text-slate-900">{p.student?.full_name ?? '—'}</p><p className="text-[11px] text-slate-400">{p.student?.admission_number}{p.channel === 'link' ? ' · app' : ''}</p></td>
                           <td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(p.fee_amount / 100, '₹')}</td>
-                          <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">{formatCurrency((p.total_amount - p.fee_amount) / 100, '₹')}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">{formatCurrency(p.convenience_fee / 100, '₹')}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">{formatCurrency(p.gst_amount / 100, '₹')}</td>
                           <td className="px-4 py-2.5 text-right tabular-nums font-semibold">{p.status === 'paid' ? formatCurrency(p.total_amount / 100, '₹') : '—'}</td>
                           <td className="px-4 py-2.5">
                             {p.refund_status === 'needed' ? (
@@ -774,11 +776,12 @@ export default function AdminFees() {
                 <h3 className="mb-3 text-sm font-semibold text-slate-900">What parents pay online</h3>
                 <div className="rounded-xl bg-slate-50 p-4 text-sm">
                   <div className="flex justify-between py-1"><span className="text-slate-500">Fee (example)</span><span className="tabular-nums">{formatCurrency(sample.fee, '₹')}</span></div>
-                  <div className="flex justify-between py-1"><span className="text-slate-500">Convenience fee (incl. GST)</span><span className="tabular-nums">{formatCurrency(sample.extra, '₹')}</span></div>
+                  <div className="flex justify-between py-1"><span className="text-slate-500">Convenience fee (2%)</span><span className="tabular-nums">{formatCurrency(sample.convenience, '₹')}</span></div>
+                  <div className="flex justify-between py-1"><span className="text-slate-500">GST (18% on convenience fee)</span><span className="tabular-nums">{formatCurrency(sample.gst, '₹')}</span></div>
                   <div className="mt-1 flex justify-between border-t border-slate-200 pt-2 font-semibold"><span>Parent pays</span><span className="tabular-nums">{formatCurrency(sample.total, '₹')}</span></div>
                 </div>
                 <ul className="mt-4 space-y-2 text-xs text-slate-500">
-                  <li className="flex gap-2"><Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-brand-500" /> The full fee amount is credited to the student's account; the convenience fee covers online processing.</li>
+                  <li className="flex gap-2"><Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-brand-500" /> Everything is paid into your school's Razorpay account. The full fee is credited to the student; the 2% convenience fee + GST covers Razorpay's charges.</li>
                   <li className="flex gap-2"><Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-brand-500" /> Payments made at the office (cash, cheque) have no extra charge.</li>
                   <li className="flex gap-2"><Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-brand-500" /> A fee is marked paid only after Razorpay confirms the payment.</li>
                 </ul>

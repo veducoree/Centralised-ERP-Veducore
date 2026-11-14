@@ -185,7 +185,7 @@ export default function ParentFees() {
   const [selectedFee, setSelectedFee] = useState<Fee | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [onlineEnabled, setOnlineEnabled] = useState<boolean | null>(null);
-  const [invoiceConvenience, setInvoiceConvenience] = useState<{ fee: number; extra: number; total: number } | null>(null);
+  const [invoiceConvenience, setInvoiceConvenience] = useState<{ fee: number; convenience: number; gst: number; total: number } | null>(null);
 
   // Invoice modal
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
@@ -725,7 +725,8 @@ export default function ParentFees() {
               return (
                 <div className="rounded-xl border border-slate-100 p-4 text-sm">
                   <div className="flex justify-between py-1"><span className="text-slate-500">Fee</span><span className="tabular-nums">{formatCurrency(c.fee, '₹')}</span></div>
-                  <div className="flex justify-between py-1"><span className="text-slate-500">Convenience fee (incl. GST)</span><span className="tabular-nums">{formatCurrency(c.extra, '₹')}</span></div>
+                  <div className="flex justify-between py-1"><span className="text-slate-500">Convenience fee (2%)</span><span className="tabular-nums">{formatCurrency(c.convenience, '₹')}</span></div>
+                  <div className="flex justify-between py-1"><span className="text-slate-500">GST (18% on convenience fee)</span><span className="tabular-nums">{formatCurrency(c.gst, '₹')}</span></div>
                   <div className="mt-1 flex justify-between border-t border-slate-100 pt-2 font-semibold text-slate-900"><span>Total</span><span className="tabular-nums">{formatCurrency(c.total, '₹')}</span></div>
                   <p className="mt-2 text-[11px] text-slate-400">Pay by UPI, card or net banking in the secure Razorpay window. No extra charge when you pay at the school office.</p>
                 </div>
@@ -828,7 +829,8 @@ export default function ParentFees() {
 
             {invoiceConvenience && !invoiceIsFeeSummary && (
               <div className="rounded-xl border border-slate-200 px-3 py-2 text-xs">
-                <div className="flex justify-between py-0.5"><span className="text-slate-500">Convenience fee (incl. GST)</span><span className="tabular-nums">{formatCurrency(invoiceConvenience.extra, '₹')}</span></div>
+                <div className="flex justify-between py-0.5"><span className="text-slate-500">Convenience fee (2%)</span><span className="tabular-nums">{formatCurrency(invoiceConvenience.convenience, '₹')}</span></div>
+                <div className="flex justify-between py-0.5"><span className="text-slate-500">GST (18% on convenience fee)</span><span className="tabular-nums">{formatCurrency(invoiceConvenience.gst, '₹')}</span></div>
                 <div className="flex justify-between py-0.5 font-semibold text-slate-800"><span>Total paid online</span><span className="tabular-nums">{formatCurrency(invoiceConvenience.total, '₹')}</span></div>
               </div>
             )}
