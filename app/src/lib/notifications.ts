@@ -168,3 +168,11 @@ export async function setBadgeCount(count: number) {
   if (!mod) return;
   try { await mod.setBadgeCountAsync(count); } catch { /* ignore */ }
 }
+
+/** Fires `handler` whenever a push notification arrives while the app is open. */
+export function onNotificationReceived(handler: () => void): () => void {
+  const mod = getNotificationsModule();
+  if (!mod) return () => {};
+  const sub = mod.addNotificationReceivedListener(() => handler());
+  return () => sub.remove();
+}

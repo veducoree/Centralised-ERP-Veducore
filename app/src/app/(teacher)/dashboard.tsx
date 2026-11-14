@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, RefreshControl, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useLiveNotifications } from '@/lib/useLiveNotifications';
+import { setBadgeCount } from '@/lib/notifications';
 import { StatusBar } from 'expo-status-bar';
 
 import {
@@ -43,6 +45,32 @@ export default function TeacherDashboard() {
   const [duties, setDuties] = useState<TimetableSubstitution[]>([]);
   const [notices, setNotices] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
+  // Opening the inbox counts as viewing everything: clear the badge right away.
+  const openInbox = () => {
+    setUnread(0);
+    setNotices(prev => prev.map(n => ({ ...n, is_read: true })));
+    router.push('/teacher-modal/notifications' as never);
+  };
+
+  // Keep the bell badge and latest notices live without a manual refresh.
+  // While the inbox is open on top, it owns read-state; skip background refreshes.
+  const focusedRef = React.useRef(true);
+  const refreshNotices = useCallback(async () => {
+    if (!focusedRef.current) return;
+    try {
+      const notifs = await fetchMyNotifications(30);
+      setNotices(notifs.slice(0, 3));
+      const count = notifs.filter(n => !n.is_read).length;
+      setUnread(count);
+      setBadgeCount(count);
+    } catch { /* offline */ }
+  }, []);
+  useLiveNotifications(refreshNotices);
+  useFocusEffect(useCallback(() => {
+    focusedRef.current = true;
+    refreshNotices();
+    return () => { focusedRef.current = false; };
+  }, [refreshNotices]));
   const [classCount, setClassCount] = useState(0);
   const [myClass, setMyClass] = useState<ClassStatus | null>(null);
   const [me, setMe] = useState<StaffAttendanceRow | null>(null);
@@ -115,7 +143,7 @@ export default function TeacherDashboard() {
       logoUrl={school?.logo_url ?? null}
       showNotificationBell
       notificationCount={unread}
-      onNotificationPress={() => router.push('/teacher-modal/notifications' as never)}
+      onNotificationPress={() => openInbox()}
       showProfile
       onProfilePress={() => router.push('/teacher-modal/profile' as never)}
     />
@@ -268,7 +296,7 @@ export default function TeacherDashboard() {
         {/* Notices */}
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>Notices</Text>
-          <TouchableOpacity onPress={() => router.push('/teacher-modal/notifications' as never)} hitSlop={8}>
+          <TouchableOpacity onPress={() => openInbox()} hitSlop={8}>
             <Text style={styles.link}>See all</Text>
           </TouchableOpacity>
         </View>
@@ -280,7 +308,7 @@ export default function TeacherDashboard() {
             </View>
           ) : notices.map((n, i) => (
             <TouchableOpacity key={n.id} style={[styles.noticeRow, i > 0 && styles.divider]} activeOpacity={0.7}
-              onPress={() => router.push('/teacher-modal/notifications' as never)}>
+              onPress={() => openInbox()}>
               <View style={[styles.dot, { backgroundColor: n.is_read ? 'transparent' : '#5B6EE8' }]} />
               <View style={styles.flex1}>
                 <Text style={styles.noticeTitle} numberOfLines={1}>{n.title}</Text>

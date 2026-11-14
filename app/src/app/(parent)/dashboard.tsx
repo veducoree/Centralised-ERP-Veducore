@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, RefreshControl, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useLiveNotifications } from '@/lib/useLiveNotifications';
+import { setBadgeCount } from '@/lib/notifications';
 import { StatusBar } from 'expo-status-bar';
 
 import {
@@ -48,6 +50,32 @@ export default function ParentDashboard() {
   const [stats, setStats] = useState<ChildStats | null>(null);
   const [notices, setNotices] = useState<Notification[]>([]);
   const [unread, setUnread] = useState(0);
+  // Opening the inbox counts as viewing everything: clear the badge right away.
+  const openInbox = () => {
+    setUnread(0);
+    setNotices(prev => prev.map(n => ({ ...n, is_read: true })));
+    router.push('/parent-modal/notifications' as never);
+  };
+
+  // Keep the bell badge and latest notices live without a manual refresh.
+  // While the inbox is open on top, it owns read-state; skip background refreshes.
+  const focusedRef = React.useRef(true);
+  const refreshNotices = useCallback(async () => {
+    if (!focusedRef.current) return;
+    try {
+      const notifs = await fetchMyNotifications(30);
+      setNotices(notifs.slice(0, 3));
+      const count = notifs.filter(n => !n.is_read).length;
+      setUnread(count);
+      setBadgeCount(count);
+    } catch { /* offline */ }
+  }, []);
+  useLiveNotifications(refreshNotices);
+  useFocusEffect(useCallback(() => {
+    focusedRef.current = true;
+    refreshNotices();
+    return () => { focusedRef.current = false; };
+  }, [refreshNotices]));
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -129,7 +157,7 @@ export default function ParentDashboard() {
       title={school?.name || 'School'}
       showNotificationBell
       notificationCount={unread}
-      onNotificationPress={() => router.push('/parent-modal/notifications' as never)}
+      onNotificationPress={() => openInbox()}
       showProfile
       onProfilePress={() => router.push('/parent-modal/profile' as never)}
     />
@@ -139,7 +167,7 @@ export default function ParentDashboard() {
     { label: 'Timetable', icon: 'calendar' as const, tint: '#5B6EE8', bg: '#EEF0FD', onPress: () => router.push('/parent-modal/timetable' as never) },
     { label: 'Remarks', icon: 'chatbubble-ellipses' as const, tint: '#F59E0B', bg: '#FEF3E0', onPress: () => setActiveTab('remarks') },
     { label: 'Transport', icon: 'bus' as const, tint: '#06B6D4', bg: '#E0F7FB', onPress: () => setActiveTab('transport') },
-    { label: 'Notices', icon: 'notifications' as const, tint: '#EC4899', bg: '#FDE7F3', onPress: () => router.push('/parent-modal/notifications' as never) },
+    { label: 'Notices', icon: 'notifications' as const, tint: '#EC4899', bg: '#FDE7F3', onPress: () => openInbox() },
   ], [router, setActiveTab]);
 
   if (loading) {
@@ -272,7 +300,7 @@ export default function ParentDashboard() {
         {/* Notices */}
         <View style={styles.sectionHead}>
           <Text style={styles.sectionTitle}>Notices</Text>
-          <TouchableOpacity onPress={() => router.push('/parent-modal/notifications' as never)} hitSlop={8}><Text style={styles.link}>See all</Text></TouchableOpacity>
+          <TouchableOpacity onPress={() => openInbox()} hitSlop={8}><Text style={styles.link}>See all</Text></TouchableOpacity>
         </View>
         <GlassCard padding={0} style={styles.card}>
           {notices.length === 0 ? (
@@ -282,7 +310,7 @@ export default function ParentDashboard() {
             </View>
           ) : notices.map((n, i) => (
             <TouchableOpacity key={n.id} style={[styles.noticeRow, i > 0 && styles.divider]} activeOpacity={0.7}
-              onPress={() => router.push('/parent-modal/notifications' as never)}>
+              onPress={() => openInbox()}>
               <View style={[styles.dot, { backgroundColor: n.is_read ? 'transparent' : '#5B6EE8' }]} />
               <View style={styles.flex1}>
                 <Text style={styles.noticeTitle} numberOfLines={1}>{n.title}</Text>
