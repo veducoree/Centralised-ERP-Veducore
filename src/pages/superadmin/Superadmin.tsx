@@ -4,11 +4,13 @@ import {
   AlertCircle, BarChart3, Building2, Contact2, CreditCard, Eye, EyeOff, History, LifeBuoy, Loader2, LogOut,
   Megaphone, Menu, Plus, Settings, ShieldCheck, Users, Wallet, X,
 } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
 import veducoreLogo from '@/assets/veducore-logo.png';
 import {
   SESSION_EXPIRED_EVENT, callManageSchools, callMgmtAuth, errMsg, mgmtSupabase, type Me, type SchoolRecord,
 } from './api';
 import { Badge, LoadingBlock, ROLES, Toaster, cx, inputCls } from './ui';
+import NotFound from '@/pages/NotFound';
 import DashboardSection from './sections/Dashboard';
 import SchoolsSection from './sections/Schools';
 
@@ -72,15 +74,18 @@ const TITLES: Record<Section, [string, string]> = {
   settings: ['Account', 'Your profile and password'],
 };
 
-function sectionFromHash(): Section {
-  const h = window.location.hash.replace('#', '') as Section;
-  return h in TITLES ? h : 'dashboard';
-}
+// Sections live at clean paths: /superadmin (dashboard), /superadmin/schools, /superadmin/billing …
+const BASE = '/superadmin';
+const isSection = (v: string | undefined): v is Section => !!v && v in TITLES;
+const pathFor = (s: Section) => (s === 'dashboard' ? BASE : `${BASE}/${s}`);
 
-export default function VeducoreManagement() {
+export default function Superadmin() {
   const [me, setMe] = useState<Me | null>(null);
   const [booting, setBooting] = useState(true);
-  const [section, setSectionState] = useState<Section>(sectionFromHash);
+  const navigate = useNavigate();
+  const { section: param } = useParams<{ section?: string }>();
+  const unknownSection = param !== undefined && !isSection(param);
+  const section: Section = isSection(param) ? param : 'dashboard';
   const [navOpen, setNavOpen] = useState(false);
   const [schools, setSchools] = useState<SchoolRecord[]>([]);
   const [schoolsLoading, setSchoolsLoading] = useState(false);
@@ -88,11 +93,17 @@ export default function VeducoreManagement() {
   const [openSchool, setOpenSchool] = useState<string | null>(null);
 
   const setSection = useCallback((s: Section) => {
-    setSectionState(s);
     setNavOpen(false);
-    window.history.replaceState(null, '', `#${s}`);
+    navigate(pathFor(s));
     window.scrollTo({ top: 0 });
-  }, []);
+  }, [navigate]);
+
+  // Old #hash links (/superadmin#billing) and /superadmin/dashboard → clean URL.
+  useEffect(() => {
+    const h = window.location.hash.slice(1);
+    if (isSection(h)) navigate(pathFor(h), { replace: true });
+    else if (param === 'dashboard') navigate(BASE, { replace: true });
+  }, [param, navigate]);
 
   // Restore an existing session.
   useEffect(() => {
@@ -139,11 +150,18 @@ export default function VeducoreManagement() {
 
   useEffect(() => { if (me) loadSchools(); }, [me, loadSchools]);
 
+  // Support staff can't open manager-only sections: send them to the dashboard URL.
+  const managerOnly = section === 'add-school' || section === 'id-cards';
+  useEffect(() => {
+    if (me && me.role === 'support' && managerOnly) navigate(BASE, { replace: true });
+  }, [me, managerOnly, navigate]);
+
+  if (unknownSection) return <NotFound />;
   if (booting) return <Splash />;
   if (!me) return <AuthScreen onSignedIn={setMe} />;
 
   const isManager = me.role !== 'support';
-  const current = (!isManager && (section === 'add-school' || section === 'id-cards')) ? 'dashboard' : section;
+  const current = (!isManager && managerOnly) ? 'dashboard' : section;
 
   const sidebar = (
     <>

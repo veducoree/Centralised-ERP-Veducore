@@ -13,8 +13,10 @@ const PageLoader = () => (
   <CenteredLoader size="lg" fullScreen />
 );
 
-// Management portal
-const VeducoreManagement = lazy(() => import('@/pages/management/VeducoreManagement'));
+const NotFound = lazy(() => import('@/pages/NotFound'));
+
+// Superadmin portal
+const Superadmin = lazy(() => import('@/pages/superadmin/Superadmin'));
 
 // Admin pages
 const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'));
@@ -146,10 +148,6 @@ function App() {
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/teacher" element={<Navigate to="/teacher/dashboard" replace />} />
             <Route path="/parent" element={<Navigate to="/parent/dashboard" replace />} />
-            {/* Old superadmin URLs keep working */}
-            <Route path="/management" element={<Navigate to="/superadmin" replace />} />
-            <Route path="/veducore" element={<Navigate to="/superadmin" replace />} />
-            <Route path="/veducore/management" element={<Navigate to="/superadmin" replace />} />
 
             {/* Admin routes */}
             <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
@@ -209,9 +207,9 @@ function App() {
             <Route path="/parent/timetable" element={<ProtectedRoute allowedRoles={['parent']}><ParentTimetable /></ProtectedRoute>} />
             <Route path="/parent/profile" element={<ProtectedRoute allowedRoles={['parent']}><ProfilePage /></ProtectedRoute>} />
 
-            <Route path="/superadmin" element={<VeducoreManagement />} />
+            <Route path="/superadmin/:section?" element={<Superadmin />} />
 
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
           </Suspense>
         </BrowserRouter>

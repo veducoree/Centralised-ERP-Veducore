@@ -1,5 +1,5 @@
-// ID card studio for the Veducore management portal (moved out of
-// VeducoreManagement.tsx unchanged; now calls the authenticated API).
+// ID card studio for the Veducore superadmin portal (moved out of
+// Superadmin.tsx unchanged; now calls the authenticated API).
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   AlertCircle, AlertTriangle, Building2, Check, CheckCircle, CheckCircle2, ChevronLeft, ChevronRight,
