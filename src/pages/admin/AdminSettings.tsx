@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Upload, X, ImageIcon, CreditCard, ShieldCheck,
   Building2, School as SchoolIcon, Bell, CalendarClock,
-  Award, CheckCircle2, Contact2, ExternalLink
+  Award, CheckCircle2, Contact2, ExternalLink, Clock, Smartphone, AlertTriangle
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
@@ -12,7 +12,8 @@ import { Input, Select } from '@/components/ui/Form';
 import { PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
-import { fetchSchool, updateSchool } from '@/services/api';
+import { fetchSchool, saveSchoolSettings } from '@/services/api';
+import { schoolInitials, schoolBranding } from '@/lib/branding';
 import type { School } from '@/types';
 
 interface InstitutionalSettings {
@@ -26,6 +27,28 @@ interface InstitutionalSettings {
   autoReceipts: boolean;
   remarksAlerts: boolean;
 }
+
+interface SchoolTimings {
+  school_start: string;
+  school_end: string;
+  saturday_end: string;
+  staff_reporting: string;
+  late_after_minutes: number;
+}
+
+const DEFAULT_TIMINGS: SchoolTimings = {
+  school_start: '08:00',
+  school_end: '14:00',
+  saturday_end: '12:00',
+  staff_reporting: '07:45',
+  late_after_minutes: 10,
+};
+
+const to12 = (t: string) => {
+  if (!t) return '—';
+  const [h, m] = t.split(':').map(Number);
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+};
 
 const DEFAULT_SETTINGS: InstitutionalSettings = {
   workingDays: '6',
@@ -56,6 +79,8 @@ export default function AdminSettings() {
   const [affiliationBoard, setAffiliationBoard] = useState('CBSE');
   const [affiliationCode, setAffiliationCode] = useState('');
   const [settings, setSettings] = useState<InstitutionalSettings>(DEFAULT_SETTINGS);
+  const [timings, setTimings] = useState<SchoolTimings>(DEFAULT_TIMINGS);
+  const [brandingOn, setBrandingOn] = useState(true);
 
   const loadData = useCallback(async () => {
     if (!profile?.school_id) return;
@@ -68,8 +93,14 @@ export default function AdminSettings() {
         setAffiliationBoard(data.affiliation_board || 'CBSE');
         setAffiliationCode(data.affiliation_code || '');
         if (data.settings && typeof data.settings === 'object') {
-          setSettings(prev => ({ ...prev, ...data.settings }));
+          const st = data.settings as Record<string, unknown>;
+          setSettings({
+            ...DEFAULT_SETTINGS,
+            ...Object.fromEntries(Object.keys(DEFAULT_SETTINGS).filter((k) => k in st).map((k) => [k, st[k]])),
+          } as InstitutionalSettings);
+          setTimings({ ...DEFAULT_TIMINGS, ...((st.timings as Partial<SchoolTimings>) ?? {}) });
         }
+        setBrandingOn(schoolBranding(data).enabled);
         setLogoPreview(data.logo_url || null);
         setLogoBase64(null);
       }
@@ -112,35 +143,36 @@ export default function AdminSettings() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
+  const timingError =
+    timings.school_end <= timings.school_start ? 'School end time must be after the start time'
+    : settings.workingDays === '6' && timings.saturday_end && timings.saturday_end <= timings.school_start ? 'Saturday end time must be after the start time'
+    : null;
+
   async function handleSave() {
     if (!profile?.school_id) return;
+    if (timingError) { toast(timingError, 'error'); return; }
     setSaving(true);
     try {
-      const updates: Partial<School> = {
-        motto,
-        affiliation_board: affiliationBoard,
-        affiliation_code: affiliationCode,
-        settings: {
-          ...(school?.settings && typeof school.settings === 'object' ? school.settings : {}),
-          ...settings,
-        },
-      };
+      const fields: Partial<School> = { motto, affiliation_board: affiliationBoard, affiliation_code: affiliationCode };
+      if (logoBase64 !== null) fields.logo_url = logoBase64;
+      else if (logoPreview === null && school?.logo_url) fields.logo_url = null;
 
-      if (logoBase64 !== null) {
-        updates.logo_url = logoBase64;
-      } else if (logoPreview === null && school?.logo_url) {
-        updates.logo_url = null;
-      }
-
-      await updateSchool(profile.school_id, updates);
-      toast('Institutional settings saved successfully', 'success');
+      // Only this page's keys are sent; the server merges them into settings.
+      await saveSchoolSettings(profile.school_id, {
+        ...settings,
+        timings,
+        app_branding: { enabled: brandingOn },
+      }, fields);
+      toast('Settings saved', 'success');
       loadData();
-    } catch {
-      toast('Failed to save settings', 'error');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to save settings', 'error');
     } finally {
       setSaving(false);
     }
   }
+
+  const initials = schoolInitials(school?.name);
 
   return (
     <DashboardLayout title="Settings">
@@ -288,6 +320,43 @@ export default function AdminSettings() {
                 </div>
               </div>
 
+              <div className="mb-5 rounded-xl border border-slate-100 p-4">
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                  <div className="flex-1">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-slate-900"><Smartphone className="h-4 w-4 text-brand-600" /> School branding in the portals</p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      When on, teachers, parents and staff see your logo and a portal name built from your school's initials instead of Veducore — in the browser tab, the web header and the mobile app.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex cursor-pointer items-center">
+                    <input type="checkbox" className="peer sr-only" checked={brandingOn} onChange={(e) => setBrandingOn(e.target.checked)} aria-label="Use school branding" />
+                    <span className="h-6 w-11 rounded-full bg-slate-200 transition peer-checked:bg-brand-500 peer-focus-visible:ring-2 peer-focus-visible:ring-brand-400" />
+                    <span className="absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow transition peer-checked:translate-x-5" />
+                  </label>
+                </div>
+                {brandingOn && (
+                  <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    {(['Teacher', 'Parent', 'Admin'] as const).map((role) => (
+                      <div key={role} className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
+                        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+                          {logoPreview ? <img src={logoPreview} alt="" className="h-full w-full object-contain p-1" />
+                            : <span className="text-sm font-bold text-brand-600">{initials.slice(0, 2) || '?'}</span>}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-slate-900">{initials ? `${initials} ` : ''}{role} Portal</p>
+                          <p className="truncate text-[11px] text-slate-400">{school?.name}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {brandingOn && (
+                  <p className="mt-3 text-[11px] text-slate-400">
+                    The phone's home-screen icon and app name come from the installed app and stay the same for every school; inside the app the logo and portal name change after login.
+                  </p>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="sm:col-span-1">
                   <Select label="Affiliation Board" value={affiliationBoard} onChange={(e) => setAffiliationBoard(e.target.value)}>
@@ -357,6 +426,33 @@ export default function AdminSettings() {
                   <span className="text-[11px] text-slate-400 mt-1 block">Used for automatic student report card status calculations.</span>
                 </div>
               </div>
+            </Card>
+
+            {/* ── SCHOOL TIMINGS ── */}
+            <Card className="p-6">
+              <div className="mb-1 flex items-center gap-2">
+                <Clock className="h-5 w-5 text-brand-600" />
+                <h3 className="text-sm font-bold text-slate-900">School Timings</h3>
+              </div>
+              <p className="mb-4 text-xs text-slate-500">Teachers who mark themselves present after reporting time plus the grace minutes are recorded as late.</p>
+              <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+                <Input label="School starts" type="time" value={timings.school_start} onChange={(e) => setTimings({ ...timings, school_start: e.target.value })} />
+                <Input label="School ends" type="time" value={timings.school_end} onChange={(e) => setTimings({ ...timings, school_end: e.target.value })} />
+                {settings.workingDays === '6' && (
+                  <Input label="Saturday ends" type="time" value={timings.saturday_end} onChange={(e) => setTimings({ ...timings, saturday_end: e.target.value })} />
+                )}
+                <Input label="Staff reporting" type="time" value={timings.staff_reporting} onChange={(e) => setTimings({ ...timings, staff_reporting: e.target.value })} />
+                <Select label="Late after" value={String(timings.late_after_minutes)} onChange={(e) => setTimings({ ...timings, late_after_minutes: Number(e.target.value) })}>
+                  {[0, 5, 10, 15, 20, 30].map((m) => <option key={m} value={m}>{m === 0 ? 'Exactly on time' : `${m} min grace`}</option>)}
+                </Select>
+              </div>
+              {timingError ? (
+                <p className="mt-3 flex items-center gap-1.5 text-xs text-red-600"><AlertTriangle className="h-3.5 w-3.5" /> {timingError}</p>
+              ) : (
+                <p className="mt-3 text-xs text-slate-500">
+                  {to12(timings.school_start)} – {to12(timings.school_end)}{settings.workingDays === '6' && timings.saturday_end ? ` (Sat till ${to12(timings.saturday_end)})` : ''} · staff report by {to12(timings.staff_reporting)}
+                </p>
+              )}
             </Card>
 
             {/* ── SECTION 4: FEE BILLING DEFAULTS & AUTOMATED NOTIFICATIONS ── */}
@@ -485,7 +581,7 @@ export default function AdminSettings() {
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-slate-900">Student ID Cards</h4>
-                    <p className="text-[11px] text-slate-400">Submit requests for student ID card generation & printing.</p>
+                    <p className="text-[11px] text-slate-400">Design, generate and print student ID cards.</p>
                   </div>
                 </div>
                 <Button
@@ -495,19 +591,19 @@ export default function AdminSettings() {
                   icon={<ExternalLink className="h-3 w-3" />}
                   className="bg-white flex-shrink-0"
                 >
-                  Request ID Cards
+                  Open ID Cards
                 </Button>
               </Card>
             </div>
 
             {/* ── SAVE ACTION BAR ── */}
-            <div className="flex items-center justify-between pt-4 border-t border-slate-200">
+            <div className="sticky bottom-0 z-10 -mx-1 flex items-center justify-between rounded-xl border-t border-slate-200 bg-white/90 px-1 py-3 backdrop-blur">
               <div className="flex items-center gap-2 text-xs text-slate-500">
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
-                <span>All institutional configuration changes apply instantly across your school.</span>
+                <span>Changes apply across your school as soon as you save.</span>
               </div>
               <Button onClick={handleSave} loading={saving} size="md">
-                Save Institutional Settings
+                Save Settings
               </Button>
             </div>
           </div>

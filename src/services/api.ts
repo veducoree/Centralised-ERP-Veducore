@@ -5,6 +5,7 @@ export {
   fetchSchool,
   getCachedSchoolSync,
   updateSchool,
+  saveSchoolSettings,
   fetchTeachers,
   createTeacherAccount,
   updateTeacher,

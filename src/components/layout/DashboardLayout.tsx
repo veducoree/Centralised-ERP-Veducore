@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, ClipboardList,
   IndianRupee, FileText, Bell, Settings, LogOut,
   X, UserCircle, ChevronDown, Shield, User,
-  Megaphone, UserPlus, ClipboardCheck, CreditCard, CalendarDays, Bus,
+  Megaphone, UserPlus, ClipboardCheck, CalendarDays, Bus,
   LayoutGrid, GripVertical, RotateCcw, Pencil, Check, ChevronRight, ChevronLeft, UserRound, Boxes, Library, CalendarClock, CalendarRange, UserCog, ArrowUpCircle, CalendarCheck2,
 } from 'lucide-react';
 import {
@@ -19,6 +19,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '@/auth/AuthContext';
 import { fetchSchool, getCachedSchoolSync } from '@/services/api';
 import { NotificationBell } from './NotificationBell';
+import { portalName, schoolBranding } from '@/lib/branding';
 import { usePermissions } from '@/auth/PermissionsContext';
 import { cn, getInitials } from '@/lib/utils';
 import veducoreLogo from '@/assets/veducore-logo.png';
@@ -49,13 +50,11 @@ export const adminNav: NavItem[] = [
   { label: 'Fees',               path: '/admin/fees',          icon: <IndianRupee className="h-5 w-5" /> },
   { label: 'Transport',          path: '/admin/transport',     icon: <Bus className="h-5 w-5" /> },
   { label: 'Student Tracking',   path: '/admin/tracking',      icon: <Shield className="h-5 w-5" /> },
-  { label: 'ID Cards',           path: '/admin/id-cards',      icon: <CreditCard className="h-5 w-5" /> },
   { label: 'Documents',          path: '/admin/documents',     icon: <FileText className="h-5 w-5" /> },
   { label: 'Holidays',           path: '/admin/holidays',      icon: <CalendarDays className="h-5 w-5" /> },
   { label: 'Academic Year',      path: '/admin/sessions',      icon: <CalendarRange className="h-5 w-5" /> },
   { label: 'Promotion',          path: '/admin/promotion',     icon: <ArrowUpCircle className="h-5 w-5" /> },
   { label: 'Notifications',      path: '/admin/notifications', icon: <Bell className="h-5 w-5" /> },
-  { label: 'Settings',           path: '/admin/settings',      icon: <Settings className="h-5 w-5" /> },
   { label: 'Staff & Roles',      path: '/admin/staff',         icon: <UserCog className="h-5 w-5" /> },
   { label: 'All Modules',        path: '/admin/all-modules',   icon: <Boxes className="h-5 w-5" /> },
 ];
@@ -387,7 +386,7 @@ export function DashboardLayout({
 
   const firstFocusRef = useRef<HTMLButtonElement>(null);
 
-  const { roleName } = usePermissions();
+  const { roleName, canPath } = usePermissions();
   const roleLabel = profile?.role === 'admin' && roleName && roleName !== 'Owner'
     ? roleName
     : profile?.role
@@ -411,8 +410,27 @@ export function DashboardLayout({
     if (cached) setSchool(cached);
     let cancelled = false;
     fetchSchool(profile.school_id).then((s) => { if (!cancelled && s) setSchool(s); }).catch(() => {});
-    return () => { cancelled = true; };
+    // Settings page saves broadcast the fresh school row.
+    const onUpdate = (e: Event) => { const s = (e as CustomEvent<School | null>).detail; if (s) setSchool(s); };
+    window.addEventListener('veducore:school-updated', onUpdate);
+    return () => { cancelled = true; window.removeEventListener('veducore:school-updated', onUpdate); };
   }, [profile?.school_id]);
+
+  // ── Browser tab: "Attendance · GVCS Teacher Portal" + school logo favicon ──
+  const portal = portalName(school, profile?.role);
+  useEffect(() => {
+    document.title = title ? `${title} · ${portal}` : portal;
+    const link = (document.querySelector("link[rel~='icon']") as HTMLLinkElement | null) ?? (() => {
+      const l = document.createElement('link');
+      l.rel = 'icon';
+      document.head.appendChild(l);
+      return l;
+    })();
+    if (!link.dataset.defaultHref) link.dataset.defaultHref = link.href;
+    const useLogo = !!school?.logo_url && schoolBranding(school).enabled;
+    link.href = useLogo ? school!.logo_url! : link.dataset.defaultHref;
+    if (useLogo) link.removeAttribute('type');
+  }, [title, portal, school]);
 
   const handleSignOut = async () => {
     setUserMenuOpen(false);
@@ -467,11 +485,16 @@ export function DashboardLayout({
               ) : (
                 <div className="h-4 w-28 animate-pulse rounded bg-slate-200" />
               )}
-              {school?.academic_year && (
-                <span className="mt-0.5 inline-flex items-center rounded-full bg-[#EEF0FD] px-2 py-0.5 text-[10px] font-semibold text-[#5B6EE8]">
-                  AY {school.academic_year}
-                </span>
-              )}
+              <div className="mt-0.5 flex items-center gap-1.5">
+                {school && schoolBranding(school).enabled && portal !== 'Veducore' && (
+                  <span className="hidden truncate text-[11px] font-medium text-slate-500 sm:inline">{portal}</span>
+                )}
+                {school?.academic_year && (
+                  <span className="inline-flex items-center rounded-full bg-[#EEF0FD] px-2 py-0.5 text-[10px] font-semibold text-[#5B6EE8]">
+                    AY {school.academic_year}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -508,13 +531,15 @@ export function DashboardLayout({
                   >
                     <UserCircle className="h-4 w-4" /> My Profile
                   </button>
-                  <button
-                    role="menuitem"
-                    onClick={() => { navigate(`/${profile?.role}/settings`); setUserMenuOpen(false); }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-[#EEF0FD] hover:text-[#5B6EE8]"
-                  >
-                    <Settings className="h-4 w-4" /> Settings
-                  </button>
+                  {profile?.role === 'admin' && canPath('/admin/settings') && (
+                    <button
+                      role="menuitem"
+                      onClick={() => { navigate('/admin/settings'); setUserMenuOpen(false); }}
+                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-[#EEF0FD] hover:text-[#5B6EE8]"
+                    >
+                      <Settings className="h-4 w-4" /> School Settings
+                    </button>
+                  )}
                   <div className="my-1 h-px bg-[#E8EAF3]" />
                   <button
                     role="menuitem"

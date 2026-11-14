@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { GLASS, SPACING } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
+import { portalName } from '@/lib/branding';
 import { getInitials } from '@/lib/utils';
 
 interface HeaderProps {
@@ -63,7 +64,10 @@ export function Header({
   }, [effectiveLogoUrl]);
 
   const showSchoolLogo = Boolean(effectiveLogoUrl && !logoLoadError);
-  const displayTitle = !showBack && school?.name ? school.name : title;
+  // After login the header shows the school's portal name, e.g. "GVCS Teacher Portal".
+  const portal = portalName(school, profile?.role);
+  const displayTitle = !showBack && school?.name ? (portal ?? school.name) : title;
+  const displaySubtitle = !showBack && portal ? school?.name : subtitle;
   const isLongTitle = displayTitle.length > 20;
 
   return (
@@ -105,6 +109,9 @@ export function Header({
             ellipsizeMode="tail">
             {displayTitle}
           </Text>
+          {displaySubtitle ? (
+            <Text style={styles.subtitle} numberOfLines={1}>{displaySubtitle}</Text>
+          ) : null}
         </View>
 
         <View style={styles.rightActions}>
@@ -210,6 +217,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#0F172A',
     letterSpacing: -0.2,
+    marginTop: 1,
+  },
+  subtitle: {
+    fontSize: 11,
+    color: '#64748B',
     marginTop: 1,
   },
   titleCompact: {

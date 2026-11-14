@@ -160,6 +160,24 @@ export async function updateSchool(schoolId: string, updates: Partial<School>) {
   return school;
 }
 
+/**
+ * Saves Settings-page changes. The settings patch is merged on the server
+ * (settings || patch) so keys other pages keep in settings aren't lost.
+ */
+export async function saveSchoolSettings(
+  schoolId: string,
+  patch: Record<string, unknown>,
+  fields: Partial<Pick<School, 'motto' | 'affiliation_board' | 'affiliation_code' | 'logo_url'>> = {},
+) {
+  const { data, error } = await supabase.rpc('update_school_settings', { p_patch: patch, p_fields: fields });
+  if (error) throw new Error(error.message);
+  invalidateCache(`school:${schoolId}`);
+  const school = data as School | null;
+  setCachedSchoolSync(schoolId, school);
+  window.dispatchEvent(new CustomEvent('veducore:school-updated', { detail: school }));
+  return school;
+}
+
 export async function fetchTeachers(schoolId: string) {
   return cachedFetch(`teachers:${schoolId}`, async () => {
     const { data, error } = await supabase
