@@ -750,3 +750,28 @@ export interface Certificate {
 }
 
 export type PromotionAction = 'promote' | 'retain' | 'leave' | 'graduate';
+
+export interface SectionDayOverview {
+  section_id: string; class_id: string; label: string; grade_level: number | null;
+  students: number; marked: number; present: number; absent: number; late: number; on_leave: number;
+}
+
+export interface RegisterRow {
+  student_id: string; full_name: string; roll_number: number | null; admission_number: string;
+  days: Record<string, AttendanceStatus>;
+  present: number; absent: number; late: number; on_leave: number; total: number;
+}
+
+export interface AttendanceDefaulter {
+  student_id: string; full_name: string; admission_number: string; roll_number: number | null;
+  class_name: string | null; section_name: string | null;
+  present: number; absent: number; total: number; percent: number; parent_phone: string | null;
+}
+
+export type StaffAttendanceStatus = 'present' | 'absent' | 'half_day' | 'leave' | 'late';
+
+export interface StaffRegisterRow {
+  teacher_id: string; full_name: string; employee_id: string;
+  days: Record<string, StaffAttendanceStatus>;
+  present: number; absent: number; half_day: number; on_leave: number; late: number; total: number;
+}

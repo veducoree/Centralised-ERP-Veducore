@@ -18,6 +18,7 @@ import type {
   StaffRole, StaffMember, MyPermissions, PermissionLevel,
   Exam, ExamScheduleRow, GradingScale, GradeBand, ExamResultRow, ExamProgressRow, RecordType,
   Certificate, CertificateType, PromotionAction,
+  SectionDayOverview, RegisterRow, AttendanceDefaulter, StaffRegisterRow, StaffAttendanceStatus,
 } from '@/types';
 
 // Lightweight in-memory cache with TTL and in-flight request deduplication
@@ -3437,4 +3438,52 @@ export async function promoteStudents(
   if (error) throw error;
   clearApiCache();
   return data as Record<PromotionAction, number>;
+}
+
+// ==========================================
+// Attendance reports & staff attendance
+// ==========================================
+export async function fetchAttendanceOverview(date: string) {
+  const { data, error } = await supabase.rpc('attendance_daily_overview', { p_date: date });
+  if (error) throw error;
+  return (data ?? []) as SectionDayOverview[];
+}
+
+export async function fetchAttendanceRegister(sectionId: string, from: string, to: string) {
+  const { data, error } = await supabase.rpc('attendance_register', { p_section: sectionId, p_from: from, p_to: to });
+  if (error) throw error;
+  return (data ?? []) as RegisterRow[];
+}
+
+export async function fetchAttendanceDefaulters(from: string, to: string, threshold: number, classId?: string | null) {
+  const { data, error } = await supabase.rpc('attendance_defaulters', { p_from: from, p_to: to, p_threshold: threshold, p_class: classId ?? null });
+  if (error) throw error;
+  return ((data ?? []) as AttendanceDefaulter[]).map((d) => ({ ...d, percent: Number(d.percent) }));
+}
+
+export async function notifyLowAttendance(studentIds: string[], from: string, to: string) {
+  const { data, error } = await supabase.rpc('notify_low_attendance', { p_students: studentIds, p_from: from, p_to: to });
+  if (error) throw error;
+  return (data as number) ?? 0;
+}
+
+export async function fetchStaffAttendanceForDate(schoolId: string, date: string) {
+  const { data, error } = await supabase.from('staff_attendance').select('*').eq('school_id', schoolId).eq('attendance_date', date);
+  if (error) throw error;
+  return (data ?? []) as { id: string; teacher_id: string; status: StaffAttendanceStatus; check_in: string | null; check_out: string | null; note: string | null }[];
+}
+
+export async function saveStaffAttendance(schoolId: string, date: string, rows: { teacher_id: string; status: StaffAttendanceStatus; check_in?: string | null; check_out?: string | null; note?: string | null }[]) {
+  if (!rows.length) return;
+  const { error } = await supabase.from('staff_attendance').upsert(
+    rows.map((r) => ({ school_id: schoolId, attendance_date: date, teacher_id: r.teacher_id, status: r.status,
+      check_in: r.check_in || null, check_out: r.check_out || null, note: r.note || null })),
+    { onConflict: 'teacher_id,attendance_date' });
+  if (error) throw error;
+}
+
+export async function fetchStaffAttendanceRegister(from: string, to: string) {
+  const { data, error } = await supabase.rpc('staff_attendance_register', { p_from: from, p_to: to });
+  if (error) throw error;
+  return (data ?? []) as StaffRegisterRow[];
 }
