@@ -106,7 +106,7 @@ function AddMemberModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
     setSaving(true);
     try {
       await callManageSchools({ action: 'team-add', ...f });
-      navigator.clipboard.writeText(`Veducore management portal\n${window.location.origin}/veducore/management\nEmail: ${f.email}\nPassword: ${f.password}`).catch(() => {});
+      navigator.clipboard.writeText(`Veducore Superadmin\n${window.location.origin}/superadmin\nEmail: ${f.email}\nPassword: ${f.password}`).catch(() => {});
       toast('Member added — login details copied to clipboard');
       onAdded();
     } catch (e) {

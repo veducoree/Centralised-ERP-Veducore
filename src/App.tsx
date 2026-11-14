@@ -146,8 +146,10 @@ function App() {
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
             <Route path="/teacher" element={<Navigate to="/teacher/dashboard" replace />} />
             <Route path="/parent" element={<Navigate to="/parent/dashboard" replace />} />
-            <Route path="/management" element={<Navigate to="/veducore/management" replace />} />
-            <Route path="/veducore" element={<Navigate to="/veducore/management" replace />} />
+            {/* Old superadmin URLs keep working */}
+            <Route path="/management" element={<Navigate to="/superadmin" replace />} />
+            <Route path="/veducore" element={<Navigate to="/superadmin" replace />} />
+            <Route path="/veducore/management" element={<Navigate to="/superadmin" replace />} />
 
             {/* Admin routes */}
             <Route path="/admin/dashboard" element={<ProtectedRoute allowedRoles={['admin']}><AdminDashboard /></ProtectedRoute>} />
@@ -207,7 +209,7 @@ function App() {
             <Route path="/parent/timetable" element={<ProtectedRoute allowedRoles={['parent']}><ParentTimetable /></ProtectedRoute>} />
             <Route path="/parent/profile" element={<ProtectedRoute allowedRoles={['parent']}><ProfilePage /></ProtectedRoute>} />
 
-            <Route path="/veducore/management" element={<VeducoreManagement />} />
+            <Route path="/superadmin" element={<VeducoreManagement />} />
 
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
