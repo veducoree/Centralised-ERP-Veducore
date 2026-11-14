@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Check, X, Clock, CalendarOff, Save, ClipboardCheck, Stethoscope, Info } from 'lucide-react';
+import { Check, X, Clock, Save, ClipboardCheck, Stethoscope, Info } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/Button';
 import { PageHeader, LoadingSpinner, SearchInput } from '@/components/ui/Primitives';
@@ -9,10 +9,10 @@ import { fetchTeacherByUserId, fetchMyAttendanceSections, fetchStudentsBySection
 import type { Teacher, Student } from '@/types';
 import { cn } from '@/lib/utils';
 
-type Status = 'present' | 'absent' | 'late' | 'leave' | 'medical';
+type Status = 'present' | 'absent' | 'late' | 'medical';
 
 const localISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-const STATUS_LABEL: Record<Status, string> = { present: 'Present', absent: 'Absent', late: 'Late', leave: 'Leave', medical: 'Medical' };
+const STATUS_LABEL: Record<Status, string> = { present: 'Present', absent: 'Absent', late: 'Late', medical: 'Medical' };
 
 export default function TeacherAttendance() {
   const { profile } = useAuth();
@@ -102,7 +102,6 @@ export default function TeacherAttendance() {
     present: <Check className="h-4 w-4" />,
     absent: <X className="h-4 w-4" />,
     late: <Clock className="h-4 w-4" />,
-    leave: <CalendarOff className="h-4 w-4" />,
     medical: <Stethoscope className="h-4 w-4" />,
   };
 
@@ -110,7 +109,6 @@ export default function TeacherAttendance() {
     present: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
     absent: 'bg-red-50 text-red-700 ring-red-200',
     late: 'bg-amber-50 text-amber-700 ring-amber-200',
-    leave: 'bg-cyan-50 text-cyan-700 ring-cyan-200',
     medical: 'bg-violet-50 text-violet-700 ring-violet-200',
   };
 
@@ -178,7 +176,7 @@ export default function TeacherAttendance() {
                       <td className="px-4 py-3 text-slate-700">{s.full_name}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          {(['present', 'absent', 'late', 'leave', 'medical'] as Status[]).map((st) => (
+                          {(['present', 'absent', 'late', 'medical'] as Status[]).map((st) => (
                             <button
                               key={st}
                               onClick={() => setStatus(s.id, st)}

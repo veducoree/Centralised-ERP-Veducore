@@ -41,7 +41,6 @@ const STATUS: Record<AttendanceStatus, { short: string; label: string; on: strin
   present: { short: 'P', label: 'Present', on: 'bg-emerald-500 text-white', cell: 'text-emerald-700' },
   absent: { short: 'A', label: 'Absent', on: 'bg-red-500 text-white', cell: 'bg-red-50 text-red-600 font-semibold' },
   late: { short: 'L', label: 'Late', on: 'bg-amber-500 text-white', cell: 'bg-amber-50 text-amber-700' },
-  leave: { short: 'LV', label: 'Leave', on: 'bg-sky-500 text-white', cell: 'bg-sky-50 text-sky-700' },
   medical: { short: 'ML', label: 'Medical (counts as present)', on: 'bg-violet-500 text-white', cell: 'bg-violet-50 text-violet-700' },
 };
 const STAFF_STATUS: Record<StaffAttendanceStatus, { short: string; label: string; on: string }> = {
@@ -179,7 +178,6 @@ function DailyTab() {
                     <span><b className="text-emerald-600">{r.present}</b> P</span>
                     <span><b className="text-red-600">{r.absent}</b> A</span>
                     <span><b className="text-amber-600">{r.late}</b> L</span>
-                    <span><b className="text-sky-600">{r.on_leave}</b> LV</span>
                     {r.medical > 0 && <span><b className="text-violet-600">{r.medical}</b> ML</span>}
                     {r.marked < r.students && <span className="text-amber-600">{r.students - r.marked} left</span>}
                   </div>
@@ -281,10 +279,10 @@ function RegisterTab({ classes, holidays }: { classes: ClassWithSections[]; holi
 
   function exportCsv() {
     downloadCsv(`Attendance ${label} ${month}`, [
-      ['Roll', 'Name', 'Admission No', ...days.map((d) => d.slice(8)), 'Present', 'Absent', 'Late', 'Leave', 'Medical', 'Marked', '%'],
+      ['Roll', 'Name', 'Admission No', ...days.map((d) => d.slice(8)), 'Present', 'Absent', 'Late', 'Medical', 'Marked', '%'],
       ...rows.map((r) => [r.roll_number, r.full_name, r.admission_number,
         ...days.map((d) => r.days[d] ? STATUS[r.days[d]].short : offDay(d) ? 'H' : ''),
-        r.present, r.absent, r.late, r.on_leave, r.medical, r.total, pct(r.present + r.late + r.medical, r.total)]),
+        r.present, r.absent, r.late, r.medical, r.total, pct(r.present + r.late + r.medical, r.total)]),
     ]);
   }
 

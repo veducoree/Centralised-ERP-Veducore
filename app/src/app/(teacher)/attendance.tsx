@@ -66,13 +66,6 @@ const STATUS_CONFIG: Record<
     bg: '#FFFBEB',
     border: '#F59E0B',
   },
-  leave: {
-    label: 'Leave',
-    icon: 'calendar',
-    color: '#0E7490',
-    bg: '#ECFEFF',
-    border: '#06B6D4',
-  },
   medical: {
     label: 'Medical',
     icon: 'medkit',
@@ -348,15 +341,13 @@ export default function TeacherAttendance() {
     let p = 0;
     let a = 0;
     let l = 0;
-    let lv = 0;
     students.forEach(s => {
       const st = statuses[s.id] || 'present';
       if (st === 'present' || st === 'medical') p++;
       else if (st === 'absent') a++;
       else if (st === 'late') l++;
-      else if (st === 'leave') lv++;
     });
-    return { present: p, absent: a, late: l, leave: lv, total: students.length };
+    return { present: p, absent: a, late: l, total: students.length };
   }, [students, statuses]);
 
   if (loading) {
@@ -513,11 +504,6 @@ export default function TeacherAttendance() {
                 <Text style={[styles.statVal, { color: '#B45309' }]}>{stats.late}</Text>
                 <Text style={styles.statLabel}>Late</Text>
               </View>
-              <View style={styles.statDivider} />
-              <View style={styles.statPill}>
-                <Text style={[styles.statVal, { color: '#0E7490' }]}>{stats.leave}</Text>
-                <Text style={styles.statLabel}>Leave</Text>
-              </View>
             </View>
           </GlassCard>
 
@@ -555,9 +541,9 @@ export default function TeacherAttendance() {
                       </View>
                     </View>
 
-                    {/* Status buttons in two rows: Present / Absent, then Late / Leave / Medical */}
+                    {/* Status buttons in two rows: Present / Absent, then Late / Medical */}
                     <View style={styles.statusButtons}>
-                      {([['present', 'absent'], ['late', 'leave', 'medical']] as AttendanceStatus[][]).map((row, ri) => (
+                      {([['present', 'absent'], ['late', 'medical']] as AttendanceStatus[][]).map((row, ri) => (
                         <View key={ri} style={styles.statusButtonsRow}>
                           {row.map(stKey => {
                             const isSelected = currentStatus === stKey;

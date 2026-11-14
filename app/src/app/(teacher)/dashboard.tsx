@@ -136,7 +136,7 @@ export default function TeacherDashboard() {
     { label: 'Attendance', icon: 'checkbox' as const, tint: '#22C08A', bg: '#E6F8F1', onPress: () => setActiveTab('attendance') },
     { label: 'Marks', icon: 'stats-chart' as const, tint: '#5B6EE8', bg: '#EEF0FD', onPress: () => setActiveTab('marks') },
     { label: 'Remarks', icon: 'chatbubble-ellipses' as const, tint: '#F59E0B', bg: '#FEF3E0', onPress: () => router.push('/teacher-modal/remarks' as never) },
-    { label: 'Leave', icon: 'airplane' as const, tint: '#EC4899', bg: '#FDE7F3', onPress: () => router.push('/teacher-modal/my-attendance' as never) },
+    { label: 'Leave', icon: 'calendar-clear' as const, tint: '#EC4899', bg: '#FDE7F3', onPress: () => router.push('/teacher-modal/my-attendance' as never) },
   ];
 
   return (

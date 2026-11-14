@@ -32,7 +32,6 @@ const TODAY_STYLE: Record<string, { label: string; color: string; bg: string; ic
   present: { label: 'Present today', color: '#15803D', bg: '#E6F8F1', icon: 'checkmark-circle' },
   medical: { label: 'Medical leave (ML)', color: '#6D28D9', bg: '#F5F3FF', icon: 'medkit' },
   late: { label: 'Arrived late', color: '#B45309', bg: '#FEF3E0', icon: 'time' },
-  leave: { label: 'On leave', color: '#0E7490', bg: '#E0F7FB', icon: 'calendar' },
   absent: { label: 'Absent today', color: '#C53030', bg: '#FEECEC', icon: 'close-circle' },
 };
 

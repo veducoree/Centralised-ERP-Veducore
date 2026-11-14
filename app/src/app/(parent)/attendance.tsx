@@ -40,7 +40,6 @@ const STATUS_THEME: Record<AttendanceStatus, { color: string; bg: string; label:
   present: { color: '#10B981', bg: 'rgba(16, 185, 129, 0.15)', label: 'Present', icon: 'checkmark-circle' },
   absent: { color: '#EF4444', bg: 'rgba(239, 68, 68, 0.15)', label: 'Absent', icon: 'close-circle' },
   late: { color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.15)', label: 'Late', icon: 'time' },
-  leave: { color: '#06B6D4', bg: 'rgba(6, 182, 212, 0.15)', label: 'Leave', icon: 'calendar' },
   medical: { color: '#7C3AED', bg: 'rgba(124, 58, 237, 0.15)', label: 'Medical', icon: 'medkit' },
 };
 
@@ -143,7 +142,6 @@ export default function ParentAttendance() {
   const presentCount = attendance.filter(a => a.status === 'present').length + medicalCount;
   const absentCount = attendance.filter(a => a.status === 'absent').length;
   const lateCount = attendance.filter(a => a.status === 'late').length;
-  const leaveCount = attendance.filter(a => a.status === 'leave').length;
   const total = attendance.length;
   const rate = total > 0 ? Math.round(((presentCount + lateCount) / total) * 100) : 0;
 
@@ -253,20 +251,19 @@ export default function ParentAttendance() {
               </View>
               <View style={styles.statDivider} />
               <View style={styles.statItem}>
-                <Text style={[styles.statVal, { color: '#D97706' }]}>{lateCount + leaveCount}</Text>
-                <Text style={styles.statLabel}>Late / Leave</Text>
+                <Text style={[styles.statVal, { color: '#D97706' }]}>{lateCount}</Text>
+                <Text style={styles.statLabel}>Late</Text>
               </View>
             </View>
           </View>
 
-          {/* Filter Pills: All, Present, Absent, Late, Leave */}
+          {/* Filter Pills: All, Present, Absent, Late, Medical */}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterPillsScroll}>
             {[
               { id: 'all', label: `All (${attendance.length})` },
               { id: 'present', label: `Present (${presentCount})` },
               { id: 'absent', label: `Absent (${absentCount})` },
               { id: 'late', label: `Late (${lateCount})` },
-              { id: 'leave', label: `Leave (${leaveCount})` },
               ...(medicalCount ? [{ id: 'medical', label: `Medical (${medicalCount})` }] : []),
             ].map(f => {
               const active = statusFilter === f.id;

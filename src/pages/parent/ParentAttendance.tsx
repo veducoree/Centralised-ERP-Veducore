@@ -54,7 +54,6 @@ export default function ParentAttendance() {
   const present = records.filter((r) => r.status === 'present').length + medical;
   const absent = records.filter((r) => r.status === 'absent').length;
   const late = records.filter((r) => r.status === 'late').length;
-  const leave = records.filter((r) => r.status === 'leave').length;
   const rate = records.length > 0 ? Math.round(((present + late) / records.length) * 100) : 0;
 
   if (loading) return <DashboardLayout title="Attendance"><LoadingSpinner /></DashboardLayout>;
@@ -76,7 +75,7 @@ export default function ParentAttendance() {
           <StatCard label="Attendance Rate" value={`${rate}%`} color="emerald" />
           <StatCard label={medical ? `Present (incl. ${medical} ML)` : 'Present'} value={present} color="blue" />
           <StatCard label="Absent" value={absent} color="red" />
-          <StatCard label="Late / Leave" value={late + leave} color="amber" />
+          <StatCard label="Late" value={late} color="amber" />
         </div>
 
         <Card className="p-4">

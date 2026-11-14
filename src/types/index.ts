@@ -1,6 +1,6 @@
 export type UserRole = 'admin' | 'teacher' | 'parent';
 export type ActiveStatus = 'active' | 'inactive';
-export type AttendanceStatus = 'present' | 'absent' | 'late' | 'leave' | 'medical';
+export type AttendanceStatus = 'present' | 'absent' | 'late' | 'medical';
 export type FeeStatus = 'paid' | 'partially_paid' | 'pending' | 'overdue';
 export type RemarkCategory = 'academic' | 'behaviour' | 'attendance' | 'performance' | 'general';
 export type RemarkVisibility = 'public' | 'parents_only' | 'staff_only';

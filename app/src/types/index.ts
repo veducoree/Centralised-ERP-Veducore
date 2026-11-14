@@ -116,7 +116,7 @@ export interface Student {
   section?: Section;
 }
 
-export type AttendanceStatus = 'present' | 'absent' | 'late' | 'leave' | 'medical';
+export type AttendanceStatus = 'present' | 'absent' | 'late' | 'medical';
 export type RecordType = 'unit_test' | 'mid_term' | 'final_exam' | 'assignment' | 'practical';
 
 export interface ExamDef {
