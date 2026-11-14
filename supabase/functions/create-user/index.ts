@@ -11,7 +11,7 @@ interface CreateUserBody {
   email: string;
   password: string;
   full_name: string;
-  role: "teacher" | "parent";
+  role: "teacher" | "parent" | "admin";
   school_id: string;
   phone?: string;
   extra?: Record<string, unknown>;
@@ -56,7 +56,7 @@ Deno.serve(async (req: Request) => {
     // Verify caller is admin
     const { data: profile } = await adminClient
       .from("profiles")
-      .select("role, school_id, status")
+      .select("role, school_id, status, staff_role_id")
       .eq("id", userData.user.id)
       .maybeSingle();
 
@@ -75,6 +75,47 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({ error: "Missing required fields" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    if (!["teacher", "parent", "admin"].includes(role)) {
+      return new Response(
+        JSON.stringify({ error: "Invalid role" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Staff accounts: owner only. Teachers/parents: owner, or staff whose
+    // role grants edit on that module.
+    const isOwner = profile.staff_role_id === null;
+    let staffRoleId: string | null = null;
+    if (role === "admin") {
+      if (!isOwner) {
+        return new Response(
+          JSON.stringify({ error: "Only the school owner can create staff logins" }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      staffRoleId = (extra?.staff_role_id as string | undefined) ?? null;
+      const { data: staffRole } = staffRoleId
+        ? await adminClient.from("staff_roles").select("id").eq("id", staffRoleId).eq("school_id", profile.school_id).maybeSingle()
+        : { data: null };
+      if (!staffRole) {
+        return new Response(
+          JSON.stringify({ error: "Choose a valid staff role" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } else if (!isOwner) {
+      const { data: staffRole } = await adminClient
+        .from("staff_roles").select("permissions").eq("id", profile.staff_role_id).maybeSingle();
+      const perms = (staffRole?.permissions ?? {}) as Record<string, string>;
+      const modules = role === "teacher" ? ["teachers"] : ["parents", "students", "admissions"];
+      if (!modules.some((m) => perms[m] === "edit")) {
+        return new Response(
+          JSON.stringify({ error: `Your role cannot create ${role} accounts` }),
+          { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
     }
 
     if (school_id !== profile.school_id) {
@@ -112,8 +153,18 @@ Deno.serve(async (req: Request) => {
         email,
         phone: phone || null,
         status: "active",
+        ...(role === "admin" ? { staff_role_id: staffRoleId } : {}),
       })
       .eq("id", newUserId);
+
+    if (profileErr && role === "admin") {
+      // Without staff_role_id the account would count as a school owner.
+      await adminClient.auth.admin.deleteUser(newUserId).catch(() => {});
+      return new Response(
+        JSON.stringify({ error: "Could not set up the staff account: " + profileErr.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (profileErr) {
       // Best effort — the auth user is created, profile may have been auto-created

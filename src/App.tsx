@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Suspense, lazy, useEffect } from 'react';
 import { AuthProvider, useAuth } from '@/auth/AuthContext';
+import { PermissionsProvider } from '@/auth/PermissionsContext';
 import { ToastProvider } from '@/components/ui/Toast';
 import { ProtectedRoute } from '@/auth/ProtectedRoute';
 import LoginPage from '@/pages/LoginPage';
@@ -34,6 +35,7 @@ const AdminIDCard = lazy(() => import('@/pages/admin/AdminIDCard'));
 const AdminDocuments = lazy(() => import('@/pages/admin/AdminDocuments'));
 const AdminHolidays = lazy(() => import('@/pages/admin/AdminHolidays'));
 const AdminSessions = lazy(() => import('@/pages/admin/AdminSessions'));
+const AdminStaff = lazy(() => import('@/pages/admin/AdminStaff'));
 const ProfilePage = lazy(() => import('@/pages/shared/ProfilePage'));
 const StudentDetailPage = lazy(() => import('@/pages/admin/StudentDetailPage'));
 const NewAdmissionPage = lazy(() => import('@/pages/admin/NewAdmissionPage'));
@@ -124,6 +126,7 @@ function RoutePrefetcher() {
 function App() {
   return (
     <AuthProvider>
+      <PermissionsProvider>
       <ToastProvider>
         <SidebarPrefProvider>
           <RoutePrefetcher />
@@ -160,6 +163,7 @@ function App() {
             <Route path="/admin/documents" element={<ProtectedRoute allowedRoles={['admin']}><AdminDocuments /></ProtectedRoute>} />
             <Route path="/admin/holidays" element={<ProtectedRoute allowedRoles={['admin']}><AdminHolidays /></ProtectedRoute>} />
             <Route path="/admin/sessions" element={<ProtectedRoute allowedRoles={['admin']}><AdminSessions /></ProtectedRoute>} />
+            <Route path="/admin/staff" element={<ProtectedRoute allowedRoles={['admin']}><AdminStaff /></ProtectedRoute>} />
             <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={['admin']}><AdminNotifications /></ProtectedRoute>} />
             <Route path="/admin/settings" element={<ProtectedRoute allowedRoles={['admin']}><AdminSettings /></ProtectedRoute>} />
             <Route path="/admin/profile" element={<ProtectedRoute allowedRoles={['admin']}><ProfilePage /></ProtectedRoute>} />
@@ -199,6 +203,7 @@ function App() {
         </BrowserRouter>
         </SidebarPrefProvider>
       </ToastProvider>
+      </PermissionsProvider>
     </AuthProvider>
   );
 }

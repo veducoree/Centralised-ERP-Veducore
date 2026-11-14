@@ -15,6 +15,7 @@ import type {
   AdmissionPaymentMode, AdmissionReceipt,
   SidebarPreference,
   AcademicSession, AdminDashboardSummary,
+  StaffRole, StaffMember, MyPermissions, PermissionLevel,
 } from '@/types';
 
 // Lightweight in-memory cache with TTL and in-flight request deduplication
@@ -3088,4 +3089,92 @@ export async function countSessionEnrollments(sessionId: string) {
     .eq('session_id', sessionId);
   if (error) throw error;
   return count ?? 0;
+}
+
+// ==========================================
+// Staff roles & permissions
+// ==========================================
+export async function fetchMyPermissions(): Promise<MyPermissions> {
+  const { data, error } = await supabase.rpc('my_permissions');
+  if (error) throw error;
+  return (data as MyPermissions) ?? {};
+}
+
+export async function fetchStaffRoles(schoolId: string) {
+  const { data, error } = await supabase
+    .from('staff_roles').select('*').eq('school_id', schoolId).order('is_system', { ascending: false }).order('name');
+  if (error) throw error;
+  return (data ?? []) as StaffRole[];
+}
+
+export async function saveStaffRole(role: {
+  id?: string; school_id: string; name: string; description?: string | null; permissions: Record<string, PermissionLevel>;
+}) {
+  const { id, ...rest } = role;
+  const payload = { ...rest, updated_at: new Date().toISOString() };
+  const q = id ? supabase.from('staff_roles').update(payload).eq('id', id) : supabase.from('staff_roles').insert(payload);
+  const { data, error } = await q.select().maybeSingle();
+  if (error) {
+    if (error.code === '23505') throw new Error(`A role named "${role.name}" already exists`);
+    throw error;
+  }
+  return data as StaffRole;
+}
+
+export async function deleteStaffRole(id: string) {
+  const { error } = await supabase.rpc('delete_staff_role', { p_role: id });
+  if (error) throw error;
+}
+
+export async function listSchoolStaff() {
+  const { data, error } = await supabase.rpc('list_school_staff');
+  if (error) throw error;
+  return (data ?? []) as StaffMember[];
+}
+
+export async function assignStaffRole(userId: string, roleId: string | null) {
+  const { error } = await supabase.rpc('assign_staff_role', { p_user: userId, p_role: roleId });
+  if (error) throw error;
+}
+
+export async function setStaffStatus(userId: string, status: 'active' | 'inactive') {
+  const { error } = await supabase.rpc('set_staff_status', { p_user: userId, p_status: status });
+  if (error) throw error;
+}
+
+/**
+ * Creates an admin-panel login with a staff role. The role is assigned
+ * again through the owner-only RPC right after creation so the account can
+ * never end up as an unrestricted owner (e.g. if an older create-user
+ * function is deployed). If that fails the account is deactivated.
+ */
+export async function createStaffAccount(params: {
+  email: string; password: string; full_name: string; school_id: string; phone?: string; staff_role_id: string;
+}) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not authenticated');
+  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({
+      email: params.email,
+      password: params.password,
+      full_name: params.full_name,
+      role: 'admin',
+      school_id: params.school_id,
+      phone: params.phone,
+      extra: { staff_role_id: params.staff_role_id },
+    }),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'Failed to create staff account');
+
+  try {
+    await assignStaffRole(result.id, params.staff_role_id);
+  } catch (err) {
+    await setStaffStatus(result.id, 'inactive').catch(() => {});
+    throw new Error('Account created but the role could not be assigned, so it was deactivated. ' +
+      (err instanceof Error ? err.message : ''));
+  }
+  return result as { id: string; email: string; password: string };
 }

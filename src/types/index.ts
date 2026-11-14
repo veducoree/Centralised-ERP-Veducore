@@ -613,3 +613,32 @@ export interface AdminDashboardSummary {
   pending_transport: number;
   recent_notifications: { id: string; title: string; category: string; audience: string; created_at: string; recipients: number }[];
 }
+
+export type PermissionLevel = 'none' | 'view' | 'edit';
+
+export interface StaffRole {
+  id: string;
+  school_id: string;
+  name: string;
+  description: string | null;
+  permissions: Record<string, PermissionLevel>;
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StaffMember {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  status: 'active' | 'inactive';
+  staff_role_id: string | null;
+  created_at: string;
+}
+
+export interface MyPermissions {
+  owner?: boolean;
+  role?: string;
+  modules?: Record<string, PermissionLevel>;
+}

@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout, adminNav } from '@/components/layout/DashboardLayout';
 import { cn } from '@/lib/utils';
+import { usePermissions } from '@/auth/PermissionsContext';
 
 // ── Color config ──────────────────────────────────────────────────────────────
 type TileColor = 'blue' | 'emerald' | 'amber' | 'cyan' | 'red' | 'violet' | 'pink' | 'orange' | 'gray';
@@ -23,6 +24,7 @@ const MODULE_COLORS: Record<string, TileColor> = {
   '/admin/sessions':      'violet',
   '/admin/notifications': 'orange',
   '/admin/settings':      'gray',
+  '/admin/staff':         'violet',
   '/admin/profile':       'blue',
 };
 
@@ -56,7 +58,8 @@ export default function AllModulesPage() {
   const navigate = useNavigate();
 
   // Strip "All Modules" itself from the grid
-  const modules = adminNav.filter((item) => item.path !== '/admin/all-modules');
+  const { canPath } = usePermissions();
+  const modules = adminNav.filter((item) => item.path !== '/admin/all-modules' && canPath(item.path));
 
   return (
     <DashboardLayout title="All Modules">

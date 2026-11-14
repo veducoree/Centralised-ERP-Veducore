@@ -5,7 +5,7 @@ import {
   IndianRupee, FileText, Bell, Settings, LogOut,
   X, UserCircle, ChevronDown, Shield, User,
   Megaphone, UserPlus, ClipboardCheck, CreditCard, CalendarDays, Bus,
-  LayoutGrid, GripVertical, RotateCcw, Pencil, Check, ChevronRight, ChevronLeft, UserRound, Boxes, Library, CalendarClock, CalendarRange,
+  LayoutGrid, GripVertical, RotateCcw, Pencil, Check, ChevronRight, ChevronLeft, UserRound, Boxes, Library, CalendarClock, CalendarRange, UserCog,
 } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
@@ -19,6 +19,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '@/auth/AuthContext';
 import { fetchSchool, getCachedSchoolSync } from '@/services/api';
 import { NotificationBell } from './NotificationBell';
+import { usePermissions } from '@/auth/PermissionsContext';
 import { cn, getInitials } from '@/lib/utils';
 import veducoreLogo from '@/assets/veducore-logo.png';
 import type { School } from '@/types';
@@ -53,6 +54,7 @@ export const adminNav: NavItem[] = [
   { label: 'Academic Year',      path: '/admin/sessions',      icon: <CalendarRange className="h-5 w-5" /> },
   { label: 'Notifications',      path: '/admin/notifications', icon: <Bell className="h-5 w-5" /> },
   { label: 'Settings',           path: '/admin/settings',      icon: <Settings className="h-5 w-5" /> },
+  { label: 'Staff & Roles',      path: '/admin/staff',         icon: <UserCog className="h-5 w-5" /> },
   { label: 'All Modules',        path: '/admin/all-modules',   icon: <Boxes className="h-5 w-5" /> },
 ];
 
@@ -204,7 +206,10 @@ function Sidebar({
   school, roleLabel, activeNavPath, onNavigate, firstFocusRef,
 }: SidebarProps) {
   const location = useLocation();
-  const { pinnedItems, isFixed, togglePin, reorder, reset, isCustomised } = useSidebarPref();
+  const { pinnedItems: allPinned, isFixed, togglePin, reorder, reset, isCustomised } = useSidebarPref();
+  const { canPath } = usePermissions();
+  // Staff only see the modules their role allows.
+  const pinnedItems = allPinned.filter((i) => canPath(i.path));
   const [editMode, setEditMode] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -379,9 +384,12 @@ export function DashboardLayout({
 
   const firstFocusRef = useRef<HTMLButtonElement>(null);
 
-  const roleLabel = profile?.role
-    ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1)
-    : '';
+  const { roleName } = usePermissions();
+  const roleLabel = profile?.role === 'admin' && roleName && roleName !== 'Owner'
+    ? roleName
+    : profile?.role
+      ? profile.role.charAt(0).toUpperCase() + profile.role.slice(1)
+      : '';
 
   // ── Sidebar stays open/closed based on hover only ───────────
 
