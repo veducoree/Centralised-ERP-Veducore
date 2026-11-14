@@ -143,7 +143,6 @@ export default function VeducoreManagement() {
 
   const isManager = me.role !== 'support';
   const current = (!isManager && (section === 'add-school' || section === 'id-cards')) ? 'dashboard' : section;
-  const initials = me.full_name.split(' ').filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
 
   const sidebar = (
     <>
@@ -180,17 +179,16 @@ export default function VeducoreManagement() {
           );
         })}
       </nav>
-      <div className="flex-shrink-0 border-t border-slate-100 p-2.5">
-        <div className="flex items-center gap-3 rounded-2xl bg-slate-50 p-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 text-xs font-bold text-white">{initials}</div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-slate-900">{me.full_name}</p>
-            <p className="text-[11px] text-slate-500">{ROLES[me.role].label}</p>
-          </div>
-          <button onClick={signOut} className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-rose-600" aria-label="Sign out" title="Sign out">
-            <LogOut className="h-4 w-4" />
-          </button>
+      <div className="flex-shrink-0 space-y-2 border-t border-slate-100 p-3">
+        <div className="flex items-center justify-between px-1">
+          <span className="text-[11px] font-medium text-slate-400">Signed in as</span>
+          <Badge tone={ROLES[me.role].tone}>{ROLES[me.role].label}</Badge>
         </div>
+        <button onClick={signOut}
+          className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition hover:bg-rose-50 hover:text-rose-600">
+          <LogOut className="h-[18px] w-[18px]" />
+          Sign out
+        </button>
       </div>
     </>
   );
