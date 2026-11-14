@@ -73,6 +73,8 @@ export interface AdminDashboardData {
     outstandingFees: number;
   };
   attendanceTrend: { date: string; present: number; absent: number }[];
+  /** Full server summary (alerts, defaulters, class strength, calendar…). */
+  summary: AdminDashboardSummary;
 }
 
 export async function fetchAdminDashboardData(schoolId: string): Promise<AdminDashboardData> {
@@ -101,6 +103,7 @@ export async function fetchAdminDashboardData(schoolId: string): Promise<AdminDa
         outstandingFees: Number(d.fees.outstanding),
       },
       attendanceTrend,
+      summary: d,
     };
   }, 45_000);
 }

@@ -1,16 +1,24 @@
-import { useEffect, useState } from 'react';
-import { Users, GraduationCap, BookOpen, UserCog, IndianRupee, TrendingUp, ClipboardCheck } from 'lucide-react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Users, GraduationCap, BookOpen, UserCog, IndianRupee, TrendingUp, ClipboardCheck,
+  UserPlus, Send, CalendarDays, AlertTriangle, ChevronRight, Bus, Cake, Bell, CheckCircle2, Wallet, CalendarRange,
+} from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { StatCard, Card } from '@/components/ui/Card';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/auth/AuthContext';
 import { fetchAdminDashboardData, type AdminDashboardData } from '@/services/api';
 import { formatCurrency } from '@/lib/utils';
+import { sortByClassOrder } from '@/lib/classOrder';
+import type { AdminDashboardSummary } from '@/types';
 
 type DashboardStats = AdminDashboardData['stats'];
 
 export default function AdminDashboard() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
+  const [summary, setSummary] = useState<AdminDashboardSummary | null>(null);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [attendanceTrend, setAttendanceTrend] = useState<{ date: string; present: number; absent: number }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,6 +41,7 @@ export default function AdminDashboard() {
       const data = await fetchAdminDashboardData(profile.school_id);
       setStats(data.stats);
       setAttendanceTrend(data.attendanceTrend);
+      setSummary(data.summary);
     } catch (err) {
       console.error('Dashboard load error:', err);
     } finally {
@@ -51,6 +60,47 @@ export default function AdminDashboard() {
   const outstandingDash = outstandingPct * C;
 
   const currencySymbol = '₹';
+
+  // ── Extra panels (same look as the cards above) ──
+  const monthly = summary?.monthly_collection ?? [];
+  const monthlyMax = Math.max(...monthly.map((m) => Number(m.amount)), 1);
+  const strength = sortByClassOrder((summary?.class_strength ?? []).map((c) => ({ ...c, name: c.class })));
+  const strengthMax = Math.max(...strength.map((c) => c.students), 1);
+
+  const alerts: { text: ReactNode; icon: ReactNode; tone: string; path: string }[] = [];
+  if (summary?.unmarked_sections.length) {
+    const n = summary.unmarked_sections.length;
+    alerts.push({ path: '/admin/attendance', icon: <ClipboardCheck className="h-4 w-4" />, tone: 'bg-[#FEF3E0] text-[#B26B00]',
+      text: <><b>{n}</b> section{n === 1 ? '' : 's'} haven't marked attendance today</> });
+  }
+  if (summary?.fees.overdue_students) {
+    const n = summary.fees.overdue_students;
+    alerts.push({ path: '/admin/fees', icon: <Wallet className="h-4 w-4" />, tone: 'bg-[#FEECEC] text-[#C53030]',
+      text: <><b>{formatCurrency(Number(summary.fees.overdue_amount), '₹')}</b> overdue from {n} student{n === 1 ? '' : 's'}</> });
+  }
+  if (summary?.pending_transport) {
+    const n = summary.pending_transport;
+    alerts.push({ path: '/admin/transport', icon: <Bus className="h-4 w-4" />, tone: 'bg-[#E0F7FB] text-[#0E7490]',
+      text: <><b>{n}</b> transport application{n === 1 ? '' : 's'} waiting for approval</> });
+  }
+
+  const quickActions = [
+    { label: 'New Admission', icon: <UserPlus className="h-5 w-5" />, path: '/admin/new-admission', tint: 'bg-[#EEF0FD] text-[#5B6EE8]' },
+    { label: 'Collect Fee', icon: <IndianRupee className="h-5 w-5" />, path: '/admin/fees', tint: 'bg-[#E6F8F1] text-[#22C08A]' },
+    { label: 'Send Notice', icon: <Send className="h-5 w-5" />, path: '/admin/notifications', tint: 'bg-[#FEF0E6] text-[#F97316]' },
+    { label: 'Add Holiday', icon: <CalendarDays className="h-5 w-5" />, path: '/admin/holidays', tint: 'bg-[#FDE7F3] text-[#EC4899]' },
+  ];
+
+  const panelTitle = (title: string, link?: { label: string; path: string }) => (
+    <div className="mb-5 flex items-center justify-between">
+      <h3 className="text-base font-semibold text-[#0F172A]">{title}</h3>
+      {link && (
+        <button onClick={() => navigate(link.path)} className="flex items-center gap-0.5 text-xs font-medium text-[#5B6EE8] hover:underline">
+          {link.label} <ChevronRight className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <DashboardLayout title="Dashboard">
@@ -74,6 +124,37 @@ export default function AdminDashboard() {
           <DashboardSkeleton cards={8} />
         ) : (
           <>
+            {/* Quick actions */}
+            <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
+              {quickActions.map((a, i) => (
+                <button
+                  key={a.label}
+                  onClick={() => navigate(a.path)}
+                  className="flex items-center gap-3 rounded-[20px] bg-white px-5 py-4 text-left shadow-[0_4px_20px_rgba(91,110,232,0.08)] transition-transform duration-200 hover:-translate-y-0.5"
+                  style={{ animation: 'fadeSlideUp 350ms ease both', animationDelay: `${i * 40}ms` }}
+                >
+                  <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${a.tint}`}>{a.icon}</span>
+                  <span className="text-sm font-semibold text-[#0F172A]">{a.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Alerts */}
+            {(alerts.length > 0 || summary?.session) && (
+              <div className="flex flex-wrap gap-3">
+                {summary?.session && (
+                  <button onClick={() => navigate('/admin/sessions')} className="flex items-center gap-2 rounded-xl bg-[#EEF0FD] px-4 py-2.5 text-sm text-[#3B4DC8]">
+                    <CalendarRange className="h-4 w-4" /> Session <b>{summary.session.name}</b>
+                  </button>
+                )}
+                {alerts.map((a) => (
+                  <button key={a.path} onClick={() => navigate(a.path)} className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm ${a.tone}`}>
+                    <AlertTriangle className="h-4 w-4" /> <span>{a.text}</span> <ChevronRight className="h-4 w-4 opacity-60" />
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Row 1: 4 stat cards */}
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               {[
@@ -203,6 +284,149 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 </div>
+              </Card>
+            </div>
+
+            {/* Monthly collection + defaulters */}
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+              <Card className="p-6">
+                {panelTitle('Monthly Collection (Last 6 Months)')}
+                {monthly.every((m) => Number(m.amount) === 0) ? (
+                  <p className="py-10 text-center text-sm text-slate-400">No payments recorded yet</p>
+                ) : (
+                  <svg viewBox="0 0 400 160" className="w-full" preserveAspectRatio="none">
+                    {[0, 40, 80, 120].map((y) => (
+                      <line key={y} x1="10" y1={y + 10} x2="395" y2={y + 10} stroke="#E8EAF3" strokeWidth="1" strokeDasharray="4 2" />
+                    ))}
+                    {monthly.map((m, i) => {
+                      const slotW = 64;
+                      const barW = 30;
+                      const x = 10 + i * slotW + (slotW - barW) / 2;
+                      const h = Math.max((Number(m.amount) / monthlyMax) * 120, Number(m.amount) > 0 ? 4 : 0);
+                      return (
+                        <g key={m.month + i}>
+                          <rect
+                            x={x} y={130 - h} width={barW} height={h} rx="5"
+                            fill={i === monthly.length - 1 ? '#5B6EE8' : '#A5B0F8'}
+                            className={barsAnimated ? 'bar-animate' : ''}
+                            style={{ animationDelay: `${i * 80}ms` }}
+                          >
+                            <title>{m.month}: {formatCurrency(Number(m.amount), '₹')}</title>
+                          </rect>
+                          <text x={x + barW / 2} y={148} textAnchor="middle" fontSize="9" fill="#94A3B8">{m.month}</text>
+                        </g>
+                      );
+                    })}
+                  </svg>
+                )}
+              </Card>
+
+              <Card className="p-6">
+                {panelTitle('Fee Defaulters', { label: 'View all', path: '/admin/fees' })}
+                {!summary?.top_defaulters.length ? (
+                  <div className="py-8 text-center">
+                    <CheckCircle2 className="mx-auto mb-2 h-8 w-8 text-[#22C08A]" />
+                    <p className="text-sm text-slate-400">No overdue fees</p>
+                  </div>
+                ) : (
+                  <ul className="space-y-3">
+                    {summary.top_defaulters.map((d) => (
+                      <li key={d.student_id}>
+                        <button onClick={() => navigate(`/admin/students/${d.student_id}`)} className="flex w-full items-center gap-3 rounded-xl p-1 text-left hover:bg-slate-50">
+                          <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-[#FEECEC] text-xs font-bold text-[#EF4444]">
+                            {d.name.split(' ').map((p) => p[0]).slice(0, 2).join('')}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium text-[#0F172A]">{d.name}</span>
+                            <span className="block text-xs text-slate-400">{d.class || d.admission_number}</span>
+                          </span>
+                          <span className="text-sm font-bold text-[#EF4444]">{formatCurrency(Number(d.due), '₹')}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            </div>
+
+            {/* Class strength / coming up / notifications */}
+            <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+              <Card className="p-6">
+                {panelTitle('Class Strength', { label: 'Classes', path: '/admin/classes' })}
+                {strength.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-slate-400">No classes yet</p>
+                ) : (
+                  <ul className="max-h-[260px] space-y-3 overflow-y-auto pr-1">
+                    {strength.map((c) => (
+                      <li key={c.class} className="flex items-center gap-3 text-sm" title={`${c.class}: ${c.students} students`}>
+                        <span className="w-20 flex-shrink-0 truncate text-slate-500">{c.class}</span>
+                        <span className="h-2 flex-1 overflow-hidden rounded-full bg-[#EEF0FD]">
+                          <span className="block h-full rounded-full bg-[#5B6EE8]" style={{ width: `${(c.students / strengthMax) * 100}%` }} />
+                        </span>
+                        <span className="w-8 text-right font-bold text-[#0F172A]">{c.students}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+
+              <Card className="p-6">
+                {panelTitle('Coming Up', { label: 'Calendar', path: '/admin/holidays' })}
+                {!!summary?.birthdays_today.length && (
+                  <div className="mb-4 rounded-xl bg-[#FDE7F3] p-3">
+                    <p className="mb-1 flex items-center gap-1.5 text-xs font-semibold text-[#BE185D]"><Cake className="h-3.5 w-3.5" /> Birthdays Today</p>
+                    {summary.birthdays_today.slice(0, 4).map((b) => (
+                      <p key={b.id} className="text-xs text-[#831843]">{b.name} · {b.class}</p>
+                    ))}
+                    {summary.birthdays_today.length > 4 && <p className="text-xs text-[#BE185D]">+{summary.birthdays_today.length - 4} more</p>}
+                  </div>
+                )}
+                {!summary?.upcoming_holidays.length ? (
+                  <p className="py-6 text-center text-sm text-slate-400">No holidays in the next 30 days</p>
+                ) : (
+                  <ul className="space-y-3">
+                    {summary.upcoming_holidays.map((h) => {
+                      const d = new Date(h.date + 'T00:00:00');
+                      return (
+                        <li key={h.date} className="flex items-center gap-3">
+                          <span className="flex h-11 w-11 flex-shrink-0 flex-col items-center justify-center rounded-xl bg-[#FDE7F3] text-[#EC4899]">
+                            <span className="text-[10px] font-medium uppercase leading-none">{d.toLocaleDateString('en-IN', { month: 'short' })}</span>
+                            <span className="text-base font-bold leading-tight">{d.getDate()}</span>
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-medium text-[#0F172A]">{h.label || 'Holiday'}</span>
+                            <span className="block text-xs text-slate-400">{d.toLocaleDateString('en-IN', { weekday: 'long' })}</span>
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </Card>
+
+              <Card className="p-6">
+                {panelTitle('Recent Notifications', { label: 'Send', path: '/admin/notifications' })}
+                {!summary?.recent_notifications.length ? (
+                  <div className="py-8 text-center">
+                    <Bell className="mx-auto mb-2 h-8 w-8 text-slate-300" />
+                    <p className="text-sm text-slate-400">Nothing sent yet</p>
+                  </div>
+                ) : (
+                  <ul className="space-y-3">
+                    {summary.recent_notifications.map((n) => (
+                      <li key={n.id} className="flex items-start gap-3">
+                        <span className="mt-0.5 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-[#FEF0E6] text-[#F97316]"><Bell className="h-4 w-4" /></span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium text-[#0F172A]">{n.title}</span>
+                          <span className="block text-xs text-slate-400">
+                            {new Date(n.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}
+                            {n.recipients ? ` · ${n.recipients} recipients` : ''}
+                          </span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </Card>
             </div>
           </>
