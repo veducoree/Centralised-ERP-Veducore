@@ -343,6 +343,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
   },
   unreadCountText: {
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.primary,
@@ -354,6 +355,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   markAllText: {
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.primary,
@@ -453,6 +455,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   notifTime: {
+    flexShrink: 1,
     fontSize: 11,
     color: COLORS.textMuted,
     marginRight: 10,

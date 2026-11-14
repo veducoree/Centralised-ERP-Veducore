@@ -377,5 +377,5 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: COLORS.borderLight,
   },
-  teacherNameText: { fontSize: 12, color: COLORS.textMuted, fontWeight: '600' },
+  teacherNameText: { flexShrink: 1, fontSize: 12, color: COLORS.textMuted, fontWeight: '600' },
 });

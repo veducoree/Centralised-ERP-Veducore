@@ -691,7 +691,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   dateCenterWrap: { flexDirection: 'row', alignItems: 'center' },
-  dateText: { fontSize: 14, fontWeight: '700', color: COLORS.text },
+  dateText: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: COLORS.text },
   statusBadgePill: {
     borderRadius: RADIUS.full,
     paddingHorizontal: 8,
@@ -740,7 +740,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FEF2F2',
     borderColor: '#FECACA',
   },
-  quickBtnText: { fontSize: 12, fontWeight: '700' },
+  quickBtnText: { flexShrink: 1, fontSize: 12, fontWeight: '700' },
   lockedNoticeCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -830,6 +830,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   lockedBottomTitle: {
+    flexShrink: 1,
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.text,

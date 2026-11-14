@@ -250,6 +250,7 @@ const styles = StyleSheet.create({
     borderColor: '#C7CDFB',
   },
   roleText: {
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.primary,
@@ -266,6 +267,7 @@ const styles = StyleSheet.create({
     borderColor: '#A7F3D0',
   },
   inchargeText: {
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: '700',
     color: '#059669',
@@ -303,6 +305,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   assignChipText: {
+    flexShrink: 1,
     fontSize: 13,
     fontWeight: '600',
     color: COLORS.text,
@@ -357,7 +360,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 13,
+    paddingVertical: 11,
     borderRadius: RADIUS.md,
     borderWidth: 1.5,
     borderColor: COLORS.primary,
@@ -365,6 +368,7 @@ const styles = StyleSheet.create({
     ...SHADOW.sm,
   },
   editBtnText: {
+    flexShrink: 1,
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.primary,
@@ -374,13 +378,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 13,
+    paddingVertical: 11,
     borderRadius: RADIUS.md,
     borderWidth: 1.5,
     borderColor: '#FCA5A5',
     backgroundColor: '#FEF2F2',
   },
   logoutBtnText: {
+    flexShrink: 1,
     fontSize: 14,
     fontWeight: '700',
     color: '#EF4444',

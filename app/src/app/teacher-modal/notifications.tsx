@@ -374,6 +374,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   notifTime: {
+    flexShrink: 1,
     fontSize: 11,
     color: COLORS.textDim,
   },
@@ -383,6 +384,7 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   readText: {
+    flexShrink: 1,
     fontSize: 11,
     color: COLORS.textDim,
     fontWeight: '500',

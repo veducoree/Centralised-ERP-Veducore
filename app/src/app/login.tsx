@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     paddingHorizontal: SPACING.md,
     marginBottom: SPACING.md,
-    height: 52,
+    height: 48,
   },
   inputFieldFocused: {
     borderColor: '#5B6EE8',

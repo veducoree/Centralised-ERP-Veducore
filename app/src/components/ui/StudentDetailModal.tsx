@@ -636,6 +636,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   remarkDate: {
+    flexShrink: 1,
     fontSize: 11,
     color: COLORS.textDim,
   },
@@ -663,6 +664,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   recordExam: {
+    flexShrink: 1,
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.text,
@@ -693,6 +695,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#F1F5F9',
   },
   recordScore: {
+    flexShrink: 1,
     fontSize: 12,
     color: COLORS.textMuted,
   },
@@ -747,6 +750,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   attDate: {
+    flexShrink: 1,
     fontSize: 13,
     fontWeight: '600',
     color: COLORS.text,
@@ -778,6 +782,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   feeType: {
+    flexShrink: 1,
     fontSize: 14,
     fontWeight: '700',
     color: COLORS.text,
@@ -788,6 +793,7 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   feeAmount: {
+    flexShrink: 1,
     fontSize: 18,
     fontWeight: '700',
     color: COLORS.text,

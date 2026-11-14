@@ -307,7 +307,7 @@ const styles = StyleSheet.create({
   heroTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700', marginTop: 2 },
   heroChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
   heroChip: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(255,255,255,0.18)', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5 },
-  heroChipText: { color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
+  heroChipText: { flexShrink: 1, color: '#FFFFFF', fontSize: 12, fontWeight: '600' },
 
   card: { marginBottom: SPACING.md },
   iconTile: { width: 44, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
   quickLabel: { fontSize: 12, fontWeight: '600', color: COLORS.text },
 
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.sm, marginTop: 4 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text },
+  sectionTitle: { flexShrink: 1, fontSize: 16, fontWeight: '700', color: COLORS.text },
   link: { fontSize: 13, fontWeight: '600', color: '#5B6EE8' },
 
   divider: { borderTopWidth: 1, borderTopColor: '#F1F2F8' },

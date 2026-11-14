@@ -429,6 +429,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   title: {
+    flexShrink: 1,
     fontSize: 18,
     fontWeight: '700',
     color: COLORS.text,
@@ -480,6 +481,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   label: {
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.text,
@@ -522,6 +524,7 @@ const styles = StyleSheet.create({
     borderColor: '#FBCFE8',
   },
   genderText: {
+    flexShrink: 1,
     fontSize: 13,
     fontWeight: '600',
     color: COLORS.textMuted,

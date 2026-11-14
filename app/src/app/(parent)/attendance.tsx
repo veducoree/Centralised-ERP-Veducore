@@ -466,7 +466,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
     borderWidth: 1,
   },
-  statusBadgeText: { fontSize: 11, fontWeight: '700' },
+  statusBadgeText: { flexShrink: 1, fontSize: 11, fontWeight: '700' },
   recNotesBox: {
     marginTop: 10,
     paddingTop: 8,
@@ -476,6 +476,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  recNotesLabel: { fontSize: 11, color: '#94A3B8', fontWeight: '700' },
+  recNotesLabel: { flexShrink: 1, fontSize: 11, color: '#94A3B8', fontWeight: '700' },
   recNotesText: { fontSize: 12, color: '#475569', flex: 1 },
 });

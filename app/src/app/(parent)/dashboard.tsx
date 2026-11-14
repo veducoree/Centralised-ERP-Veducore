@@ -315,7 +315,7 @@ const styles = StyleSheet.create({
   heroName: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
   heroMeta: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 2 },
   todayPill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, marginTop: 14 },
-  todayText: { fontSize: 12, fontWeight: '700' },
+  todayText: { flexShrink: 1, fontSize: 12, fontWeight: '700' },
 
   statRow: { flexDirection: 'row', gap: 10, marginBottom: SPACING.md },
   stat: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: RADIUS.lg, paddingVertical: 14, paddingHorizontal: 12,
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
   quickLabel: { fontSize: 12, fontWeight: '600', color: COLORS.text },
 
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.sm, marginTop: 4 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text },
+  sectionTitle: { flexShrink: 1, fontSize: 16, fontWeight: '700', color: COLORS.text },
   link: { fontSize: 13, fontWeight: '600', color: '#5B6EE8' },
 
   remarkText: { fontSize: 14, color: COLORS.text, lineHeight: 20, fontStyle: 'italic' },

@@ -1390,7 +1390,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   feeHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  feeTypeTitle: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
+  feeTypeTitle: { flexShrink: 1, fontSize: 15, fontWeight: '700', color: '#0F172A' },
   feeDueSub: { fontSize: 11, color: '#475569', fontWeight: '600', marginTop: 2 },
   statusBadge: {
     paddingHorizontal: 9,
@@ -1430,7 +1430,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 8,
   },
-  scheduleTitle: { fontSize: 11, fontWeight: '700', color: '#334155' },
+  scheduleTitle: { flexShrink: 1, fontSize: 11, fontWeight: '700', color: '#334155' },
   windowPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1540,6 +1540,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   receiptBtnText: {
+    flexShrink: 1,
     color: '#5B6EE8',
     fontSize: 13,
     fontWeight: '700',
@@ -1564,7 +1565,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.md,
   },
-  modalTitle: { fontSize: 17, fontWeight: '700', color: '#0F172A' },
+  modalTitle: { flexShrink: 1, fontSize: 17, fontWeight: '700', color: '#0F172A' },
   modalSummaryBox: {
     alignItems: 'center',
     backgroundColor: '#F4F5FB',
@@ -1672,6 +1673,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   receiptMetaLabel: {
+    flexShrink: 1,
     fontSize: 9.5,
     fontWeight: '700',
     color: '#94A3B8',
@@ -1698,6 +1700,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   receiptDetailKey: {
+    flexShrink: 1,
     fontSize: 12,
     color: '#64748B',
     fontWeight: '600',
@@ -1737,6 +1740,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F1F5F9',
   },
   receiptTableKey: {
+    flexShrink: 1,
     fontSize: 12,
     color: '#475569',
     fontWeight: '600',
@@ -1758,6 +1762,7 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
   },
   paidStampText: {
+    flexShrink: 1,
     fontSize: 11,
     fontWeight: '700',
     color: '#065F46',

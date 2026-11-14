@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, RefreshControl,
+  KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -124,7 +125,8 @@ export default function MyAttendanceScreen() {
     <View style={styles.container}>
       <StatusBar style="dark" />
       <Header title="My Attendance" showBack onBackPress={() => router.back()} />
-      <ScrollView contentContainerStyle={styles.content}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} tintColor={COLORS.primary}
           onRefresh={async () => { setRefreshing(true); await load(); setRefreshing(false); }} />}>
         {loading ? <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} /> : !teacherId ? (
@@ -226,6 +228,7 @@ export default function MyAttendanceScreen() {
         )}
         <View style={{ height: 40 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -238,9 +241,9 @@ const styles = StyleSheet.create({
   todayStatus: { fontSize: 18, fontWeight: '700', color: COLORS.text, marginTop: 4 },
   todayTime: { fontSize: 13, fontWeight: '400', color: COLORS.textMuted },
   primaryBtn: { marginTop: SPACING.md, backgroundColor: COLORS.primary, borderRadius: RADIUS.md, paddingVertical: 12, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
-  primaryBtnText: { color: '#fff', fontWeight: '600', fontSize: 15 },
+  primaryBtnText: { flexShrink: 1, color: '#fff', fontWeight: '600', fontSize: 14 },
   outlineBtn: { marginTop: SPACING.md, borderWidth: 1, borderColor: COLORS.primary, borderRadius: RADIUS.md, paddingVertical: 11, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 },
-  outlineBtnText: { color: COLORS.primary, fontWeight: '600', fontSize: 15 },
+  outlineBtnText: { flexShrink: 1, color: COLORS.primary, fontWeight: '600', fontSize: 14 },
   countRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: SPACING.md, borderTopWidth: 1, borderTopColor: COLORS.borderLight, paddingTop: SPACING.sm },
   countItem: { alignItems: 'center', flex: 1 },
   countNum: { fontSize: 18, fontWeight: '700' },
@@ -257,10 +260,10 @@ const styles = StyleSheet.create({
   quickText: { fontSize: 12, color: COLORS.textMuted },
   quickTextActive: { color: '#fff', fontWeight: '600' },
   dateRow: { flexDirection: 'row', gap: SPACING.sm },
-  label: { fontSize: 12, color: COLORS.textMuted, marginTop: SPACING.sm, marginBottom: 4, fontWeight: '500' },
+  label: { flexShrink: 1, fontSize: 12, color: COLORS.textMuted, marginTop: SPACING.sm, marginBottom: 4, fontWeight: '500' },
   input: { borderWidth: 1, borderColor: COLORS.border, borderRadius: RADIUS.md, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: COLORS.text, backgroundColor: '#fff' },
   leaveRow: { flexDirection: 'row', gap: SPACING.sm },
-  leaveTitle: { fontSize: 14, fontWeight: '600', color: COLORS.text, marginBottom: 2 },
+  leaveTitle: { flexShrink: 1, fontSize: 14, fontWeight: '600', color: COLORS.text, marginBottom: 2 },
   leaveStatus: { fontSize: 11, fontWeight: '700' },
   cancelText: { fontSize: 12, color: '#DC2626', fontWeight: '600' },
 });

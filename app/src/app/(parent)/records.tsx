@@ -440,7 +440,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   recCardHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  recSubjectName: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
+  recSubjectName: { flexShrink: 1, fontSize: 16, fontWeight: '700', color: '#0F172A' },
   recExamName: { fontSize: 12, color: '#64748B', marginTop: 2 },
   gradeBadge: {
     paddingHorizontal: 10,
@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
 
   scoreRow: { marginTop: SPACING.sm },
   scoreTextWrap: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 },
-  scoreValueText: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
+  scoreValueText: { flexShrink: 1, fontSize: 15, fontWeight: '700', color: '#0F172A' },
   scoreMaxText: { fontSize: 12, color: '#94A3B8', fontWeight: '600' },
   scorePctText: { fontSize: 13, fontWeight: '700' },
   progressBarTrack: {

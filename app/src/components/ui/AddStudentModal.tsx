@@ -404,6 +404,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
+    flexShrink: 1,
     fontSize: 18,
     fontWeight: '700',
     color: COLORS.text,

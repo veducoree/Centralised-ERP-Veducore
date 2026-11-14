@@ -843,7 +843,7 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     ...SHADOW.sm,
   },
-  addExamBtnText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
+  addExamBtnText: { flexShrink: 1, color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
 
   filterChipsRow: { flexDirection: 'row', gap: 8, marginBottom: SPACING.md },
   filterChip: {
@@ -876,7 +876,7 @@ const styles = StyleSheet.create({
   },
   examHeaderMeta: { flex: 1 },
   examTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  examNameText: { fontSize: 16, fontWeight: '700', color: COLORS.text },
+  examNameText: { flexShrink: 1, fontSize: 16, fontWeight: '700', color: COLORS.text },
   examTypePill: {
     backgroundColor: '#F0F9FF',
     borderWidth: 1,
@@ -918,7 +918,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   subjectRowLeft: { flexDirection: 'row', alignItems: 'center' },
-  subjectRowName: { fontSize: 13, fontWeight: '700', color: COLORS.text },
+  subjectRowName: { flexShrink: 1, fontSize: 13, fontWeight: '700', color: COLORS.text },
   subjectRowCode: { fontSize: 11, color: COLORS.textMuted },
   subjectRowRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   markedStatusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: RADIUS.sm },
@@ -933,12 +933,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: RADIUS.sm,
   },
-  enterMarksBtnText: { fontSize: 12, fontWeight: '700', color: COLORS.primary, marginRight: 2 },
+  enterMarksBtnText: { flexShrink: 1, fontSize: 12, fontWeight: '700', color: COLORS.primary, marginRight: 2 },
 
   // Enter Marks Banner
   marksBannerCard: { marginBottom: SPACING.md, borderRadius: RADIUS.lg },
   bannerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
-  bannerExamName: { fontSize: 18, fontWeight: '700', color: COLORS.text },
+  bannerExamName: { flexShrink: 1, fontSize: 18, fontWeight: '700', color: COLORS.text },
   bannerSubTitle: { fontSize: 13, color: COLORS.textMuted, marginTop: 2 },
   bannerMaxMarksPill: {
     backgroundColor: '#EEF0FD',
@@ -958,7 +958,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
-  metaBadgeText: { fontSize: 11, color: COLORS.textMuted, fontWeight: '600' },
+  metaBadgeText: { flexShrink: 1, fontSize: 11, color: COLORS.textMuted, fontWeight: '600' },
 
   studentsLoadingWrap: { paddingVertical: 30, alignItems: 'center', gap: 6 },
   loadingText: { color: COLORS.textMuted, fontSize: 13 },
@@ -1053,8 +1053,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: SPACING.md,
   },
-  modalTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text },
-  modalLabel: { fontSize: 12, fontWeight: '700', color: COLORS.textMuted, marginBottom: 5, marginTop: 10 },
+  modalTitle: { flexShrink: 1, fontSize: 18, fontWeight: '700', color: COLORS.text },
+  modalLabel: { flexShrink: 1, fontSize: 12, fontWeight: '700', color: COLORS.textMuted, marginBottom: 5, marginTop: 10 },
   modalInput: {
     height: 44,
     backgroundColor: '#F4F5FB',

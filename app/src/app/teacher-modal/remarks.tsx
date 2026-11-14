@@ -616,6 +616,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   headerAddBtnText: {
+    flexShrink: 1,
     fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
@@ -763,6 +764,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   visibilityText: {
+    flexShrink: 1,
     fontSize: 11,
     fontWeight: '600',
     color: COLORS.textMuted,
@@ -805,6 +807,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F1F5F9',
   },
   modalTitle: {
+    flexShrink: 1,
     fontSize: 18,
     fontWeight: '700',
     color: COLORS.text,
@@ -973,14 +976,14 @@ const styles = StyleSheet.create({
     gap: 8,
     backgroundColor: COLORS.primary,
     borderRadius: RADIUS.md,
-    paddingVertical: 14,
+    paddingVertical: 11,
     ...SHADOW.md,
   },
   saveBtnDisabled: {
     opacity: 0.6,
   },
   saveBtnText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: '#FFFFFF',
   },

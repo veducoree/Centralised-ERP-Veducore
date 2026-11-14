@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
   },
   classInfo: { flex: 1 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  className: { fontSize: 16, fontWeight: '700', color: COLORS.text },
+  className: { flexShrink: 1, fontSize: 16, fontWeight: '700', color: COLORS.text },
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, flexWrap: 'wrap' },
   classTeacherBadge: {
     flexDirection: 'row',
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
-  classTeacherText: { fontSize: 11, fontWeight: '700', color: '#0369A1' },
+  classTeacherText: { flexShrink: 1, fontSize: 11, fontWeight: '700', color: '#0369A1' },
   studentCountPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -451,7 +451,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
   },
-  studentCountText: { fontSize: 11, color: COLORS.textMuted, fontWeight: '600' },
+  studentCountText: { flexShrink: 1, fontSize: 11, color: COLORS.textMuted, fontWeight: '600' },
   chevronWrap: { padding: 4 },
 
   subjectsSection: {
@@ -467,6 +467,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   subjectsHeader: {
+    flexShrink: 1,
     fontSize: 11,
     fontWeight: '700',
     color: COLORS.textMuted,
@@ -502,7 +503,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     gap: 6,
   },
-  subjectChipName: { fontSize: 12, fontWeight: '600', color: COLORS.text },
+  subjectChipName: { flexShrink: 1, fontSize: 12, fontWeight: '600', color: COLORS.text },
   subjectCodePill: {
     backgroundColor: '#EEF0FD',
     borderRadius: 4,
@@ -520,6 +521,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   studentListTitle: {
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.textMuted,

@@ -664,6 +664,7 @@ const styles = StyleSheet.create({
   },
 
   sectionTitle: {
+    flexShrink: 1,
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.text,

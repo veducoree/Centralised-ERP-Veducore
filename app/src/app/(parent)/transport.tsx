@@ -573,7 +573,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  assignedLabel: { fontSize: 9, fontWeight: '700', color: '#2563EB', letterSpacing: 0.5 },
+  assignedLabel: { flexShrink: 1, fontSize: 9, fontWeight: '700', color: '#2563EB', letterSpacing: 0.5 },
   assignedStopName: { fontSize: 16, fontWeight: '700', color: '#0F172A', marginTop: 2 },
   assignedLandmark: { fontSize: 11, color: '#475569', marginTop: 2 },
   assignedAmountBox: {
@@ -595,7 +595,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   assignedMetaItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  assignedMetaText: { fontSize: 12, color: '#334155', fontWeight: '600' },
+  assignedMetaText: { flexShrink: 1, fontSize: 12, color: '#334155', fontWeight: '600' },
 
   applyCard: {
     backgroundColor: '#FFFFFF',
@@ -727,6 +727,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   selectedSummaryLabel: {
+    flexShrink: 1,
     fontSize: 10,
     fontWeight: '700',
     color: '#64748B',

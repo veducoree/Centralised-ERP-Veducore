@@ -207,7 +207,7 @@ const styles = StyleSheet.create({
     marginTop: SPACING.md,
     backgroundColor: '#F1F5F9',
     borderRadius: RADIUS.md,
-    paddingVertical: 13,
+    paddingVertical: 11,
     alignItems: 'center',
   },
   cancelBtnText: {

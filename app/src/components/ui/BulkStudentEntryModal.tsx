@@ -590,6 +590,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   title: {
+    flexShrink: 1,
     fontSize: 18,
     fontWeight: '700',
     color: COLORS.text,
@@ -691,6 +692,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   formatSpecTitle: {
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: '700',
     color: COLORS.primary,
@@ -722,6 +724,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.full,
   },
   requiredTagText: {
+    flexShrink: 1,
     fontSize: 11,
     fontWeight: '600',
     color: '#059669',

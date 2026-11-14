@@ -453,6 +453,7 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.2 }],
   },
   dayTitle: {
+    flexShrink: 1,
     fontSize: 16,
     fontWeight: '700',
     color: COLORS.text,
@@ -469,6 +470,7 @@ const styles = StyleSheet.create({
     borderColor: '#A7F3D0',
   },
   todayPillText: {
+    flexShrink: 1,
     fontSize: 11,
     fontWeight: '700',
     color: '#059669',
@@ -488,6 +490,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   noClassText: {
+    flexShrink: 1,
     fontSize: 13,
     color: COLORS.textDim,
     fontStyle: 'italic',
@@ -585,6 +588,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   classPillText: {
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: '600',
     color: COLORS.text,
@@ -601,6 +605,7 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   roomPillText: {
+    flexShrink: 1,
     fontSize: 12,
     fontWeight: '500',
     color: COLORS.textMuted,

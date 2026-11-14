@@ -40,13 +40,14 @@ export function Button({
   const isDisabled = disabled || loading;
 
   const sizeStyles = {
-    sm: { paddingVertical: 8, paddingHorizontal: 16, borderRadius: RADIUS.sm },
-    md: { paddingVertical: 12, paddingHorizontal: 22, borderRadius: RADIUS.md },
-    lg: { paddingVertical: 15, paddingHorizontal: 28, borderRadius: RADIUS.lg },
+    // Compact, website-like sizes (≈32 / 40 / 44px tall).
+    sm: { minHeight: 32, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 10 },
+    md: { minHeight: 40, paddingVertical: 9, paddingHorizontal: 16, borderRadius: 12 },
+    lg: { minHeight: 44, paddingVertical: 11, paddingHorizontal: 20, borderRadius: 12 },
   }[size];
 
-  const textSizes = { sm: 13, md: 15, lg: 16 }[size];
-  const iconSizes = { sm: 16, md: 18, lg: 20 }[size];
+  const textSizes = { sm: 13, md: 14, lg: 14 }[size];
+  const iconSizes = { sm: 15, md: 16, lg: 17 }[size];
 
   if (variant === 'primary') {
     return (
@@ -77,8 +78,10 @@ export function Button({
                 />
               )}
               <Text
+                numberOfLines={1}
+                ellipsizeMode="tail"
                 style={[
-                  styles.primaryText,
+                  styles.primaryText, styles.labelShrink,
                   { fontSize: textSizes },
                   textStyle,
                 ]}>
@@ -117,8 +120,10 @@ export function Button({
               />
             )}
             <Text
+              numberOfLines={1}
+              ellipsizeMode="tail"
               style={[
-                styles.glassText,
+                styles.glassText, styles.labelShrink,
                 { fontSize: textSizes },
                 textStyle,
               ]}>
@@ -171,8 +176,10 @@ export function Button({
             />
           )}
           <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
             style={[
-              styles.baseText,
+              styles.baseText, styles.labelShrink,
               { fontSize: textSizes, color: textColor },
               textStyle,
             ]}>
@@ -185,6 +192,8 @@ export function Button({
 }
 
 const styles = StyleSheet.create({
+  // Keeps long labels inside the button instead of overflowing it.
+  labelShrink: { flexShrink: 1 },
   gradientBtn: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -199,14 +208,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    maxWidth: '100%',
   },
   iconStyle: {
-    marginRight: 8,
+    marginRight: 6,
   },
   primaryText: {
     color: '#fff',
-    fontWeight: '700',
-    letterSpacing: 0.3,
+    fontWeight: '600',
   },
   glassBtn: {
     alignItems: 'center',
@@ -218,7 +227,7 @@ const styles = StyleSheet.create({
   },
   glassText: {
     color: '#0F172A',
-    fontWeight: '700',
+    fontWeight: '600',
   },
   baseBtn: {
     alignItems: 'center',

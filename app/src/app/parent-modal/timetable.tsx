@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#FDE68A',
   },
-  breakText: { fontSize: 12, fontWeight: '700', color: '#B45309' },
+  breakText: { flexShrink: 1, fontSize: 12, fontWeight: '700', color: '#B45309' },
   slotCard: { backgroundColor: '#FFFFFF', borderColor: '#E2E8F0', ...SHADOW.sm },
   slotCardSub: { borderColor: '#A7F3D0', backgroundColor: '#F0FDF4' },
   slotRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
