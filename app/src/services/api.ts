@@ -786,6 +786,16 @@ export async function fetchGatewayActive() {
 export const createPaymentLink = (params: { allocations: { fee_id: string; amount: number }[]; next_due_dates?: Record<string, string> }) =>
   paymentsCall<{ online_payment_id: string; link_url: string; amount: number }>({ action: 'create', channel: 'link', ...params });
 
+export const reconcilePayments = () => paymentsCall<{ applied: number; pending: number }>({ action: 'reconcile' });
+
+/** Convenience charge (₹) paid on top of the fee for an online receipt. */
+export async function fetchConvenienceForReceipt(receiptNumber: string | null | undefined) {
+  if (!receiptNumber?.startsWith('ONL-')) return null;
+  const { data } = await supabase.from('online_payments').select('fee_amount, total_amount').eq('receipt_number', receiptNumber).maybeSingle();
+  if (!data) return null;
+  return { extra: (Number(data.total_amount) - Number(data.fee_amount)) / 100, total: Number(data.total_amount) / 100 };
+}
+
 export const checkOnlinePayment = (onlinePaymentId: string) =>
   paymentsCall<{ status: 'paid' | 'pending' | 'expired'; receipt_number?: string }>({ action: 'check', online_payment_id: onlinePaymentId });
 

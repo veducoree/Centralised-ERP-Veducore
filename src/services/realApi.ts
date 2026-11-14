@@ -3627,3 +3627,44 @@ export async function payWithCheckout(p: CreatedPayment, opts: { name: string; p
     rzp.open();
   });
 }
+
+export interface OnlinePaymentRow {
+  id: string;
+  student_id: string;
+  channel: 'checkout' | 'link';
+  fee_amount: number; convenience_fee: number; gst_amount: number; platform_fee: number; total_amount: number; // paise
+  status: 'created' | 'processing' | 'paid' | 'failed' | 'expired';
+  receipt_number: string | null;
+  razorpay_payment_id: string | null;
+  unapplied_amount: number;
+  refund_status: 'none' | 'needed' | 'refunded';
+  error: string | null;
+  created_at: string;
+  paid_at: string | null;
+  student?: { full_name: string; admission_number: string } | null;
+}
+
+/** Applies any finished-but-unrecorded payments the caller can see. */
+export const reconcilePayments = () => paymentsCall<{ applied: number; pending: number }>({ action: 'reconcile' });
+
+export async function fetchOnlinePayments(schoolId: string, limit = 200) {
+  const { data, error } = await supabase.from('online_payments')
+    .select('id, student_id, channel, fee_amount, convenience_fee, gst_amount, platform_fee, total_amount, status, receipt_number, razorpay_payment_id, unapplied_amount, refund_status, error, created_at, paid_at, student:students(full_name, admission_number)')
+    .eq('school_id', schoolId).order('created_at', { ascending: false }).limit(limit);
+  if (error) throw error;
+  return (data ?? []) as unknown as OnlinePaymentRow[];
+}
+
+/** Convenience charge (₹) a parent paid on top of the fee, for receipts. */
+export async function fetchConvenienceForReceipt(receiptNumber: string) {
+  if (!receiptNumber?.startsWith('ONL-')) return null;
+  const { data } = await supabase.from('online_payments')
+    .select('fee_amount, total_amount').eq('receipt_number', receiptNumber).maybeSingle();
+  if (!data) return null;
+  return { fee: Number(data.fee_amount) / 100, extra: (Number(data.total_amount) - Number(data.fee_amount)) / 100, total: Number(data.total_amount) / 100 };
+}
+
+export async function markPaymentRefunded(id: string) {
+  const { error } = await supabase.rpc('mark_payment_refunded', { p_id: id });
+  if (error) throw error;
+}

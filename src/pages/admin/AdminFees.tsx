@@ -10,12 +10,12 @@ import { required, positiveNumber, paymentAmount, range } from '@/lib/validators
 import { SearchInput, PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
-import { fetchFees, fetchStudents, fetchFeeTypes, fetchClasses, createFee, recordFeePayment, deleteFee, fetchSchool, updateSchool, fetchGatewayStatus, saveGateway, disableGateway, onlineCharges, type GatewayStatus } from '@/services/api';
+import { fetchFees, fetchStudents, fetchFeeTypes, fetchClasses, createFee, recordFeePayment, deleteFee, fetchSchool, updateSchool, fetchGatewayStatus, saveGateway, disableGateway, onlineCharges, reconcilePayments, fetchOnlinePayments, markPaymentRefunded, type GatewayStatus, type OnlinePaymentRow } from '@/services/api';
 import type { Fee, Student, FeeType, FeeStructure, Class } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { StatusBadge, Badge } from '@/components/ui/Badge';
 
-type ActiveTab = 'records' | 'structure' | 'setup';
+type ActiveTab = 'records' | 'online' | 'structure' | 'setup';
 type MethodFilter = 'all' | 'online' | 'offline';
 
 const SAMPLE_STRUCTURES: FeeStructure[] = [
@@ -71,6 +71,11 @@ export default function AdminFees() {
   const [showSecret, setShowSecret] = useState(false);
   const [gatewaySaving, setGatewaySaving] = useState(false);
   const [disableOpen, setDisableOpen] = useState(false);
+
+  // ── Online payments tab ──
+  const [onlinePayments, setOnlinePayments] = useState<OnlinePaymentRow[]>([]);
+  const [onlineLoading, setOnlineLoading] = useState(false);
+  const [reconciling, setReconciling] = useState(false);
 
   // ── Load data ──
   const loadData = useCallback(async () => {
@@ -436,6 +441,44 @@ export default function AdminFees() {
   }
 
   const sample = onlineCharges(10000);
+  const refundsNeeded = onlinePayments.filter((p) => p.refund_status === 'needed').length;
+
+  const loadOnline = useCallback(async () => {
+    if (!profile?.school_id) return;
+    setOnlineLoading(true);
+    try { setOnlinePayments(await fetchOnlinePayments(profile.school_id)); }
+    catch { /* table may be empty */ }
+    finally { setOnlineLoading(false); }
+  }, [profile?.school_id]);
+
+  // On open: record any payments that finished while nobody was watching.
+  useEffect(() => {
+    if (!profile?.school_id) return;
+    (async () => {
+      const gs = await fetchGatewayStatus().catch(() => ({ active: false }));
+      if (gs.active) {
+        const r = await reconcilePayments().catch(() => null);
+        if (r?.applied) { toast(`${r.applied} online payment${r.applied === 1 ? '' : 's'} recorded`, 'success'); loadData(); }
+      }
+      loadOnline();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.school_id]);
+
+  async function handleReconcile() {
+    setReconciling(true);
+    try {
+      const r = await reconcilePayments();
+      toast(r.applied ? `${r.applied} payment${r.applied === 1 ? '' : 's'} recorded` : r.pending ? `${r.pending} still waiting at Razorpay` : 'Everything is up to date', 'success');
+      loadOnline(); if (r.applied) loadData();
+    } catch (e) { toast(e instanceof Error ? e.message : 'Could not refresh', 'error'); }
+    finally { setReconciling(false); }
+  }
+
+  async function handleRefunded(id: string) {
+    try { await markPaymentRefunded(id); toast('Marked as refunded', 'success'); loadOnline(); }
+    catch (e) { toast(e instanceof Error ? e.message : 'Failed', 'error'); }
+  }
 
   const TAB_CLASSES = {
     active: 'border-b-2 border-brand-600 text-brand-600 font-semibold bg-white px-4 py-2.5 text-sm',
@@ -454,13 +497,13 @@ export default function AdminFees() {
         {/* ── Tab Bar ── */}
         <div className="border-b border-slate-200">
           <div className="flex">
-            {(['records', 'structure', 'setup'] as ActiveTab[]).map((tab) => (
+            {(['records', 'online', 'structure', 'setup'] as ActiveTab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={activeTab === tab ? TAB_CLASSES.active : TAB_CLASSES.inactive}
               >
-                {tab === 'records' ? 'Fee Records' : tab === 'structure' ? 'Fee Structure' : 'Payment Setup'}
+                {tab === 'records' ? 'Fee Records' : tab === 'online' ? `Online Payments${refundsNeeded ? ` (${refundsNeeded})` : ''}` : tab === 'structure' ? 'Fee Structure' : 'Payment Setup'}
               </button>
             ))}
           </div>
@@ -624,6 +667,67 @@ export default function AdminFees() {
         )}
 
         {/* ══════════════ TAB 3: PAYMENT SETUP ══════════════ */}
+        {activeTab === 'online' && (
+          <div className="space-y-4">
+            {refundsNeeded > 0 && (
+              <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                {refundsNeeded} payment{refundsNeeded === 1 ? '' : 's'} could not be applied because the fee was already paid (e.g. cash at the office). Refund {refundsNeeded === 1 ? 'it' : 'them'} from the Razorpay dashboard, then mark as refunded here.
+              </div>
+            )}
+            <Card className="overflow-hidden">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4">
+                <div>
+                  <p className="font-semibold text-slate-900">Online payments</p>
+                  <p className="text-xs text-slate-500">Every Razorpay payment started by parents or at admission.</p>
+                </div>
+                <Button variant="outline" size="sm" loading={reconciling} onClick={handleReconcile}>Refresh status</Button>
+              </div>
+              {onlineLoading ? <div className="p-6"><LoadingSpinner /></div> : onlinePayments.length === 0 ? (
+                <p className="px-5 py-10 text-center text-sm text-slate-500">No online payments yet.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-slate-50 text-left text-xs text-slate-500">
+                      <tr>
+                        <th className="px-4 py-2.5 font-medium">Date</th>
+                        <th className="px-4 py-2.5 font-medium">Student</th>
+                        <th className="px-4 py-2.5 text-right font-medium">Fee</th>
+                        <th className="px-4 py-2.5 text-right font-medium">Convenience (incl. GST)</th>
+                        <th className="px-4 py-2.5 text-right font-medium">Paid</th>
+                        <th className="px-4 py-2.5 font-medium">Status</th>
+                        <th className="px-4 py-2.5 font-medium">Receipt</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {onlinePayments.map((p) => (
+                        <tr key={p.id}>
+                          <td className="px-4 py-2.5 text-xs text-slate-500">{new Date(p.paid_at ?? p.created_at).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</td>
+                          <td className="px-4 py-2.5"><p className="font-medium text-slate-900">{p.student?.full_name ?? '—'}</p><p className="text-[11px] text-slate-400">{p.student?.admission_number}{p.channel === 'link' ? ' · app' : ''}</p></td>
+                          <td className="px-4 py-2.5 text-right tabular-nums">{formatCurrency(p.fee_amount / 100, '₹')}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums text-slate-500">{formatCurrency((p.total_amount - p.fee_amount) / 100, '₹')}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums font-semibold">{p.status === 'paid' ? formatCurrency(p.total_amount / 100, '₹') : '—'}</td>
+                          <td className="px-4 py-2.5">
+                            {p.refund_status === 'needed' ? (
+                              <div className="flex flex-col items-start gap-1">
+                                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">Refund {formatCurrency(p.unapplied_amount / 100, '₹')}</span>
+                                <button onClick={() => handleRefunded(p.id)} className="text-[11px] font-medium text-brand-600 hover:underline">Mark refunded</button>
+                              </div>
+                            ) : p.refund_status === 'refunded' ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Refunded</span>
+                              : p.status === 'paid' ? <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Paid</span>
+                              : p.status === 'created' ? <span className="rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">Waiting</span>
+                              : <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 capitalize" title={p.error ?? ''}>{p.status}</span>}
+                          </td>
+                          <td className="px-4 py-2.5 font-mono text-xs text-slate-500">{p.receipt_number ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </Card>
+          </div>
+        )}
+
         {activeTab === 'setup' && (
           <div className="space-y-5">
             {/* Status */}

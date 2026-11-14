@@ -7,6 +7,7 @@
 //                   or "link" (mobile app, Razorpay payment link)
 //   verify          web checkout success: check signature, confirm with Razorpay, apply
 //   check           ask Razorpay whether a payment finished (app return / retries), apply
+//   reconcile       check every unfinished payment the caller can see (last 72h), apply paid ones
 //
 // Money is always computed here in paise; nothing from the client is trusted:
 //   fee + 2% convenience + 18% GST on that + ₹5 platform fee.
@@ -106,6 +107,29 @@ async function confirmPayment(gw: { key_id: string; key_secret: string }, row: R
   }
 }
 
+/** Asks Razorpay about one unfinished payment; applies it when paid. */
+async function checkRow(admin: SupabaseClient, gw: { key_id: string; key_secret: string }, row: Record<string, unknown>) {
+  if (row.status === "paid") return { status: "paid" as const, row };
+  let payId: string | null = null;
+  if (row.razorpay_order_id) {
+    const r = await rzp(gw.key_id, gw.key_secret, `/orders/${row.razorpay_order_id}/payments`);
+    const items = (r.body?.items ?? []) as { id: string; status: string }[];
+    payId = items.find((p) => p.status === "captured")?.id ?? items.find((p) => p.status === "authorized")?.id ?? null;
+  } else if (row.razorpay_link_id) {
+    const r = await rzp(gw.key_id, gw.key_secret, `/payment_links/${row.razorpay_link_id}`);
+    const link = r.body as { status?: string; payments?: { payment_id: string; status: string }[] };
+    payId = link.payments?.find((p) => p.status === "captured")?.payment_id ?? null;
+    if (!payId && (link.status === "expired" || link.status === "cancelled")) {
+      await admin.from("online_payments").update({ status: "expired" }).eq("id", row.id).eq("status", "created");
+      return { status: "expired" as const, row };
+    }
+  }
+  if (!payId) return { status: "pending" as const, row };
+  await confirmPayment(gw, row, payId);
+  const applied = await apply(admin, String(row.id), payId);
+  return { status: "paid" as const, row: applied };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 200, headers: cors });
   try {
@@ -172,6 +196,30 @@ Deno.serve(async (req) => {
       const b = breakdown(feePaise);
       const gw = await getGateway(admin, caller.school_id);
 
+      // Same fees, same amount, still open (< 20 min)? Reuse it so a double
+      // tap or a second tab can't charge twice — an order is payable once.
+      const since = new Date(Date.now() - 20 * 60 * 1000).toISOString();
+      const { data: open } = await admin.from("online_payments").select("*")
+        .eq("student_id", studentId).eq("status", "created").eq("channel", channel).gte("created_at", since)
+        .order("created_at", { ascending: false }).limit(5);
+      const sameAlloc = (x: unknown) => JSON.stringify([...(x as { fee_id: string; amount: number }[])].sort((a, b) => a.fee_id.localeCompare(b.fee_id)))
+        === JSON.stringify([...allocations].sort((a: { fee_id: string }, b: { fee_id: string }) => a.fee_id.localeCompare(b.fee_id)));
+      const reuse = (open ?? []).find((o) => sameAlloc(o.allocations) && (o.razorpay_order_id || o.link_url));
+      if (reuse) {
+        const c = await checkRow(admin, gw, reuse);
+        if (c.status === "paid") throw new HttpError(409, "This fee was just paid. Refresh to see the receipt.");
+        if (c.status === "pending") {
+          const { data: st } = await admin.from("students").select("full_name, admission_number").eq("id", studentId).maybeSingle();
+          return json({
+            online_payment_id: reuse.id, key_id: gw.key_id,
+            order_id: reuse.razorpay_order_id ?? null, link_url: reuse.link_url ?? null,
+            amount: Number(reuse.total_amount),
+            breakdown: { fee: Number(reuse.fee_amount), convenience_with_gst: Number(reuse.convenience_fee) + Number(reuse.gst_amount) + Number(reuse.platform_fee), total: Number(reuse.total_amount) },
+            description: `Fees: ${st?.full_name ?? "Student"} (${st?.admission_number ?? ""})`,
+          });
+        }
+      }
+
       // Admission receipt must be this student's.
       let admissionReceiptId: string | null = null;
       if (body.admission_receipt_id) {
@@ -214,7 +262,8 @@ Deno.serve(async (req) => {
           amount: b.total, currency: "INR", description, reference_id: id.slice(0, 40), notes,
           expire_by: Math.floor(Date.now() / 1000) + 30 * 60,
           reminder_enable: false, notify: { sms: false, email: false },
-          customer: caller.email ? { email: caller.email } : undefined,
+          // Login usernames map to placeholder addresses (…@veducore.internal); send only real emails.
+          customer: caller.email && !/\.(internal|veducore)$/i.test(caller.email) ? { email: caller.email } : undefined,
         };
         let r = await rzp(gw.key_id, gw.key_secret, "/payment_links", {
           method: "POST", body: JSON.stringify(transfers ? { ...base, options: { order: { transfers } } } : base),
@@ -262,25 +311,37 @@ Deno.serve(async (req) => {
         return json({ status: "paid", receipt_number: applied?.receipt_number, payment: applied });
       }
 
-      // check: ask Razorpay
-      let payId: string | null = null;
-      if (row.razorpay_order_id) {
-        const r = await rzp(gw.key_id, gw.key_secret, `/orders/${row.razorpay_order_id}/payments`);
-        const items = (r.body?.items ?? []) as { id: string; status: string }[];
-        payId = items.find((p) => p.status === "captured")?.id ?? items.find((p) => p.status === "authorized")?.id ?? null;
-      } else if (row.razorpay_link_id) {
-        const r = await rzp(gw.key_id, gw.key_secret, `/payment_links/${row.razorpay_link_id}`);
-        const link = r.body as { status?: string; payments?: { payment_id: string; status: string }[] };
-        if (link.status === "expired" || link.status === "cancelled") {
-          await admin.from("online_payments").update({ status: "expired" }).eq("id", row.id).eq("status", "created");
-          return json({ status: "expired" });
-        }
-        payId = link.payments?.find((p) => p.status === "captured")?.payment_id ?? null;
+      const c = await checkRow(admin, gw, row);
+      return json({ status: c.status, receipt_number: (c.row as { receipt_number?: string })?.receipt_number, payment: c.row });
+    }
+
+    // ── Reconcile everything unfinished the caller can see ────────────────
+    if (action === "reconcile") {
+      const since = new Date(Date.now() - 72 * 3600 * 1000).toISOString();
+      let q = admin.from("online_payments").select("*").eq("school_id", caller.school_id).eq("status", "created").gte("created_at", since)
+        .order("created_at", { ascending: false }).limit(25);
+      if (caller.role === "parent") {
+        const { data: links } = await admin.from("parent_students").select("student_id, parent:parents!inner(user_id)").eq("parent.user_id", caller.id);
+        const ids = (links ?? []).map((l) => l.student_id);
+        if (!ids.length) return json({ applied: 0, pending: 0 });
+        q = q.in("student_id", ids);
+      } else if (!(await canManageFees(admin, caller, ["fees", "admissions"]))) {
+        throw new HttpError(403, "Not allowed");
       }
-      if (!payId) return json({ status: "pending" });
-      await confirmPayment(gw, row, payId);
-      const applied = await apply(admin, row.id, payId);
-      return json({ status: "paid", receipt_number: applied?.receipt_number, payment: applied });
+      const { data: rows } = await q;
+      if (!rows?.length) return json({ applied: 0, pending: 0 });
+      const { data: gwRow } = await admin.from("payment_gateways").select("*").eq("school_id", caller.school_id).maybeSingle();
+      if (!gwRow) return json({ applied: 0, pending: rows.length });
+      let applied = 0, pending = 0;
+      for (const r of rows) {
+        try {
+          const c = await checkRow(admin, gwRow, r);
+          if (c.status === "paid") applied++; else if (c.status === "pending") pending++;
+        } catch (e) {
+          await admin.from("online_payments").update({ error: String(e instanceof Error ? e.message : e).slice(0, 300) }).eq("id", r.id);
+        }
+      }
+      return json({ applied, pending });
     }
 
     return json({ error: "Unknown action" }, 400);

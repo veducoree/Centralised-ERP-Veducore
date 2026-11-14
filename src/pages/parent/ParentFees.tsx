@@ -28,6 +28,8 @@ import {
   payWithCheckout,
   checkOnlinePayment,
   onlineCharges,
+  reconcilePayments,
+  fetchConvenienceForReceipt,
 } from '@/services/api';
 import type { Parent, Student, Fee, School } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -183,6 +185,7 @@ export default function ParentFees() {
   const [selectedFee, setSelectedFee] = useState<Fee | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [onlineEnabled, setOnlineEnabled] = useState<boolean | null>(null);
+  const [invoiceConvenience, setInvoiceConvenience] = useState<{ fee: number; extra: number; total: number } | null>(null);
 
   // Invoice modal
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
@@ -193,7 +196,23 @@ export default function ParentFees() {
   const [invoiceSessionAmount, setInvoiceSessionAmount] = useState<number>(0);
   const [invoiceIsFeeSummary, setInvoiceIsFeeSummary] = useState<boolean>(false);
 
-  useEffect(() => { fetchGatewayStatus().then((g) => setOnlineEnabled(!!g.active)).catch(() => setOnlineEnabled(false)); }, []);
+  useEffect(() => {
+    fetchGatewayStatus().then(async (g) => {
+      setOnlineEnabled(!!g.active);
+      // Record any payment that finished after the window was closed.
+      if (g.active) {
+        const r = await reconcilePayments().catch(() => null);
+        if (r?.applied) loadFees();
+      }
+    }).catch(() => setOnlineEnabled(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Online receipts also show the convenience charge the parent paid.
+  useEffect(() => {
+    setInvoiceConvenience(null);
+    if (invoiceModalOpen && lastPaymentId) fetchConvenienceForReceipt(lastPaymentId).then(setInvoiceConvenience).catch(() => {});
+  }, [invoiceModalOpen, lastPaymentId]);
 
   const loadData = useCallback(async () => {
     if (!profile?.id) return;
@@ -806,6 +825,13 @@ export default function ParentFees() {
                 </tr>
               </tbody>
             </table>
+
+            {invoiceConvenience && !invoiceIsFeeSummary && (
+              <div className="rounded-xl border border-slate-200 px-3 py-2 text-xs">
+                <div className="flex justify-between py-0.5"><span className="text-slate-500">Convenience fee (incl. GST)</span><span className="tabular-nums">{formatCurrency(invoiceConvenience.extra, '₹')}</span></div>
+                <div className="flex justify-between py-0.5 font-semibold text-slate-800"><span>Total paid online</span><span className="tabular-nums">{formatCurrency(invoiceConvenience.total, '₹')}</span></div>
+              </div>
+            )}
 
             <div className="rounded-xl bg-emerald-50 border border-emerald-100 p-3 space-y-1">
               <div className="flex items-center gap-1.5 mb-2">

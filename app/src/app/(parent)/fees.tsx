@@ -24,6 +24,8 @@ import {
   createPaymentLink,
   checkOnlinePayment,
   onlineCharges,
+  reconcilePayments,
+  fetchConvenienceForReceipt,
   fetchSchool,
 } from '@/services/api';
 import { SPACING, RADIUS, formatDate, formatCurrency } from '@/lib/utils';
@@ -373,7 +375,17 @@ export default function ParentFees() {
     setStructureMode(mode);
   };
 
-  useEffect(() => { fetchGatewayActive().then(setOnlineEnabled).catch(() => setOnlineEnabled(false)); }, []);
+  useEffect(() => {
+    fetchGatewayActive().then(async (on) => {
+      setOnlineEnabled(on);
+      // Record any payment that finished while the app was closed.
+      if (on) {
+        const r = await reconcilePayments().catch(() => null);
+        if (r?.applied && children[selectedIndex]) loadFees(children[selectedIndex]);
+      }
+    }).catch(() => setOnlineEnabled(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [children.length]);
 
   const finishPaid = useCallback(async (fee: Fee, installment: number, receipt?: string) => {
     setPendingPayment(null);
@@ -451,6 +463,7 @@ export default function ParentFees() {
     const pDate = formatDate(fee.payment_date || fee.updated_at || new Date().toISOString());
     const pMethod = fee.payment_method || 'Cash (School Office)';
 
+    const online = await fetchConvenienceForReceipt(fee.receipt_number).catch(() => null);
     const text = [
       `================================`,
       `${sName.toUpperCase()}`,
@@ -468,6 +481,7 @@ export default function ParentFees() {
       `Total Paid : ${formatCurrency(fee.paid_amount)}`,
       `Balance Due: ${formatCurrency(fee.remaining_amount)}`,
       `Pay Mode   : ${pMethod}`,
+      ...(online ? [`Convenience: ${formatCurrency(online.extra)} (incl. GST)`, `Paid Online: ${formatCurrency(online.total)}`] : []),
       `Status     : ${Number(fee.remaining_amount) <= 0 ? 'PAID IN FULL' : 'PARTIALLY PAID'}`,
       `================================`,
     ].join('\n');
