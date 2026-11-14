@@ -128,6 +128,8 @@ export interface ExamDef {
   date: string;
   school_id: string;
   created_by_teacher_id: string;
+  /** Set when the exam was scheduled by the school office. */
+  exam_id?: string | null;
 }
 
 export interface Attendance {

@@ -16,6 +16,7 @@ import type {
   SidebarPreference,
   AcademicSession, AdminDashboardSummary,
   StaffRole, StaffMember, MyPermissions, PermissionLevel,
+  Exam, ExamScheduleRow, GradingScale, GradeBand, ExamResultRow, ExamProgressRow, RecordType,
 } from '@/types';
 
 // Lightweight in-memory cache with TTL and in-flight request deduplication
@@ -3177,4 +3178,208 @@ export async function createStaffAccount(params: {
       (err instanceof Error ? err.message : ''));
   }
   return result as { id: string; email: string; password: string };
+}
+
+// ==========================================
+// Exams & results
+// ==========================================
+type ExamRow = Omit<Exam, 'class_ids'> & { exam_classes: { class_id: string }[] | null };
+
+export async function fetchExams(schoolId: string, sessionId?: string | null) {
+  let q = supabase.from('exams').select('*, exam_classes(class_id)').eq('school_id', schoolId)
+    .order('start_date', { ascending: false, nullsFirst: true }).order('created_at', { ascending: false });
+  if (sessionId) q = q.eq('session_id', sessionId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return ((data ?? []) as ExamRow[]).map(({ exam_classes, ...e }) => ({
+    ...e, class_ids: (exam_classes ?? []).map((c) => c.class_id),
+  })) as Exam[];
+}
+
+export async function fetchExam(id: string) {
+  const { data, error } = await supabase.from('exams').select('*, exam_classes(class_id)').eq('id', id).maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const { exam_classes, ...e } = data as ExamRow;
+  return { ...e, class_ids: (exam_classes ?? []).map((c) => c.class_id) } as Exam;
+}
+
+export async function saveExam(exam: {
+  id?: string; school_id: string; name: string; record_type: RecordType;
+  start_date: string | null; end_date: string | null; grading_scale_id: string | null;
+  instructions: string | null; class_ids: string[];
+}) {
+  const { id, class_ids, ...rest } = exam;
+  const q = id ? supabase.from('exams').update(rest).eq('id', id) : supabase.from('exams').insert(rest);
+  const { data, error } = await q.select().maybeSingle();
+  if (error) throw error;
+  const examId = (data as { id: string }).id;
+
+  const { data: existing } = await supabase.from('exam_classes').select('class_id').eq('exam_id', examId);
+  const have = new Set((existing ?? []).map((r: { class_id: string }) => r.class_id));
+  const want = new Set(class_ids);
+  const add = class_ids.filter((c) => !have.has(c)).map((class_id) => ({ exam_id: examId, class_id }));
+  const remove = [...have].filter((c) => !want.has(c));
+  if (add.length) {
+    const { error: e1 } = await supabase.from('exam_classes').insert(add);
+    if (e1) throw e1;
+  }
+  if (remove.length) {
+    const { error: e2 } = await supabase.from('exam_classes').delete().eq('exam_id', examId).in('class_id', remove);
+    if (e2) throw e2;
+    await supabase.from('exam_schedule').delete().eq('exam_id', examId).in('class_id', remove);
+  }
+  // Keep teacher-facing exam_defs in step once a datesheet exists.
+  if (id) await supabase.rpc('sync_exam_defs', { p_exam: examId });
+  return examId;
+}
+
+export async function deleteExam(id: string) {
+  const { error } = await supabase.from('exams').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function fetchExamSchedule(examId: string) {
+  const { data, error } = await supabase.from('exam_schedule').select('*').eq('exam_id', examId);
+  if (error) throw error;
+  return (data ?? []) as ExamScheduleRow[];
+}
+
+/** Replaces the datesheet for one class, then syncs teacher exam_defs. */
+export async function saveExamScheduleForClass(examId: string, classId: string, rows: ExamScheduleRow[]) {
+  const keep = rows.map((r) => r.subject_id);
+  let del = supabase.from('exam_schedule').delete().eq('exam_id', examId).eq('class_id', classId);
+  if (keep.length) del = del.not('subject_id', 'in', `(${keep.join(',')})`);
+  const { error: delErr } = await del;
+  if (delErr) throw delErr;
+  if (rows.length) {
+    const payload = rows.map(({ id: _id, ...r }) => ({ ...r, exam_id: examId, class_id: classId }));
+    const { error } = await supabase.from('exam_schedule').upsert(payload, { onConflict: 'exam_id,class_id,subject_id' });
+    if (error) throw error;
+  }
+  const { error: syncErr } = await supabase.rpc('sync_exam_defs', { p_exam: examId });
+  if (syncErr) throw syncErr;
+}
+
+export async function fetchExamProgress(examId: string) {
+  const { data, error } = await supabase.rpc('exam_progress', { p_exam: examId });
+  if (error) throw error;
+  return (data ?? []) as ExamProgressRow[];
+}
+
+export async function fetchExamResults(examId: string, sectionId?: string | null) {
+  const { data, error } = await supabase.rpc('exam_results', { p_exam: examId, p_section: sectionId ?? null });
+  if (error) throw error;
+  return ((data ?? []) as ExamResultRow[]).map((r) => ({
+    ...r,
+    total: r.total === null ? null : Number(r.total),
+    max_total: r.max_total === null ? null : Number(r.max_total),
+    percent: r.percent === null ? null : Number(r.percent),
+  }));
+}
+
+export async function publishExam(examId: string, publish = true) {
+  const { data, error } = await supabase.rpc('publish_exam', { p_exam: examId, p_publish: publish });
+  if (error) throw error;
+  return (data as number) ?? 0;
+}
+
+/** Marks for one exam + subject in a section, keyed by student. */
+export async function fetchExamMarks(examId: string, subjectId: string, studentIds: string[]) {
+  if (!studentIds.length) return {} as Record<string, { id: string; marks: number; teacher_comment: string | null }>;
+  const { data, error } = await supabase.from('student_records')
+    .select('id, student_id, marks, teacher_comment')
+    .eq('exam_id', examId).eq('subject_id', subjectId).in('student_id', studentIds);
+  if (error) throw error;
+  const out: Record<string, { id: string; marks: number; teacher_comment: string | null }> = {};
+  for (const r of (data ?? []) as { id: string; student_id: string; marks: number; teacher_comment: string | null }[]) {
+    out[r.student_id] = { id: r.id, marks: Number(r.marks), teacher_comment: r.teacher_comment };
+  }
+  return out;
+}
+
+export async function saveExamMarks(params: {
+  school_id: string; exam: Exam; subject: { id: string; name: string }; max_marks: number;
+  entries: { student_id: string; record_id?: string; marks: number | null }[];
+}) {
+  const { school_id, exam, subject, max_marks, entries } = params;
+  const toDelete = entries.filter((e) => e.marks === null && e.record_id).map((e) => e.record_id as string);
+  const toUpdate = entries.filter((e) => e.marks !== null && e.record_id);
+  const toInsert = entries.filter((e) => e.marks !== null && !e.record_id);
+
+  if (toDelete.length) {
+    const { error } = await supabase.from('student_records').delete().in('id', toDelete);
+    if (error) throw error;
+  }
+  for (const e of toUpdate) {
+    const { error } = await supabase.from('student_records').update({ marks: e.marks, max_marks }).eq('id', e.record_id as string);
+    if (error) throw error;
+  }
+  if (toInsert.length) {
+    const { error } = await supabase.from('student_records').insert(toInsert.map((e) => ({
+      school_id, student_id: e.student_id, subject_id: subject.id, subject_name: subject.name,
+      record_type: exam.record_type, exam_name: exam.name, exam_id: exam.id,
+      marks: e.marks, max_marks, date: exam.start_date ?? new Date().toISOString().slice(0, 10),
+    })));
+    if (error) throw error;
+  }
+}
+
+export async function fetchGradingScales(schoolId: string) {
+  const { data, error } = await supabase.from('grading_scales')
+    .select('*, bands:grade_bands(*)').eq('school_id', schoolId).order('is_default', { ascending: false });
+  if (error) throw error;
+  return ((data ?? []) as GradingScale[]).map((g) => ({
+    ...g,
+    pass_percent: Number(g.pass_percent),
+    bands: [...(g.bands ?? [])].map((b) => ({ ...b, min_percent: Number(b.min_percent), grade_point: b.grade_point === null ? null : Number(b.grade_point) }))
+      .sort((a, b) => b.min_percent - a.min_percent),
+  }));
+}
+
+export async function saveGradingScale(scaleId: string, passPercent: number, bands: GradeBand[]) {
+  const { error: e1 } = await supabase.from('grading_scales').update({ pass_percent: passPercent, updated_at: new Date().toISOString() }).eq('id', scaleId);
+  if (e1) throw e1;
+  const { error: e2 } = await supabase.from('grade_bands').delete().eq('scale_id', scaleId);
+  if (e2) throw e2;
+  const { error: e3 } = await supabase.from('grade_bands').insert(bands.map((b) => ({
+    scale_id: scaleId, grade: b.grade.trim(), min_percent: b.min_percent, grade_point: b.grade_point, remark: b.remark || null,
+  })));
+  if (e3) throw e3;
+}
+
+export async function fetchAttendanceSummary(sectionId: string, from: string, to: string) {
+  const { data, error } = await supabase.rpc('attendance_summary', { p_section: sectionId, p_from: from, p_to: to });
+  if (error) throw error;
+  const out: Record<string, { present: number; absent: number; late: number; on_leave: number; total: number }> = {};
+  for (const r of (data ?? []) as { student_id: string; present: number; absent: number; late: number; on_leave: number; total: number }[]) {
+    out[r.student_id] = r;
+  }
+  return out;
+}
+
+/** Existing marks for one exam name + subject among the given students. */
+export async function fetchRecordsForExamSubject(examName: string, subjectId: string, studentIds: string[]) {
+  if (!studentIds.length) return [] as StudentRecord[];
+  const { data, error } = await supabase.from('student_records').select('*')
+    .eq('subject_id', subjectId).ilike('exam_name', examName).in('student_id', studentIds);
+  if (error) throw error;
+  return (data ?? []) as StudentRecord[];
+}
+
+export async function fetchExamStatuses(examIds: string[]) {
+  if (!examIds.length) return {} as Record<string, string>;
+  const { data, error } = await supabase.from('exams').select('id, status').in('id', examIds);
+  if (error) throw error;
+  return Object.fromEntries(((data ?? []) as { id: string; status: string }[]).map((e) => [e.id, e.status]));
+}
+
+/** Marks of students in the given sections (light columns for counting). */
+export async function fetchRecordsForSections(sectionIds: string[]) {
+  if (!sectionIds.length) return [] as StudentRecord[];
+  const { data, error } = await supabase.from('student_records')
+    .select('id, student_id, subject_id, exam_name, exam_id, marks, student:students!inner(id, section_id)')
+    .in('student.section_id', sectionIds);
+  if (error) throw error;
+  return (data ?? []) as unknown as StudentRecord[];
 }

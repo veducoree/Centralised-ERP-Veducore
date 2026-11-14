@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, Trash2, ClipboardList, ChevronRight, Save, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, ClipboardList, ChevronRight, Save, ArrowLeft, Lock } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Form';
@@ -11,68 +11,19 @@ import {
   fetchTeacherByUserId,
   fetchTeacherAssignments,
   fetchStudentsBySection,
-  fetchStudentRecords,
   createStudentRecord,
   deleteStudentRecord,
   fetchSubjects,
+  fetchExamDefs,
+  createExamDef,
+  deleteExamDef,
+  fetchRecordsForExamSubject,
+  fetchExamStatuses,
+  fetchRecordsForSections,
 } from '@/services/api';
 import type { Teacher, ClassAssignment, Student, StudentRecord, Subject, ExamDef, RecordType } from '@/types';
 import { formatDate } from '@/lib/utils';
 import { Badge } from '@/components/ui/Badge';
-
-// ── localStorage helpers ──────────────────────────────────────────────────────
-
-const EXAM_DEFS_KEY = (schoolId: string) => `veducore_exam_defs_${schoolId}`;
-
-function loadExamDefs(schoolId: string): ExamDef[] {
-  try {
-    return JSON.parse(localStorage.getItem(EXAM_DEFS_KEY(schoolId)) ?? '[]') as ExamDef[];
-  } catch {
-    return [];
-  }
-}
-
-function saveExamDefs(schoolId: string, defs: ExamDef[]): void {
-  localStorage.setItem(EXAM_DEFS_KEY(schoolId), JSON.stringify(defs));
-}
-
-function seedExamDefsIfEmpty(schoolId: string, teacherId: string): void {
-  const existing = loadExamDefs(schoolId);
-  if (existing.length > 0) return;
-  const defaults: ExamDef[] = [
-    {
-      id: 'examdef-001',
-      exam_name: 'Unit Test 1',
-      record_type: 'unit_test',
-      max_marks: 50,
-      section_id: 'sec-001',
-      date: '2026-01-15',
-      school_id: schoolId,
-      created_by_teacher_id: teacherId,
-    },
-    {
-      id: 'examdef-002',
-      exam_name: 'Mid Term',
-      record_type: 'mid_term',
-      max_marks: 100,
-      section_id: 'sec-001',
-      date: '2026-03-10',
-      school_id: schoolId,
-      created_by_teacher_id: teacherId,
-    },
-    {
-      id: 'examdef-003',
-      exam_name: 'Final Exam',
-      record_type: 'final_exam',
-      max_marks: 100,
-      section_id: 'sec-001',
-      date: '2026-05-20',
-      school_id: schoolId,
-      created_by_teacher_id: teacherId,
-    },
-  ];
-  saveExamDefs(schoolId, defaults);
-}
 
 type View = 'list' | 'enter-marks';
 
@@ -84,6 +35,7 @@ export default function TeacherExamMarks() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [allRecords, setAllRecords] = useState<StudentRecord[]>([]);
   const [examDefs, setExamDefs] = useState<ExamDef[]>([]);
+  const [examStatus, setExamStatus] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   // Create exam modal
@@ -116,17 +68,19 @@ export default function TeacherExamMarks() {
       const t = await fetchTeacherByUserId(profile.id);
       if (t) {
         setTeacher(t);
-        const [a, r, s] = await Promise.all([
+        const [a, s, defs] = await Promise.all([
           fetchTeacherAssignments(t.id),
-          fetchStudentRecords({ teacherId: t.id }),
           fetchSubjects(profile.school_id),
+          fetchExamDefs({ schoolId: profile.school_id }),
         ]);
         setAssignments(a);
-        setAllRecords(r);
         setSubjects(s);
-        // Seed ExamDefs if this is the first load
-        seedExamDefsIfEmpty(profile.school_id, t.id);
-        setExamDefs(loadExamDefs(profile.school_id));
+        setExamDefs(defs);
+        // Marks for the teacher's sections, whoever entered them (admin, co-teacher).
+        const sectionIds = new Set(a.map((x) => x.section_id));
+        setAllRecords(await fetchRecordsForSections([...sectionIds]));
+        const ids = [...new Set(defs.map((d) => d.exam_id).filter(Boolean))] as string[];
+        setExamStatus(await fetchExamStatuses(ids).catch(() => ({})));
       }
     } catch {
       /* handled */
@@ -139,10 +93,7 @@ export default function TeacherExamMarks() {
     loadData();
   }, [loadData]);
 
-  // Re-read ExamDefs when school changes (covers hot reload edge cases)
-  useEffect(() => {
-    if (profile?.school_id) setExamDefs(loadExamDefs(profile.school_id));
-  }, [profile?.school_id]);
+  const isLocked = (d: ExamDef | null) => !!d?.exam_id && examStatus[d.exam_id] === 'published';
 
   // ── Derived ────────────────────────────────────────────────────────────────
 
@@ -182,7 +133,9 @@ export default function TeacherExamMarks() {
 
   function countMarked(examDef: ExamDef, subject: Subject): number {
     return allRecords.filter(
-      (r) => r.exam_name === examDef.exam_name && r.subject_id === subject.id
+      (r) => r.exam_name.toLowerCase() === examDef.exam_name.toLowerCase()
+        && r.subject_id === subject.id
+        && r.student?.section_id === examDef.section_id
     ).length;
   }
 
@@ -206,10 +159,7 @@ export default function TeacherExamMarks() {
     }
     setSaving(true);
     try {
-      const newDef: ExamDef = {
-        id: (typeof crypto !== 'undefined' && crypto.randomUUID)
-          ? crypto.randomUUID()
-          : Math.random().toString(36).slice(2) + Date.now().toString(36),
+      const created = await createExamDef({
         exam_name: examDefForm.exam_name.trim(),
         record_type: examDefForm.record_type,
         max_marks: parseFloat(examDefForm.max_marks) || 50,
@@ -217,10 +167,8 @@ export default function TeacherExamMarks() {
         date: examDefForm.date,
         school_id: profile.school_id,
         created_by_teacher_id: teacher.id,
-      };
-      const updated = [...examDefs, newDef];
-      saveExamDefs(profile.school_id, updated);
-      setExamDefs(updated);
+      });
+      if (created) setExamDefs((prev) => [created, ...prev]);
       setCreateModalOpen(false);
       setExamDefForm({
         exam_name: '',
@@ -230,6 +178,8 @@ export default function TeacherExamMarks() {
         date: new Date().toISOString().split('T')[0],
       });
       toast('Exam created', 'success');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to create exam', 'error');
     } finally {
       setSaving(false);
     }
@@ -241,9 +191,7 @@ export default function TeacherExamMarks() {
     setView('enter-marks');
     const students = await fetchStudentsBySection(examDef.section_id);
     setSectionStudents(students);
-    const existing = allRecords.filter(
-      (r) => r.exam_name === examDef.exam_name && r.subject_id === subject.id
-    );
+    const existing = await fetchRecordsForExamSubject(examDef.exam_name, subject.id, students.map((s) => s.id));
     const marks: Record<string, string> = {};
     const comments: Record<string, string> = {};
     for (const r of existing) {
@@ -258,9 +206,9 @@ export default function TeacherExamMarks() {
     if (!teacher || !profile?.school_id || !selectedExamDef || !selectedSubject) return;
     setSubmittingMarks(true);
     try {
-      const existing = allRecords.filter(
-        (r) => r.exam_name === selectedExamDef.exam_name && r.subject_id === selectedSubject.id
-      );
+      // Only this section's marks for this exam + subject are replaced.
+      const existing = await fetchRecordsForExamSubject(
+        selectedExamDef.exam_name, selectedSubject.id, sectionStudents.map((s) => s.id));
       for (const r of existing) {
         await deleteStudentRecord(r.id);
       }
@@ -299,15 +247,15 @@ export default function TeacherExamMarks() {
     if (!def) return;
     try {
       // Delete all records for this exam where student belongs to this section
+      if (def.exam_id) { toast('School exams can only be removed by the office', 'error'); return; }
       const toDelete = allRecords.filter(
         (r) => r.exam_name === def.exam_name && r.student?.section_id === def.section_id
       );
       for (const r of toDelete) {
         await deleteStudentRecord(r.id);
       }
-      const updated = examDefs.filter((d) => d.id !== deleteExamId);
-      saveExamDefs(profile.school_id, updated);
-      setExamDefs(updated);
+      await deleteExamDef(def.id);
+      setExamDefs((prev) => prev.filter((d) => d.id !== deleteExamId));
       toast('Exam deleted', 'success');
       await loadData();
     } catch {
@@ -356,6 +304,7 @@ export default function TeacherExamMarks() {
                 </span>
                 <Button
                   onClick={handleSaveMarks}
+                  disabled={isLocked(selectedExamDef)}
                   loading={submittingMarks}
                   icon={<Save className="h-4 w-4" />}
                 >
@@ -416,6 +365,7 @@ export default function TeacherExamMarks() {
             <div className="flex justify-end border-t border-gray-100 px-4 py-3">
               <Button
                 onClick={handleSaveMarks}
+                disabled={isLocked(selectedExamDef)}
                 loading={submittingMarks}
                 icon={<Save className="h-4 w-4" />}
               >
@@ -485,14 +435,18 @@ export default function TeacherExamMarks() {
                       <span className="text-xs text-gray-500">{sectionLabelFor(def.section_id)}</span>
                       <span className="text-xs text-gray-400">&middot; Max: {def.max_marks}</span>
                       <span className="text-xs text-gray-400">&middot; {formatDate(def.date)}</span>
+                      {def.exam_id && <Badge variant="default">School exam</Badge>}
+                      {isLocked(def) && <span className="inline-flex items-center gap-1 text-xs text-emerald-700"><Lock className="h-3 w-3" /> Results published</span>}
                     </div>
-                    <button
-                      onClick={() => setDeleteExamId(def.id)}
-                      className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                      aria-label="Delete exam"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {!def.exam_id && (
+                      <button
+                        onClick={() => setDeleteExamId(def.id)}
+                        className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                        aria-label="Delete exam"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
 
                   {/* Subject rows */}
@@ -521,7 +475,7 @@ export default function TeacherExamMarks() {
                               icon={<ChevronRight className="h-3.5 w-3.5" />}
                               onClick={() => openEnterMarks(def, sub)}
                             >
-                              Enter Marks
+                              {isLocked(def) ? 'View Marks' : 'Enter Marks'}
                             </Button>
                           </div>
                         );

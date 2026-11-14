@@ -14,7 +14,9 @@ export interface ExamDef {
   section_id: string;
   date: string;         // YYYY-MM-DD
   school_id: string;
-  created_by_teacher_id: string;
+  created_by_teacher_id: string | null;
+  /** Set when the exam was scheduled by the school (Exams module). */
+  exam_id?: string | null;
 }
 
 export interface Holiday {
@@ -641,4 +643,89 @@ export interface MyPermissions {
   owner?: boolean;
   role?: string;
   modules?: Record<string, PermissionLevel>;
+}
+
+export type ExamStatus = 'draft' | 'scheduled' | 'published';
+
+export interface Exam {
+  id: string;
+  school_id: string;
+  session_id: string | null;
+  name: string;
+  record_type: RecordType;
+  start_date: string | null;
+  end_date: string | null;
+  grading_scale_id: string | null;
+  status: ExamStatus;
+  published_at: string | null;
+  instructions: string | null;
+  created_at: string;
+  class_ids: string[];
+}
+
+export interface ExamScheduleRow {
+  id?: string;
+  exam_id: string;
+  class_id: string;
+  subject_id: string;
+  exam_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  max_marks: number;
+  pass_marks: number | null;
+  room: string | null;
+}
+
+export interface GradeBand {
+  id?: string;
+  scale_id?: string;
+  grade: string;
+  min_percent: number;
+  grade_point: number | null;
+  remark: string | null;
+}
+
+export interface GradingScale {
+  id: string;
+  school_id: string;
+  name: string;
+  is_default: boolean;
+  pass_percent: number;
+  bands: GradeBand[];
+}
+
+export interface ExamResultSubject {
+  subject_id: string | null;
+  subject: string;
+  marks: number;
+  max_marks: number;
+  pass_marks: number;
+  grade: string | null;
+}
+
+export interface ExamResultRow {
+  student_id: string;
+  full_name: string;
+  admission_number: string;
+  roll_number: number | null;
+  class_name: string | null;
+  section_id: string | null;
+  section_name: string | null;
+  total: number | null;
+  max_total: number | null;
+  percent: number | null;
+  grade: string | null;
+  passed: boolean | null;
+  subjects_failed: number;
+  rank: number | null;
+  subjects: ExamResultSubject[];
+}
+
+export interface ExamProgressRow {
+  section_id: string;
+  label: string;
+  subject_id: string;
+  subject: string;
+  students: number;
+  entered: number;
 }

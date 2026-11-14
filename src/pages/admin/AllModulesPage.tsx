@@ -15,6 +15,7 @@ const MODULE_COLORS: Record<string, TileColor> = {
   '/admin/subjects':      'cyan',
   '/admin/timetable':     'violet',
   '/admin/attendance':    'emerald',
+  '/admin/exams':         'violet',
   '/admin/fees':          'emerald',
   '/admin/transport':     'amber',
   '/admin/tracking':      'red',

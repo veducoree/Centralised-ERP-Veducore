@@ -45,6 +45,7 @@ export const adminNav: NavItem[] = [
   { label: 'Subjects',           path: '/admin/subjects',      icon: <Library className="h-5 w-5" /> },
   { label: 'Timetable',          path: '/admin/timetable',     icon: <CalendarClock className="h-5 w-5" /> },
   { label: 'Attendance',         path: '/admin/attendance',    icon: <ClipboardList className="h-5 w-5" /> },
+  { label: 'Exams & Results',    path: '/admin/exams',         icon: <ClipboardCheck className="h-5 w-5" /> },
   { label: 'Fees',               path: '/admin/fees',          icon: <IndianRupee className="h-5 w-5" /> },
   { label: 'Transport',          path: '/admin/transport',     icon: <Bus className="h-5 w-5" /> },
   { label: 'Student Tracking',   path: '/admin/tracking',      icon: <Shield className="h-5 w-5" /> },

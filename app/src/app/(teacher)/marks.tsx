@@ -29,6 +29,7 @@ import {
   fetchStudentsBySection,
   fetchStudentRecords,
   createStudentRecord,
+  fetchRecordsForExamSubject,
   deleteStudentRecord,
 } from '@/services/api';
 import { COLORS, SPACING, RADIUS, SHADOW, formatDate } from '@/lib/utils';
@@ -188,7 +189,9 @@ export default function TeacherMarks() {
   // Count marked students for an exam and subject
   const countMarked = (exam: ExamDef, subject: Subject): { marked: number; total: number } => {
     const records = allRecords.filter(
-      r => r.exam_name === exam.exam_name && r.subject_id === subject.id
+      r => r.exam_name.toLowerCase() === exam.exam_name.toLowerCase()
+        && r.subject_id === subject.id
+        && (r as { student?: { section_id?: string | null } }).student?.section_id === exam.section_id
     );
     return { marked: records.length, total: 5 };
   };
@@ -231,6 +234,10 @@ export default function TeacherMarks() {
 
   // Delete Exam handler
   const handleDeleteExam = (exam: ExamDef) => {
+    if (exam.exam_id) {
+      Alert.alert('School exam', 'This exam was scheduled by the school office and can only be removed there.');
+      return;
+    }
     Alert.alert(
       'Delete Exam',
       `Are you sure you want to delete "${exam.exam_name}"? All student marks associated with this exam will be removed.`,
@@ -269,9 +276,7 @@ export default function TeacherMarks() {
       const students = await fetchStudentsBySection(exam.section_id);
       setSectionStudents(students);
 
-      const existing = allRecords.filter(
-        r => r.exam_name === exam.exam_name && r.subject_id === subject.id
-      );
+      const existing = await fetchRecordsForExamSubject(exam.exam_name, subject.id, students.map(s => s.id));
 
       const marks: Record<string, string> = {};
       const comments: Record<string, string> = {};
@@ -298,9 +303,9 @@ export default function TeacherMarks() {
       const teacher = user?.id ? await fetchTeacherByUserId(user.id) : null;
       const schoolId = teacher?.school_id || 'school-001';
 
-      const existing = allRecords.filter(
-        r => r.exam_name === selectedExam.exam_name && r.subject_id === selectedSubject.id
-      );
+      // Only this section's marks for this exam + subject are replaced.
+      const existing = await fetchRecordsForExamSubject(
+        selectedExam.exam_name, selectedSubject.id, sectionStudents.map(s => s.id));
 
       for (const r of existing) {
         await deleteStudentRecord(r.id);
@@ -333,7 +338,10 @@ export default function TeacherMarks() {
       await loadData();
       setView('list');
     } catch (err) {
-      Alert.alert('Error', 'Failed to save marks.');
+      const msg = err instanceof Error ? err.message : '';
+      Alert.alert('Error', /row-level security|policy/i.test(msg)
+        ? 'Results for this exam are published, so marks are locked. Ask the office to unpublish to make changes.'
+        : 'Failed to save marks.');
     } finally {
       setSavingMarks(false);
     }

@@ -678,6 +678,15 @@ export async function deleteStudentRecord(id: string) {
   if (error) throw error;
 }
 
+/** Existing marks for one exam name + subject among the given students. */
+export async function fetchRecordsForExamSubject(examName: string, subjectId: string, studentIds: string[]) {
+  if (!studentIds.length) return [] as StudentRecord[];
+  const { data, error } = await supabase.from('student_records').select('*')
+    .eq('subject_id', subjectId).ilike('exam_name', examName).in('student_id', studentIds);
+  if (error) throw error;
+  return (data || []) as StudentRecord[];
+}
+
 // ==========================================
 // Exam Definitions API
 // ==========================================

@@ -37,6 +37,7 @@ const PATH_MODULES: [prefix: string, module: string][] = [
   ['/admin/subjects', 'subjects'],
   ['/admin/timetable', 'timetable'],
   ['/admin/attendance', 'attendance'],
+  ['/admin/exams', 'exams'],
   ['/admin/fees', 'fees'],
   ['/admin/transport', 'transport'],
   ['/admin/tracking', 'tracking'],
