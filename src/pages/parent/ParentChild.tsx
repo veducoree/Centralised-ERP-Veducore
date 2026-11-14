@@ -67,7 +67,7 @@ export default function ParentChild() {
         {child ? (
           <Card className="p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-xl font-bold text-blue-700 overflow-hidden">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-brand-100 text-xl font-bold text-brand-700 overflow-hidden">
                 {child.avatar_url ? (
                   <img src={child.avatar_url} alt={child.full_name} className="h-full w-full rounded-full object-cover" />
                 ) : (
@@ -75,8 +75,8 @@ export default function ParentChild() {
                 )}
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-900">{child.full_name}</h2>
-                <p className="text-sm text-gray-500">{child.admission_number}</p>
+                <h2 className="text-xl font-bold text-slate-900">{child.full_name}</h2>
+                <p className="text-sm text-slate-500">{child.admission_number}</p>
                 <div className="mt-1"><StatusBadge status={child.status} /></div>
               </div>
             </div>
@@ -92,8 +92,8 @@ export default function ParentChild() {
           </Card>
         ) : (
           <Card className="p-8 text-center">
-            <User className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-            <p className="font-medium text-gray-600">No child linked to your account</p>
+            <User className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+            <p className="font-medium text-slate-600">No child linked to your account</p>
           </Card>
         )}
       </div>
@@ -103,11 +103,11 @@ export default function ParentChild() {
 
 function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="flex items-center gap-3 rounded-lg bg-gray-50 px-3 py-2.5">
-      <div className="text-gray-400">{icon}</div>
+    <div className="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2.5">
+      <div className="text-slate-400">{icon}</div>
       <div>
-        <p className="text-xs text-gray-500">{label}</p>
-        <p className="text-sm font-medium text-gray-900">{value}</p>
+        <p className="text-xs text-slate-500">{label}</p>
+        <p className="text-sm font-medium text-slate-900">{value}</p>
       </div>
     </div>
   );

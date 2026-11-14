@@ -427,12 +427,12 @@ export default function ParentFees() {
         </div>
 
         {/* ── FEE PAYMENT STRUCTURE SELECTOR: MONTHLY | QUARTERLY | ANNUALLY ── */}
-        <Card className="p-5 border border-blue-100">
+        <Card className="p-5 border border-brand-100">
           <div className="mb-3">
-            <h3 className="text-sm font-bold text-gray-900">
+            <h3 className="text-sm font-bold text-slate-900">
               Choose Fee Payment Structure (Monthly / Quarterly / Annually)
             </h3>
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5">
               Select your preferred payment frequency. Paying an installment automatically marks that period as paid and advances to the next installment.
             </p>
           </div>
@@ -469,20 +469,20 @@ export default function ParentFees() {
                   onClick={() => setStructureMode(mode.id)}
                   className={`flex items-center gap-3 rounded-xl border p-3.5 text-left transition-all ${
                     active
-                      ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                      : 'border-gray-200 bg-gray-50/70 text-gray-800 hover:border-blue-300 hover:bg-white'
+                      ? 'border-brand-600 bg-brand-600 text-white shadow-sm'
+                      : 'border-slate-200 bg-slate-50/70 text-slate-800 hover:border-brand-300 hover:bg-white'
                   }`}
                 >
                   <div
                     className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${
-                      active ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-600'
+                      active ? 'bg-white/20 text-white' : 'bg-brand-100 text-brand-600'
                     }`}
                   >
                     <Icon className="h-5 w-5" />
                   </div>
                   <div>
                     <p className="text-sm font-semibold">{mode.title}</p>
-                    <p className={`text-xs ${active ? 'text-blue-100' : 'text-gray-500'}`}>
+                    <p className={`text-xs ${active ? 'text-brand-100' : 'text-slate-500'}`}>
                       {mode.sub}
                     </p>
                   </div>
@@ -493,9 +493,9 @@ export default function ParentFees() {
         </Card>
 
         {fees.length === 0 ? (
-          <div className="flex flex-col items-center py-16 text-center rounded-xl border border-dashed border-gray-300">
-            <IndianRupee className="h-10 w-10 text-gray-300 mb-2" />
-            <p className="text-sm text-gray-400">No fee records</p>
+          <div className="flex flex-col items-center py-16 text-center rounded-xl border border-dashed border-slate-300">
+            <IndianRupee className="h-10 w-10 text-slate-300 mb-2" />
+            <p className="text-sm text-slate-400">No fee records</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -511,8 +511,8 @@ export default function ParentFees() {
                 <Card key={f.id} className="p-5 space-y-4">
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div>
-                      <span className="text-base font-bold text-gray-900">{f.fee_type}</span>
-                      <p className="text-xs text-gray-500 mt-0.5">
+                      <span className="text-base font-bold text-slate-900">{f.fee_type}</span>
+                      <p className="text-xs text-slate-500 mt-0.5">
                         {isFullyPaid
                           ? 'All Installments Paid ✅'
                           : `Active Due Period: ${plan.currentPeriodLabel} · Next Due Date: ${formatDate(f.due_date)}`}
@@ -529,19 +529,19 @@ export default function ParentFees() {
                   </div>
 
                   {/* Amount Breakdown */}
-                  <div className="grid grid-cols-3 gap-3 rounded-xl bg-gray-50 border border-gray-100 p-3.5 text-sm">
+                  <div className="grid grid-cols-3 gap-3 rounded-xl bg-slate-50 border border-slate-100 p-3.5 text-sm">
                     <div>
-                      <span className="text-xs font-medium text-gray-500">Total Annual Fee</span>
-                      <p className="font-bold text-gray-900 mt-0.5">{formatCurrency(f.amount, '₹')}</p>
+                      <span className="text-xs font-medium text-slate-500">Total Annual Fee</span>
+                      <p className="font-bold text-slate-900 mt-0.5">{formatCurrency(f.amount, '₹')}</p>
                     </div>
                     <div>
-                      <span className="text-xs font-medium text-gray-500">Paid So Far</span>
+                      <span className="text-xs font-medium text-slate-500">Paid So Far</span>
                       <p className="font-bold text-emerald-700 mt-0.5">
                         {formatCurrency(f.paid_amount, '₹')}
                       </p>
                     </div>
                     <div>
-                      <span className="text-xs font-medium text-gray-500">Remaining Balance</span>
+                      <span className="text-xs font-medium text-slate-500">Remaining Balance</span>
                       <p className="font-bold text-red-600 mt-0.5">
                         {formatCurrency(f.remaining_amount, '₹')}
                       </p>
@@ -550,13 +550,13 @@ export default function ParentFees() {
 
                   {/* ── MONTHLY TRACKER CHIPS ── */}
                   {structureMode === 'monthly' && (
-                    <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-3.5 space-y-2.5">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-2.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-gray-700">
+                        <span className="text-xs font-bold text-slate-700">
                           Monthly Progression ({plan.paidPeriods} of 12 Months Paid)
                         </span>
                         {!isFullyPaid && (
-                          <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-700">
+                          <span className="rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-bold text-brand-700">
                             Now Due: {MONTH_ORDER[plan.currentPeriodIndex]} ({formatCurrency(plan.installmentAmount, '₹')})
                           </span>
                         )}
@@ -577,8 +577,8 @@ export default function ParentFees() {
                                 isMonthPaid
                                   ? 'bg-emerald-50 border-emerald-200 text-emerald-700 cursor-default'
                                   : isCurrentDue
-                                    ? 'bg-blue-600 border-blue-600 text-white shadow-sm hover:bg-blue-700 cursor-pointer'
-                                    : 'bg-white border-gray-200 text-gray-400 cursor-default'
+                                    ? 'bg-brand-600 border-brand-600 text-white shadow-sm hover:bg-brand-700 cursor-pointer'
+                                    : 'bg-white border-slate-200 text-slate-400 cursor-default'
                               }`}
                             >
                               <span>{MONTH_ABBR[month]}</span>
@@ -589,8 +589,8 @@ export default function ParentFees() {
                       </div>
 
                       {!isFullyPaid && plan.nextPeriodLabel && (
-                        <p className="text-xs text-gray-600">
-                          💡 Pay <span className="font-bold text-blue-700">{plan.currentPeriodLabel}</span> ({formatCurrency(plan.installmentAmount, '₹')}) now — once paid, <span className="font-semibold text-gray-900">{plan.nextPeriodLabel}</span> will automatically become the next active due month!
+                        <p className="text-xs text-slate-600">
+                          💡 Pay <span className="font-bold text-brand-700">{plan.currentPeriodLabel}</span> ({formatCurrency(plan.installmentAmount, '₹')}) now — once paid, <span className="font-semibold text-slate-900">{plan.nextPeriodLabel}</span> will automatically become the next active due month!
                         </p>
                       )}
                     </div>
@@ -598,13 +598,13 @@ export default function ParentFees() {
 
                   {/* ── QUARTERLY TRACKER CHIPS ── */}
                   {structureMode === 'quarterly' && (
-                    <div className="rounded-xl border border-gray-200 bg-gray-50/50 p-3.5 space-y-2.5">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3.5 space-y-2.5">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-gray-700">
+                        <span className="text-xs font-bold text-slate-700">
                           Quarterly Progression ({plan.paidPeriods} of 4 Quarters Paid)
                         </span>
                         {!isFullyPaid && (
-                          <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-700">
+                          <span className="rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-bold text-brand-700">
                             Now Due: {QUARTERS[plan.currentPeriodIndex].id} ({formatCurrency(plan.installmentAmount, '₹')})
                           </span>
                         )}
@@ -625,8 +625,8 @@ export default function ParentFees() {
                                 isQPaid
                                   ? 'bg-emerald-50 border-emerald-200 text-emerald-700 cursor-default'
                                   : isCurrentQ
-                                    ? 'bg-blue-600 border-blue-600 text-white shadow-sm hover:bg-blue-700 cursor-pointer'
-                                    : 'bg-white border-gray-200 text-gray-400 cursor-default'
+                                    ? 'bg-brand-600 border-brand-600 text-white shadow-sm hover:bg-brand-700 cursor-pointer'
+                                    : 'bg-white border-slate-200 text-slate-400 cursor-default'
                               }`}
                             >
                               <span>{q.short}</span>
@@ -637,8 +637,8 @@ export default function ParentFees() {
                       </div>
 
                       {!isFullyPaid && plan.nextPeriodLabel && (
-                        <p className="text-xs text-gray-600">
-                          💡 Pay <span className="font-bold text-blue-700">{plan.currentPeriodLabel}</span> ({formatCurrency(plan.installmentAmount, '₹')}) now — next quarter will unlock automatically!
+                        <p className="text-xs text-slate-600">
+                          💡 Pay <span className="font-bold text-brand-700">{plan.currentPeriodLabel}</span> ({formatCurrency(plan.installmentAmount, '₹')}) now — next quarter will unlock automatically!
                         </p>
                       )}
                     </div>
@@ -646,7 +646,7 @@ export default function ParentFees() {
 
                   {/* Progress bar */}
                   <div>
-                    <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                    <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
                       <div
                         className="h-full rounded-full bg-emerald-500 transition-all"
                         style={{ width: `${pct}%` }}
@@ -660,7 +660,7 @@ export default function ParentFees() {
                       {isPastDue(f) ? (
                         <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
                       ) : null}
-                      <span className={isPastDue(f) ? 'text-red-600 font-semibold' : 'text-gray-500'}>
+                      <span className={isPastDue(f) ? 'text-red-600 font-semibold' : 'text-slate-500'}>
                         Due Date: {formatDate(f.due_date)}
                         {isPastDue(f) ? ' (Overdue)' : ''}
                       </span>
@@ -722,11 +722,11 @@ export default function ParentFees() {
           }
         >
           <div className="space-y-4">
-            <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 text-center">
-              <span className="inline-block rounded-full bg-blue-600 px-3 py-0.5 text-[11px] font-bold text-white uppercase">
+            <div className="rounded-xl border border-brand-100 bg-brand-50/60 p-4 text-center">
+              <span className="inline-block rounded-full bg-brand-600 px-3 py-0.5 text-[11px] font-bold text-white uppercase">
                 {activeModalPlan.currentPeriodLabel}
               </span>
-              <p className="mt-2 text-2xl font-bold text-blue-700">
+              <p className="mt-2 text-2xl font-bold text-brand-700">
                 {formatCurrency(activeModalPlan.installmentAmount, '₹')}
               </p>
               {activeModalPlan.nextPeriodLabel && (
@@ -737,7 +737,7 @@ export default function ParentFees() {
             </div>
 
             <div className="space-y-2">
-              <p className="text-xs font-bold text-gray-500 uppercase">Select Payment Method</p>
+              <p className="text-xs font-bold text-slate-500 uppercase">Select Payment Method</p>
               {(
                 [
                   { id: 'UPI', label: 'UPI / Google Pay / PhonePe' },
@@ -751,13 +751,13 @@ export default function ParentFees() {
                   onClick={() => setPaymentMethodChoice(pm.id)}
                   className={`w-full rounded-xl border p-3 text-left text-sm font-medium transition-all flex items-center justify-between ${
                     paymentMethodChoice === pm.id
-                      ? 'border-blue-600 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 text-gray-700 hover:border-gray-300'
+                      ? 'border-brand-600 bg-brand-50 text-brand-700'
+                      : 'border-slate-200 text-slate-700 hover:border-slate-300'
                   }`}
                 >
                   <span>{pm.label}</span>
                   {paymentMethodChoice === pm.id && (
-                    <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                    <CheckCircle2 className="h-4 w-4 text-brand-600" />
                   )}
                 </button>
               ))}
@@ -786,66 +786,66 @@ export default function ParentFees() {
         >
           <style>{printStyles}</style>
           <div id="invoice-print-area" className="space-y-4 text-sm">
-            <div className="flex items-center gap-4 border-b border-gray-200 pb-4">
+            <div className="flex items-center gap-4 border-b border-slate-200 pb-4">
               {school?.logo_url && (
                 <img
                   src={school.logo_url}
                   alt="School logo"
-                  className="h-14 w-14 object-contain rounded-lg border border-gray-100"
+                  className="h-14 w-14 object-contain rounded-lg border border-slate-100"
                 />
               )}
               <div>
-                <h2 className="text-base font-semibold text-gray-900">{school?.name || 'School'}</h2>
-                {school?.address && <p className="text-gray-500 text-xs">{school.address}</p>}
+                <h2 className="text-base font-semibold text-slate-900">{school?.name || 'School'}</h2>
+                {school?.address && <p className="text-slate-500 text-xs">{school.address}</p>}
                 {school?.contact_number && (
-                  <p className="text-gray-500 text-xs">Tel: {school.contact_number}</p>
+                  <p className="text-slate-500 text-xs">Tel: {school.contact_number}</p>
                 )}
               </div>
             </div>
 
             <div className="flex items-start justify-between">
               <div>
-                <p className="text-xs text-gray-500">Invoice Number</p>
-                <p className="font-semibold text-gray-900">{generateInvoiceNumber(invoiceFee)}</p>
+                <p className="text-xs text-slate-500">Invoice Number</p>
+                <p className="font-semibold text-slate-900">{generateInvoiceNumber(invoiceFee)}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-gray-500">Date</p>
-                <p className="font-semibold text-gray-900">
+                <p className="text-xs text-slate-500">Date</p>
+                <p className="font-semibold text-slate-900">
                   {new Date().toLocaleDateString('en-IN')}
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 bg-gray-50 rounded-xl p-3">
+            <div className="grid grid-cols-2 gap-4 bg-slate-50 rounded-xl p-3">
               <div>
-                <p className="text-xs text-gray-500 mb-1">Student</p>
-                <p className="font-medium text-gray-900">
+                <p className="text-xs text-slate-500 mb-1">Student</p>
+                <p className="font-medium text-slate-900">
                   {selectedChild?.full_name || invoiceFee.student?.full_name || '—'}
                 </p>
                 {(selectedChild?.class || invoiceFee.student?.class) && (
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-slate-500">
                     Class: {(selectedChild?.class || invoiceFee.student?.class)?.name}
                   </p>
                 )}
               </div>
               <div>
-                <p className="text-xs text-gray-500 mb-1">Parent / Guardian</p>
-                <p className="font-medium text-gray-900">{parent?.full_name || '—'}</p>
-                {parent?.email && <p className="text-xs text-gray-500">{parent.email}</p>}
+                <p className="text-xs text-slate-500 mb-1">Parent / Guardian</p>
+                <p className="font-medium text-slate-900">{parent?.full_name || '—'}</p>
+                {parent?.email && <p className="text-xs text-slate-500">{parent.email}</p>}
               </div>
             </div>
 
-            <table className="w-full text-left text-sm border border-gray-200 rounded-xl overflow-hidden">
-              <thead className="bg-gray-50">
+            <table className="w-full text-left text-sm border border-slate-200 rounded-xl overflow-hidden">
+              <thead className="bg-slate-50">
                 <tr>
-                  <th className="px-3 py-2 font-semibold text-gray-600">Fee Type</th>
-                  <th className="px-3 py-2 font-semibold text-gray-600 text-right">Amount Paid</th>
+                  <th className="px-3 py-2 font-semibold text-slate-600">Fee Type</th>
+                  <th className="px-3 py-2 font-semibold text-slate-600 text-right">Amount Paid</th>
                 </tr>
               </thead>
               <tbody>
-                <tr className="border-t border-gray-200">
-                  <td className="px-3 py-2 text-gray-900">{invoiceFee.fee_type}</td>
-                  <td className="px-3 py-2 text-right font-semibold text-gray-900">
+                <tr className="border-t border-slate-200">
+                  <td className="px-3 py-2 text-slate-900">{invoiceFee.fee_type}</td>
+                  <td className="px-3 py-2 text-right font-semibold text-slate-900">
                     {formatCurrency(invoiceSessionAmount || invoiceFee.paid_amount, '₹')}
                   </td>
                 </tr>
@@ -860,20 +860,20 @@ export default function ParentFees() {
                 </span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-gray-500">Payment Date</span>
+                <span className="text-slate-500">Payment Date</span>
                 <span className="font-medium">
                   {lastPaymentDate ? new Date(lastPaymentDate).toLocaleDateString('en-IN') : '—'}
                 </span>
               </div>
               <div className="flex justify-between text-xs">
-                <span className="text-gray-500">Payment Method</span>
+                <span className="text-slate-500">Payment Method</span>
                 <span className="font-medium">
                   {lastPaymentMethod || invoiceFee.payment_method || '—'}
                 </span>
               </div>
               {lastPaymentId && (
                 <div className="flex justify-between text-xs">
-                  <span className="text-gray-500">Receipt / Payment ID</span>
+                  <span className="text-slate-500">Receipt / Payment ID</span>
                   <span className="font-medium font-mono">{lastPaymentId}</span>
                 </div>
               )}

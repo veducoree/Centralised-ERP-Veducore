@@ -92,10 +92,10 @@ export default function TeacherClasses() {
         {loading ? (
           <LoadingSpinner variant="cards" />
         ) : cards.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-20 text-center">
-            <BookOpen className="h-12 w-12 text-gray-300 mb-3" />
-            <p className="font-medium text-gray-600">No classes assigned yet</p>
-            <p className="mt-1 text-sm text-gray-400">Contact your administrator to assign classes</p>
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 py-20 text-center">
+            <BookOpen className="h-12 w-12 text-slate-300 mb-3" />
+            <p className="font-medium text-slate-600">No classes assigned yet</p>
+            <p className="mt-1 text-sm text-slate-400">Contact your administrator to assign classes</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -107,14 +107,14 @@ export default function TeacherClasses() {
               <Card key={card.key} className="p-5 flex flex-col gap-4">
                 {/* Header */}
                 <div className="flex items-start gap-3">
-                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-blue-50">
-                    <BookOpen className="h-5 w-5 text-blue-600" />
+                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-brand-50">
+                    <BookOpen className="h-5 w-5 text-brand-600" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h3 className="font-semibold text-gray-900 leading-tight">
+                    <h3 className="font-semibold text-slate-900 leading-tight">
                       {card.className}
                     </h3>
-                    <p className="text-sm text-gray-500">Section {card.sectionName}</p>
+                    <p className="text-sm text-slate-500">Section {card.sectionName}</p>
                   </div>
                   {card.isClassTeacher && (
                     <Badge variant="info" className="flex-shrink-0 flex items-center gap-1">
@@ -127,25 +127,25 @@ export default function TeacherClasses() {
                 {/* Subjects */}
                 <div>
                   {card.subjects.length === 0 ? (
-                    <p className="text-xs text-gray-400 italic">
+                    <p className="text-xs text-slate-400 italic">
                       {card.isClassTeacher
                         ? 'No subject assigned — class teacher only'
                         : 'No subjects assigned'}
                     </p>
                   ) : (
                     <div className="space-y-1.5">
-                      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide flex items-center gap-1">
+                      <p className="text-xs font-medium text-slate-400 uppercase tracking-wide flex items-center gap-1">
                         <Layers className="h-3 w-3" /> Subjects
                       </p>
                       <div className="flex flex-wrap gap-1.5">
                         {card.subjects.map((subj) => (
                           <span
                             key={subj.id}
-                            className="inline-flex items-center gap-1.5 rounded-lg bg-gray-50 border border-gray-200 px-2.5 py-1 text-xs"
+                            className="inline-flex items-center gap-1.5 rounded-lg bg-slate-50 border border-slate-200 px-2.5 py-1 text-xs"
                           >
-                            <span className="font-medium text-gray-800">{subj.name}</span>
+                            <span className="font-medium text-slate-800">{subj.name}</span>
                             {subj.code && (
-                              <span className="font-mono font-bold text-blue-600">{subj.code}</span>
+                              <span className="font-mono font-bold text-brand-600">{subj.code}</span>
                             )}
                           </span>
                         ))}

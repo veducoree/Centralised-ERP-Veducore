@@ -104,29 +104,29 @@ export default function TeacherRemarks() {
         {loading ? (
           <LoadingSpinner variant="cards" />
         ) : remarks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-            <Megaphone className="h-12 w-12 text-gray-300 mb-3" />
-            <p className="font-medium text-gray-600">No remarks yet</p>
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+            <Megaphone className="h-12 w-12 text-slate-300 mb-3" />
+            <p className="font-medium text-slate-600">No remarks yet</p>
           </div>
         ) : (
           <div className="space-y-3">
             {remarks.map((r) => (
               <Card key={r.id} className="p-4">
                 <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
-                    <Megaphone className="h-4 w-4 text-blue-600" />
+                  <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50">
+                    <Megaphone className="h-4 w-4 text-brand-600" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-sm font-semibold text-gray-900">{r.student?.full_name || '—'}</h3>
+                      <h3 className="text-sm font-semibold text-slate-900">{r.student?.full_name || '—'}</h3>
                       <Badge variant="info">{r.category}</Badge>
                       {r.visibility === 'parents_only' && <Badge variant="warning">Parents Only</Badge>}
                       {r.visibility === 'staff_only' && <Badge variant="neutral">Staff Only</Badge>}
                     </div>
-                    <p className="mt-1 text-sm text-gray-600">{r.remark}</p>
-                    <p className="mt-1 text-xs text-gray-400">{formatDate(r.created_at)}</p>
+                    <p className="mt-1 text-sm text-slate-600">{r.remark}</p>
+                    <p className="mt-1 text-xs text-slate-400">{formatDate(r.created_at)}</p>
                   </div>
-                  <button onClick={() => setDeleteId(r.id)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600">
+                  <button onClick={() => setDeleteId(r.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600">
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>

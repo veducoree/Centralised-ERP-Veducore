@@ -1,188 +1,233 @@
-import { useEffect, useState, useCallback } from 'react';
-import { CalendarDays, Megaphone } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  CheckCircle2, Fingerprint, Users, ClipboardList, ClipboardCheck, Megaphone, Plane, ChevronRight,
+  Coffee, BellOff, BookOpen, Clock,
+} from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { StatCard, Card } from '@/components/ui/Card';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 import { DashboardSkeleton } from '@/components/ui/Skeleton';
+import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
-import { fetchTeacherByUserId, fetchTeacherScheduleByTeacher, fetchRemarks } from '@/services/api';
-import type { Teacher, TeacherSchedule, Remark } from '@/types';
-import { formatTime, getDayName, formatDate } from '@/lib/utils';
+import {
+  fetchTeacherByUserId, fetchTeacherScheduleByTeacher, fetchTeacherAssignments, fetchSubstitutions,
+  fetchMyNotifications, fetchMyAttendanceSections, fetchStudentsBySection, fetchAttendance,
+  fetchMyStaffAttendance, markMyAttendance,
+} from '@/services/api';
+import type { Teacher, TeacherSchedule, TimetableSubstitution, Notification, StaffAttendanceRow } from '@/types';
+
+const localISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+const time12 = (t: string | null | undefined) => {
+  if (!t) return '';
+  const [h, m] = t.split(':').map(Number);
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`;
+};
+const STAFF_LABEL: Record<string, string> = { present: 'Present', late: 'Late', half_day: 'Half day', leave: 'On leave', absent: 'Absent' };
+
+function SectionHead({ title, action }: { title: string; action?: ReactNode }) {
+  return (
+    <div className="mb-3 flex items-center justify-between">
+      <h3 className="text-base font-semibold text-[#0F172A]">{title}</h3>
+      {action}
+    </div>
+  );
+}
 
 export default function TeacherDashboard() {
   const { profile } = useAuth();
-  const [teacher, setTeacher] = useState<Teacher | null>(null);
-  const [schedules, setSchedules] = useState<TeacherSchedule[]>([]);
-  const [remarks, setRemarks] = useState<Remark[]>([]);
-  const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const toast = useToast();
+  const today = localISO();
+  const weekday = new Date().getDay();
 
-  const loadData = useCallback(async () => {
+  const [teacher, setTeacher] = useState<Teacher | null>(null);
+  const [slots, setSlots] = useState<TeacherSchedule[]>([]);
+  const [duties, setDuties] = useState<TimetableSubstitution[]>([]);
+  const [notices, setNotices] = useState<Notification[]>([]);
+  const [classCount, setClassCount] = useState(0);
+  const [myClass, setMyClass] = useState<{ label: string; students: number; marked: number } | null>(null);
+  const [me, setMe] = useState<StaffAttendanceRow | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [marking, setMarking] = useState(false);
+
+  const load = useCallback(async () => {
     if (!profile?.id) return;
-    setLoading(true);
     try {
       const t = await fetchTeacherByUserId(profile.id);
-      if (t) {
-        setTeacher(t);
-        const [s, r] = await Promise.all([
-          fetchTeacherScheduleByTeacher(t.id),
-          fetchRemarks({ teacherId: t.id }),
+      if (!t) return;
+      setTeacher(t);
+      const [assignments, schedule, subs, notifs, sections, myRows] = await Promise.all([
+        fetchTeacherAssignments(t.id).catch(() => []),
+        fetchTeacherScheduleByTeacher(t.id).catch(() => [] as TeacherSchedule[]),
+        fetchSubstitutions({ substituteTeacherId: t.id, from: today, to: today }).catch(() => [] as TimetableSubstitution[]),
+        fetchMyNotifications(10).catch(() => [] as Notification[]),
+        fetchMyAttendanceSections().catch(() => []),
+        fetchMyStaffAttendance(t.id, today, today).catch(() => [] as StaffAttendanceRow[]),
+      ]);
+      setClassCount(new Set(assignments.map((a) => a.section_id)).size);
+      setSlots(schedule.filter((s) => s.day_of_week === weekday).sort((a, b) => a.start_time.localeCompare(b.start_time)));
+      setDuties(subs);
+      setNotices(notifs.slice(0, 4));
+      setMe(myRows[0] ?? null);
+      const own = sections.find((s) => s.is_class_teacher);
+      if (own) {
+        const [students, att] = await Promise.all([
+          fetchStudentsBySection(own.section_id).catch(() => []),
+          fetchAttendance({ sectionId: own.section_id, date: today }).catch(() => []),
         ]);
-        setSchedules(s);
-        setRemarks(r);
+        setMyClass({ label: own.label, students: students.length, marked: att.length });
       }
-    } catch { /* handled */ }
-    finally { setLoading(false); }
-  }, [profile?.id]);
-
-  useEffect(() => { loadData(); }, [loadData]);
-
-  const today = new Date().getDay();
-  const todaySchedule = schedules
-    .filter((s) => s.day_of_week === today)
-    .sort((a, b) => a.start_time.localeCompare(b.start_time));
-
-  // Greeting
-  const hour = new Date().getHours();
-  const greetingTeacher = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
-
-  // Weekly overview
-  const weekDays = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-  const classesByDay = Array.from({ length: 7 }, (_, i) => schedules.filter((s) => s.day_of_week === i).length);
-  const maxClasses = Math.max(...classesByDay, 1);
-
-  // Schedule timeline colors
-  const subjectColors = ['border-blue-500', 'border-emerald-500', 'border-amber-500', 'border-purple-500', 'border-pink-500'];
-
-  // Current time for "Now" indicator
-  const currentTimeStr = `${String(new Date().getHours()).padStart(2, '0')}:${String(new Date().getMinutes()).padStart(2, '0')}`;
-
-  // Remark category badge styles
-  const remarkCategoryStyle = (category: string) => {
-    switch (category) {
-      case 'academic': return 'bg-blue-100 text-blue-700';
-      case 'behaviour': return 'bg-orange-100 text-orange-700';
-      case 'attendance': return 'bg-red-100 text-red-700';
-      case 'performance': return 'bg-green-100 text-green-700';
-      default: return 'bg-gray-100 text-gray-600';
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [profile?.id, today, weekday]);
 
-  if (loading) return (
-    <DashboardLayout title="Dashboard">
-      <DashboardSkeleton cards={2} />
-    </DashboardLayout>
-  );
+  useEffect(() => { load(); }, [load]);
+
+  async function markPresent() {
+    setMarking(true);
+    try { setMe(await markMyAttendance(false)); toast('Marked present', 'success'); }
+    catch (e) { toast(e instanceof Error ? e.message : 'Could not mark', 'error'); }
+    finally { setMarking(false); }
+  }
+
+  const nowStr = new Date().toTimeString().slice(0, 5);
+  const liveId = useMemo(() => slots.find((s) => s.start_time.slice(0, 5) <= nowStr && nowStr < s.end_time.slice(0, 5))?.id, [slots, nowStr]);
+
+  if (loading) return <DashboardLayout title="Dashboard"><DashboardSkeleton cards={4} /></DashboardLayout>;
+
+  const h = new Date().getHours();
+  const greet = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
+  const classDone = !!myClass && myClass.students > 0 && myClass.marked >= myClass.students;
+
+  const quick = [
+    { label: 'Class attendance', icon: <ClipboardList className="h-5 w-5" />, tint: 'bg-[#E6F8F1] text-[#22C08A]', path: '/teacher/attendance' },
+    { label: 'Exam marks', icon: <ClipboardCheck className="h-5 w-5" />, tint: 'bg-[#EEF0FD] text-[#5B6EE8]', path: '/teacher/exam-marks' },
+    { label: 'Remarks', icon: <Megaphone className="h-5 w-5" />, tint: 'bg-[#FEF3E0] text-[#F5A623]', path: '/teacher/remarks' },
+    { label: 'Apply leave', icon: <Plane className="h-5 w-5" />, tint: 'bg-[#FDE7F3] text-[#EC4899]', path: '/teacher/my-attendance' },
+  ];
 
   return (
     <DashboardLayout title="Dashboard">
       <div className="space-y-6">
         {/* Greeting */}
-        <div className="rounded-2xl border border-gray-100 bg-white px-5 py-4 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">{greetingTeacher}, {teacher?.full_name || profile?.full_name || 'Teacher'} 👋</h2>
-          <p className="mt-0.5 text-sm text-gray-500">Here's your schedule for today.</p>
-        </div>
-
-        {/* Stat cards */}
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div className="hover:shadow-md transition-shadow duration-200">
-            <StatCard label="Today's Classes" value={todaySchedule.length} icon={<CalendarDays className="h-5 w-5" />} color="amber" />
-          </div>
-          <div className="hover:shadow-md transition-shadow duration-200">
-            <StatCard label="My Remarks" value={remarks.length} icon={<Megaphone className="h-5 w-5" />} color="cyan" />
+        <div className="rounded-[20px] bg-gradient-to-br from-[#5B6EE8] to-[#7B8CF7] p-6 text-white shadow-[0_8px_30px_rgba(91,110,232,0.25)]">
+          <p className="text-sm text-white/80">{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+          <h1 className="mt-1 text-2xl font-semibold">{greet}, {(teacher?.full_name || profile?.full_name || '').split(' ')[0]}</h1>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs font-medium">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1"><BookOpen className="h-3.5 w-3.5" /> {classCount} classes</span>
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1"><Clock className="h-3.5 w-3.5" /> {slots.length + duties.length} periods today</span>
           </div>
         </div>
 
-        {/* Today's Schedule — timeline */}
-        <Card className="p-5">
-          <h3 className="mb-4 text-sm font-semibold text-gray-900">Today's Schedule — {getDayName(today)}</h3>
-          {todaySchedule.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-gray-400">
-              <svg viewBox="0 0 64 64" className="h-12 w-12 mb-3 text-gray-200" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <rect x="8" y="12" width="48" height="44" rx="4" />
-                <path d="M8 22h48" />
-                <path d="M22 8v8M42 8v8" />
-                <path d="M20 34h8M36 34h8M20 44h8" />
-              </svg>
-              <p className="text-sm font-medium">No classes today</p>
-              <p className="text-xs mt-1">Enjoy your free day!</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {todaySchedule.map((s, idx) => {
-                const isNow = currentTimeStr >= s.start_time && currentTimeStr <= s.end_time;
-                return (
-                  <div key={s.id} className="flex gap-4">
-                    {/* Time column */}
-                    <div className="w-20 flex-shrink-0 pt-1">
-                      <span className="text-xs font-bold text-gray-900">{formatTime(s.start_time)}</span>
-                      <span className="block text-[10px] text-gray-400">{formatTime(s.end_time)}</span>
-                    </div>
-                    {/* Card with colored left border */}
-                    <div className={`flex-1 rounded-xl border-l-4 ${subjectColors[idx % subjectColors.length]} bg-white border border-gray-100 shadow-sm p-3`}>
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-gray-900">{s.class?.name} - {s.section?.name}</p>
-                        {isNow && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                            Now
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500">{s.subject?.name || '—'} · Room {s.room_number || '—'}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Card>
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)]">
+          <div className="space-y-6">
+            {/* My attendance */}
+            <Card className="flex items-center gap-4 p-5">
+              <span className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${me ? 'bg-[#E6F8F1] text-[#22C08A]' : 'bg-[#FEF3E0] text-[#F5A623]'}`}>
+                {me ? <CheckCircle2 className="h-5 w-5" /> : <Fingerprint className="h-5 w-5" />}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-slate-500">My attendance</p>
+                <p className="font-semibold text-[#0F172A]">{me ? `${STAFF_LABEL[me.status]}${me.check_in ? ` · ${time12(me.check_in)}` : ''}` : 'Not marked yet'}</p>
+              </div>
+              {me
+                ? <button onClick={() => navigate('/teacher/my-attendance')} aria-label="Open my attendance" className="rounded-lg p-2 text-slate-400 hover:bg-slate-50"><ChevronRight className="h-5 w-5" /></button>
+                : <Button size="sm" loading={marking} onClick={markPresent}>Mark present</Button>}
+            </Card>
 
-        {/* Weekly Overview — CSS bar chart */}
-        <Card className="p-5">
-          <h3 className="mb-4 text-sm font-semibold text-gray-900">Weekly Overview</h3>
-          <div className="flex items-end gap-2 h-24">
-            {classesByDay.map((count, i) => {
-              const isToday = i === today;
-              const heightPct = (count / maxClasses) * 100;
-              return (
-                <div key={i} className="flex flex-1 flex-col items-center gap-1">
-                  <span className="text-xs font-bold text-gray-700">{count > 0 ? count : ''}</span>
-                  <div
-                    className="w-full rounded-t-md transition-all duration-500"
-                    style={{ height: `${Math.max(heightPct, 8)}%`, backgroundColor: isToday ? '#3b82f6' : '#e5e7eb' }}
-                  />
-                  <span className={`text-[10px] font-medium ${isToday ? 'text-blue-600' : 'text-gray-400'}`}>{weekDays[i]}</span>
+            {/* Class teacher */}
+            {myClass && (
+              <Card className="flex cursor-pointer items-center gap-4 p-5" onClick={() => navigate('/teacher/attendance')}>
+                <span className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-[#EEF0FD] text-[#5B6EE8]"><Users className="h-5 w-5" /></span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs text-slate-500">Class teacher · {myClass.label}</p>
+                  <p className="font-semibold text-[#0F172A]">
+                    {myClass.marked === 0 ? "Today's attendance not taken" : classDone ? 'Attendance done' : `${myClass.marked}/${myClass.students} marked`}
+                  </p>
                 </div>
-              );
-            })}
-          </div>
-        </Card>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${classDone ? 'bg-[#E6F8F1] text-emerald-700' : 'bg-[#FEF3E0] text-amber-700'}`}>{classDone ? 'Done' : 'Take now'}</span>
+              </Card>
+            )}
 
-        {/* Recent Remarks */}
-        <Card className="p-5">
-          <h3 className="mb-4 text-sm font-semibold text-gray-900">Recent Remarks</h3>
-          {remarks.length === 0 ? (
-            <p className="text-sm text-gray-400">No remarks added yet</p>
-          ) : (
-            <div className="space-y-3">
-              {remarks.slice(0, 5).map((r) => (
-                <div key={r.id} className="rounded-xl border border-gray-100 p-3">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    {r.student && (
-                      <span className="bg-gray-100 text-gray-700 text-xs px-2 py-0.5 rounded-full font-medium">
-                        {r.student.full_name}
-                      </span>
-                    )}
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${remarkCategoryStyle(r.category)}`}>
-                      {r.category}
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-700">{r.remark}</p>
-                  <p className="mt-1.5 text-xs text-gray-400 text-right">{formatDate(r.created_at)}</p>
-                </div>
+            {/* Quick actions */}
+            <div className="grid grid-cols-2 gap-4">
+              {quick.map((q) => (
+                <button key={q.label} onClick={() => navigate(q.path)}
+                  className="flex items-center gap-3 rounded-[20px] bg-white p-4 text-left shadow-[0_4px_20px_rgba(91,110,232,0.08)] transition hover:-translate-y-0.5">
+                  <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${q.tint}`}>{q.icon}</span>
+                  <span className="text-sm font-semibold text-[#0F172A]">{q.label}</span>
+                </button>
               ))}
             </div>
-          )}
-        </Card>
+          </div>
+
+          <div className="space-y-6">
+            {/* Today's classes */}
+            <Card className="p-5">
+              <SectionHead title="Today's classes" action={
+                <button onClick={() => navigate('/teacher/schedule')} className="flex items-center gap-0.5 text-xs font-medium text-[#5B6EE8] hover:underline">Timetable <ChevronRight className="h-3.5 w-3.5" /></button>
+              } />
+              {slots.length === 0 && duties.length === 0 ? (
+                <div className="flex flex-col items-center py-8 text-center"><Coffee className="mb-2 h-7 w-7 text-slate-300" /><p className="text-sm text-slate-400">No classes scheduled today</p></div>
+              ) : (
+                <ul className="space-y-2">
+                  {slots.map((s) => {
+                    const live = s.id === liveId;
+                    return (
+                      <li key={s.id} className={`flex items-center gap-4 rounded-xl px-3 py-2.5 ${live ? 'bg-[#F8F9FF] ring-1 ring-[#5B6EE8]/30' : ''}`}>
+                        <div className="w-20 flex-shrink-0">
+                          <p className={`text-sm font-semibold ${live ? 'text-[#5B6EE8]' : 'text-[#0F172A]'}`}>{time12(s.start_time)}</p>
+                          <p className="text-[11px] text-slate-400">{time12(s.end_time)}</p>
+                        </div>
+                        <span className={`h-9 w-1 rounded-full ${live ? 'bg-[#5B6EE8]' : 'bg-[#E8EAF3]'}`} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-[#0F172A]">{s.subject?.name ?? 'Class'}</p>
+                          <p className="truncate text-xs text-slate-500">{s.class?.name}{s.section?.name ? ` - ${s.section.name}` : ''}{s.room_number ? ` · Room ${s.room_number}` : ''}</p>
+                        </div>
+                        {live && <span className="rounded-md bg-[#5B6EE8] px-1.5 py-0.5 text-[10px] font-bold text-white">NOW</span>}
+                      </li>
+                    );
+                  })}
+                  {duties.map((d) => (
+                    <li key={d.id} className="flex items-center gap-4 rounded-xl px-3 py-2.5">
+                      <div className="w-20 flex-shrink-0">
+                        <p className="text-sm font-semibold text-[#0F172A]">{time12(d.start_time)}</p>
+                        <p className="text-[11px] text-slate-400">{time12(d.end_time)}</p>
+                      </div>
+                      <span className="h-9 w-1 rounded-full bg-[#F5A623]" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-[#0F172A]">{d.subject?.name ?? 'Substitution'}</p>
+                        <p className="truncate text-xs text-slate-500">{d.class?.name}{d.section?.name ? ` - ${d.section.name}` : ''} · Substitution</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+
+            {/* Notices */}
+            <Card className="p-5">
+              <SectionHead title="Notices" />
+              {notices.length === 0 ? (
+                <div className="flex flex-col items-center py-6 text-center"><BellOff className="mb-2 h-7 w-7 text-slate-300" /><p className="text-sm text-slate-400">You're all caught up</p></div>
+              ) : (
+                <ul className="divide-y divide-[#F1F2F8]">
+                  {notices.map((n) => (
+                    <li key={n.id} className="flex gap-3 py-3">
+                      <span className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${n.is_read ? 'bg-transparent' : 'bg-[#5B6EE8]'}`} />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-[#0F172A]">{n.title}</p>
+                        <p className="line-clamp-2 text-xs text-slate-500">{n.message}</p>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
+        </div>
       </div>
     </DashboardLayout>
   );

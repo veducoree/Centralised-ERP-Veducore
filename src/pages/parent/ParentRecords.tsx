@@ -66,31 +66,31 @@ export default function ParentRecords() {
         <Card className="p-4">
           {records.length === 0 ? (
             <div className="flex flex-col items-center py-12 text-center">
-              <FileText className="h-10 w-10 text-gray-300 mb-2" />
-              <p className="text-sm text-gray-400">No academic records available</p>
+              <FileText className="h-10 w-10 text-slate-300 mb-2" />
+              <p className="text-sm text-slate-400">No academic records available</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm">
-                <thead className="border-b border-gray-200">
+                <thead className="border-b border-slate-200">
                   <tr>
-                    <th className="px-3 py-2 font-semibold text-gray-600">Subject</th>
-                    <th className="px-3 py-2 font-semibold text-gray-600">Exam</th>
-                    <th className="px-3 py-2 font-semibold text-gray-600">Marks</th>
-                    <th className="px-3 py-2 font-semibold text-gray-600">Grade</th>
-                    <th className="px-3 py-2 font-semibold text-gray-600">Date</th>
-                    <th className="px-3 py-2 font-semibold text-gray-600">Comment</th>
+                    <th className="px-3 py-2 font-semibold text-slate-600">Subject</th>
+                    <th className="px-3 py-2 font-semibold text-slate-600">Exam</th>
+                    <th className="px-3 py-2 font-semibold text-slate-600">Marks</th>
+                    <th className="px-3 py-2 font-semibold text-slate-600">Grade</th>
+                    <th className="px-3 py-2 font-semibold text-slate-600">Date</th>
+                    <th className="px-3 py-2 font-semibold text-slate-600">Comment</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-slate-100">
                   {records.map((r) => (
                     <tr key={r.id}>
-                      <td className="px-3 py-2 font-medium text-gray-900">{r.subject_name}</td>
-                      <td className="px-3 py-2 text-gray-700 capitalize">{r.exam_name}</td>
-                      <td className="px-3 py-2 text-gray-700">{r.marks}/{r.max_marks}</td>
-                      <td className="px-3 py-2 text-gray-700">{r.grade || '—'}</td>
-                      <td className="px-3 py-2 text-gray-700">{formatDate(r.date)}</td>
-                      <td className="px-3 py-2 text-gray-500">{r.teacher_comment || '—'}</td>
+                      <td className="px-3 py-2 font-medium text-slate-900">{r.subject_name}</td>
+                      <td className="px-3 py-2 text-slate-700 capitalize">{r.exam_name}</td>
+                      <td className="px-3 py-2 text-slate-700">{r.marks}/{r.max_marks}</td>
+                      <td className="px-3 py-2 text-slate-700">{r.grade || '—'}</td>
+                      <td className="px-3 py-2 text-slate-700">{formatDate(r.date)}</td>
+                      <td className="px-3 py-2 text-slate-500">{r.teacher_comment || '—'}</td>
                     </tr>
                   ))}
                 </tbody>

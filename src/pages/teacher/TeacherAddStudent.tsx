@@ -195,7 +195,7 @@ export default function TeacherAddStudent() {
 
         {/* Section selector */}
         {uniqueSections.length > 0 && (
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
+          <div className="rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)] p-4">
             <Select
               label="Select Section"
               value={selectedSection}
@@ -211,48 +211,48 @@ export default function TeacherAddStudent() {
         {loading ? (
           <LoadingSpinner />
         ) : uniqueSections.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-            <Users className="h-12 w-12 text-gray-300 mb-3" />
-            <p className="font-medium text-gray-600">No class assigned as incharge</p>
-            <p className="mt-1 text-sm text-gray-400">Only class teachers can add students here</p>
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+            <Users className="h-12 w-12 text-slate-300 mb-3" />
+            <p className="font-medium text-slate-600">No class assigned as incharge</p>
+            <p className="mt-1 text-sm text-slate-400">Only class teachers can add students here</p>
           </div>
         ) : students.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-            <Users className="h-12 w-12 text-gray-300 mb-3" />
-            <p className="font-medium text-gray-600">No students in this section</p>
-            <p className="mt-1 text-sm text-gray-400">Click "Add Student" to add students</p>
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+            <Users className="h-12 w-12 text-slate-300 mb-3" />
+            <p className="font-medium text-slate-600">No students in this section</p>
+            <p className="mt-1 text-sm text-slate-400">Click "Add Student" to add students</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <div className="overflow-x-auto rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50/50">
+              <thead className="border-b border-slate-200 bg-slate-50/50">
                 <tr>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Photo</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Admission No.</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Name</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Father's Name</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Mother's Name</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Gender</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Status</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600 text-right">Action</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Photo</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Admission No.</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Name</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Father's Name</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Mother's Name</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Gender</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Status</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 {students.map((s) => (
-                  <tr key={s.id} className="hover:bg-gray-50/50">
+                  <tr key={s.id} className="hover:bg-slate-50/50">
                     <td className="px-4 py-3"><StudentPhotoUpload student={s} onUpdated={loadStudents} /></td>
-                    <td className="px-4 py-3 font-medium text-gray-900">{s.admission_number}</td>
-                    <td className="px-4 py-3 text-gray-700">{s.full_name}</td>
-                    <td className="px-4 py-3 text-gray-700">{s.father_name || '—'}</td>
-                    <td className="px-4 py-3 text-gray-700">{s.mother_name || '—'}</td>
-                    <td className="px-4 py-3 text-gray-700 capitalize">{s.gender || '—'}</td>
+                    <td className="px-4 py-3 font-medium text-slate-900">{s.admission_number}</td>
+                    <td className="px-4 py-3 text-slate-700">{s.full_name}</td>
+                    <td className="px-4 py-3 text-slate-700">{s.father_name || '—'}</td>
+                    <td className="px-4 py-3 text-slate-700">{s.mother_name || '—'}</td>
+                    <td className="px-4 py-3 text-slate-700 capitalize">{s.gender || '—'}</td>
                     <td className="px-4 py-3">
                       <StatusBadge status={s.status} />
                     </td>
                     <td className="px-4 py-3 text-right">
                       <button
                         onClick={() => setDeleteId(s.id)}
-                        className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

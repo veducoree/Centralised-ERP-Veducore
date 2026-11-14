@@ -136,7 +136,7 @@ export default function TeacherRecords() {
   const allPromoted = studentRows.length > 0 && studentRows.every((row) => row.isPromoted);
 
   function pctPill(pct: number | null): string {
-    if (pct === null) return 'bg-gray-100 text-gray-500';
+    if (pct === null) return 'bg-slate-100 text-slate-500';
     if (pct >= 75) return 'bg-emerald-100 text-emerald-700';
     if (pct >= 50) return 'bg-yellow-100 text-yellow-700';
     return 'bg-red-100 text-red-700';
@@ -220,37 +220,37 @@ export default function TeacherRecords() {
         {loading ? (
           <LoadingSpinner />
         ) : filteredRecords.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-            <FileText className="h-12 w-12 text-gray-300 mb-3" />
-            <p className="font-medium text-gray-600">No academic records yet</p>
-            <p className="mt-1 text-sm text-gray-400">
-              Go to <span className="font-medium text-blue-600">Exam Marks</span> → Create Exam → Enter Marks to generate records automatically
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+            <FileText className="h-12 w-12 text-slate-300 mb-3" />
+            <p className="font-medium text-slate-600">No academic records yet</p>
+            <p className="mt-1 text-sm text-slate-400">
+              Go to <span className="font-medium text-brand-600">Exam Marks</span> → Create Exam → Enter Marks to generate records automatically
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <div className="overflow-x-auto rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50/50">
+              <thead className="border-b border-slate-200 bg-slate-50/50">
                 <tr>
-                  <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Student</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600 whitespace-nowrap">Student</th>
                   {uniqueExams.map((exam) => (
-                    <th key={exam.exam_name} className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">
+                    <th key={exam.exam_name} className="px-4 py-3 font-semibold text-slate-600 whitespace-nowrap">
                       <div>{exam.exam_name}</div>
-                      <span className="text-[10px] font-normal text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
+                      <span className="text-[10px] font-normal text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">
                         {getTypeLabel(exam.record_type)}
                       </span>
                     </th>
                   ))}
-                  <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Overall %</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Result</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600 whitespace-nowrap">Status</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600 whitespace-nowrap">Overall %</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600 whitespace-nowrap">Result</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600 whitespace-nowrap">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 {studentRows.map((row) => (
-                  <tr key={row.student.id} className="hover:bg-gray-50/50">
+                  <tr key={row.student.id} className="hover:bg-slate-50/50">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900">{row.student.full_name}</div>
+                      <div className="font-medium text-slate-900">{row.student.full_name}</div>
                     </td>
 
                     {/* Per-exam combined marks (all subjects summed) */}
@@ -258,14 +258,14 @@ export default function TeacherRecords() {
                       const t = row.examTotals[exam.exam_name];
                       const pct = t && t.maxMarks > 0 ? Math.round((t.marks / t.maxMarks) * 100) : null;
                       return (
-                        <td key={exam.exam_name} className="px-4 py-3 text-gray-700">
+                        <td key={exam.exam_name} className="px-4 py-3 text-slate-700">
                           {t === null ? (
-                            <span className="text-gray-300">—</span>
+                            <span className="text-slate-300">—</span>
                           ) : (
                             <span>
-                              <span className="font-semibold text-gray-900">{t.marks}</span>
-                              <span className="text-gray-400">/{t.maxMarks}</span>
-                              <span className="ml-1 text-xs text-gray-400">({pct}%)</span>
+                              <span className="font-semibold text-slate-900">{t.marks}</span>
+                              <span className="text-slate-400">/{t.maxMarks}</span>
+                              <span className="ml-1 text-xs text-slate-400">({pct}%)</span>
                             </span>
                           )}
                         </td>
@@ -275,7 +275,7 @@ export default function TeacherRecords() {
                     {/* Overall % across all exams + subjects */}
                     <td className="px-4 py-3">
                       {row.overallPct === null ? (
-                        <span className="text-gray-300">—</span>
+                        <span className="text-slate-300">—</span>
                       ) : (
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${pctPill(row.overallPct)}`}>
                           {row.overallPct}%
@@ -286,7 +286,7 @@ export default function TeacherRecords() {
                     {/* Pass/Fail — only after final exam */}
                     <td className="px-4 py-3">
                       {row.result === null ? (
-                        <span className="text-gray-300">—</span>
+                        <span className="text-slate-300">—</span>
                       ) : row.result === 'Pass' ? (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
                           <CheckCircle className="h-3 w-3" /> Pass
@@ -301,7 +301,7 @@ export default function TeacherRecords() {
                     {/* Promoted badge */}
                     <td className="px-4 py-3">
                       {row.isPromoted && (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-brand-100 text-brand-700">
                           <TrendingUp className="h-3 w-3" /> Promoted ↑
                         </span>
                       )}

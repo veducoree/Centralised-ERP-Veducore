@@ -69,7 +69,7 @@ export default function TeacherStudents() {
             <select
               value={selectedSection}
               onChange={(e) => setSelectedSection(e.target.value)}
-              className="h-[42px] w-full rounded-xl border border-gray-200 bg-white px-3 pr-8 text-sm text-gray-700 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none bg-no-repeat"
+              className="h-[42px] w-full rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)] px-3 pr-8 text-sm text-slate-700 shadow-sm transition-all focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 appearance-none bg-no-repeat"
               style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundPosition: 'right 12px center' }}
             >
               {uniqueSections.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
@@ -83,29 +83,29 @@ export default function TeacherStudents() {
         {loading ? (
           <LoadingSpinner />
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-            <Users className="h-12 w-12 text-gray-300 mb-3" />
-            <p className="font-medium text-gray-600">No students found</p>
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+            <Users className="h-12 w-12 text-slate-300 mb-3" />
+            <p className="font-medium text-slate-600">No students found</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <div className="overflow-x-auto rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50/50">
+              <thead className="border-b border-slate-200 bg-slate-50/50">
                 <tr>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Photo</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Admission No.</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Name</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Gender</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Status</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Photo</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Admission No.</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Name</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Gender</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 {filtered.map((s) => (
-                  <tr key={s.id} className="hover:bg-gray-50/50">
+                  <tr key={s.id} className="hover:bg-slate-50/50">
                     <td className="px-4 py-3"><StudentPhotoUpload student={s} onUpdated={loadStudents} /></td>
-                    <td className="px-4 py-3 font-medium text-gray-900">{s.admission_number}</td>
-                    <td className="px-4 py-3 text-gray-700">{s.full_name}</td>
-                    <td className="px-4 py-3 text-gray-700 capitalize">{s.gender || '—'}</td>
+                    <td className="px-4 py-3 font-medium text-slate-900">{s.admission_number}</td>
+                    <td className="px-4 py-3 text-slate-700">{s.full_name}</td>
+                    <td className="px-4 py-3 text-slate-700 capitalize">{s.gender || '—'}</td>
                     <td className="px-4 py-3"><StatusBadge status={s.status} /></td>
                   </tr>
                 ))}

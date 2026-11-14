@@ -127,20 +127,20 @@ export default function TeacherAttendance() {
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1 min-w-0">
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Class / Section</label>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">Class / Section</label>
             <select
               value={selectedSection}
               onChange={(e) => setSelectedSection(e.target.value)}
-              className="h-[42px] w-full rounded-xl border border-gray-200 bg-white px-3 pr-8 text-sm text-gray-700 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 appearance-none bg-no-repeat"
+              className="h-[42px] w-full rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)] px-3 pr-8 text-sm text-slate-700 shadow-sm transition-all focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 appearance-none bg-no-repeat"
               style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`, backgroundPosition: 'right 12px center' }}
             >
               {sections.map((s) => <option key={s.id} value={s.id}>{s.label}{s.isClassTeacher ? '' : ' (no class teacher set)'}</option>)}
             </select>
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">Date</label>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">Date</label>
             <input type="date" value={selectedDate} max={localISO()} onChange={(e) => setSelectedDate(e.target.value)}
-              className="h-[42px] rounded-xl border border-gray-200 bg-white px-3.5 text-sm text-gray-700 shadow-sm transition-all focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20" />
+              className="h-[42px] rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)] px-3.5 text-sm text-slate-700 shadow-sm transition-all focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20" />
           </div>
           <div className="flex-1 min-w-0">
             <SearchInput value={search} onChange={setSearch} placeholder="Search by student name..." />
@@ -150,9 +150,9 @@ export default function TeacherAttendance() {
         {loading ? (
           <LoadingSpinner />
         ) : students.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-            <ClipboardCheck className="h-12 w-12 text-gray-300 mb-3" />
-            <p className="font-medium text-gray-600">No students in this section</p>
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+            <ClipboardCheck className="h-12 w-12 text-slate-300 mb-3" />
+            <p className="font-medium text-slate-600">No students in this section</p>
           </div>
         ) : (
           <>
@@ -162,20 +162,20 @@ export default function TeacherAttendance() {
               <Button size="sm" variant="outline" onClick={() => markAll('absent')}>Mark All Absent</Button>
             </div>
 
-            <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+            <div className="overflow-x-auto rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
               <table className="w-full text-left text-sm">
-                <thead className="border-b border-gray-200 bg-gray-50/50">
+                <thead className="border-b border-slate-200 bg-slate-50/50">
                   <tr>
-                    <th className="px-4 py-3 font-semibold text-gray-600">#</th>
-                    <th className="px-4 py-3 font-semibold text-gray-600">Name</th>
-                    <th className="px-4 py-3 font-semibold text-gray-600">Status</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600">#</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600">Name</th>
+                    <th className="px-4 py-3 font-semibold text-slate-600">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-slate-100">
                   {students.filter((s) => !search || s.full_name.toLowerCase().includes(search.toLowerCase())).map((s, idx) => (
-                    <tr key={s.id} className="hover:bg-gray-50/50">
-                      <td className="px-4 py-3 font-medium text-gray-900">{idx + 1}</td>
-                      <td className="px-4 py-3 text-gray-700">{s.full_name}</td>
+                    <tr key={s.id} className="hover:bg-slate-50/50">
+                      <td className="px-4 py-3 font-medium text-slate-900">{idx + 1}</td>
+                      <td className="px-4 py-3 text-slate-700">{s.full_name}</td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap items-center gap-1.5">
                           {(['present', 'absent', 'late', 'leave', 'medical'] as Status[]).map((st) => (
@@ -184,7 +184,7 @@ export default function TeacherAttendance() {
                               onClick={() => setStatus(s.id, st)}
                               className={cn(
                                 'flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium ring-1 ring-inset transition-all',
-                                statuses[s.id] === st ? statusClasses[st] : 'bg-white text-gray-400 ring-gray-200 hover:bg-gray-50'
+                                statuses[s.id] === st ? statusClasses[st] : 'bg-white text-slate-400 ring-slate-200 hover:bg-slate-50'
                               )}
                             >
                               {statusIcons[st]}

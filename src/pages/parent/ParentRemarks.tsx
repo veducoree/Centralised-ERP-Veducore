@@ -66,24 +66,24 @@ export default function ParentRemarks() {
 
         {remarks.length === 0 ? (
           <Card className="p-8 text-center">
-            <Megaphone className="h-10 w-10 text-gray-300 mx-auto mb-2" />
-            <p className="text-sm text-gray-400">No remarks available</p>
+            <Megaphone className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+            <p className="text-sm text-slate-400">No remarks available</p>
           </Card>
         ) : (
           <div className="space-y-3">
             {remarks.map((r) => (
               <Card key={r.id} className="p-4">
                 <div className="flex items-start gap-3">
-                  <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
-                    <Megaphone className="h-4 w-4 text-blue-600" />
+                  <div className="mt-0.5 flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50">
+                    <Megaphone className="h-4 w-4 text-brand-600" />
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <Badge variant="info">{r.category}</Badge>
-                      <span className="text-xs text-gray-400">{formatDate(r.created_at)}</span>
+                      <span className="text-xs text-slate-400">{formatDate(r.created_at)}</span>
                     </div>
-                    <p className="mt-1.5 text-sm text-gray-700">{r.remark}</p>
-                    {r.teacher && <p className="mt-1 text-xs text-gray-400">By {r.teacher.full_name}</p>}
+                    <p className="mt-1.5 text-sm text-slate-700">{r.remark}</p>
+                    {r.teacher && <p className="mt-1 text-xs text-slate-400">By {r.teacher.full_name}</p>}
                   </div>
                 </div>
               </Card>

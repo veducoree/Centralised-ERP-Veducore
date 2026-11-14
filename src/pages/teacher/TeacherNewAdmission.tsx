@@ -85,9 +85,9 @@ function UploadField({ label, required, file, onChange, accept, error, note, sho
 
   return (
     <div className="w-full">
-      <label className="mb-1.5 block text-sm font-medium text-gray-700">
+      <label className="mb-1.5 block text-sm font-medium text-slate-700">
         {label} {required && <span className="text-red-500">*</span>}
-        {note && <span className="ml-1 font-normal text-gray-400">{note}</span>}
+        {note && <span className="ml-1 font-normal text-slate-400">{note}</span>}
       </label>
       {file ? (
         <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
@@ -106,16 +106,16 @@ function UploadField({ label, required, file, onChange, accept, error, note, sho
       ) : (
         <div
           role="button" tabIndex={0}
-          className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-5 transition-colors ${dragOver ? 'border-blue-400 bg-blue-50' : error ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-gray-50 hover:border-blue-300 hover:bg-blue-50'}`}
+          className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-5 transition-colors ${dragOver ? 'border-brand-400 bg-brand-50' : error ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-slate-50 hover:border-brand-300 hover:bg-brand-50'}`}
           onClick={() => inputRef.current?.click()}
           onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.click()}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) onChange(f); }}
         >
-          {showPreview ? <ImageIcon className="mb-2 h-8 w-8 text-gray-300" /> : <Upload className="mb-2 h-8 w-8 text-gray-300" />}
-          <span className="text-sm font-medium text-gray-500">Click to upload or drag & drop</span>
-          {accept && <span className="mt-1 text-xs text-gray-400">{accept.replace(/\./g, '').replace(/,/g, ', ').toUpperCase()}</span>}
+          {showPreview ? <ImageIcon className="mb-2 h-8 w-8 text-slate-300" /> : <Upload className="mb-2 h-8 w-8 text-slate-300" />}
+          <span className="text-sm font-medium text-slate-500">Click to upload or drag & drop</span>
+          {accept && <span className="mt-1 text-xs text-slate-400">{accept.replace(/\./g, '').replace(/,/g, ', ').toUpperCase()}</span>}
         </div>
       )}
       <input ref={inputRef} type="file" accept={accept} className="hidden"
@@ -129,7 +129,7 @@ function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   return (
     <button type="button" onClick={() => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
-      className="ml-2 rounded-md p-1 text-blue-400 hover:bg-blue-100 hover:text-blue-600 transition-colors">
+      className="ml-2 rounded-md p-1 text-brand-400 hover:bg-brand-100 hover:text-brand-600 transition-colors">
       {copied ? <CheckCircle className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
     </button>
   );
@@ -137,8 +137,8 @@ function CopyButton({ text }: { text: string }) {
 
 function ReviewCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl bg-gray-50 p-4">
-      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">{title}</p>
+    <div className="rounded-xl bg-slate-50 p-4">
+      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</p>
       <div className="space-y-2">{children}</div>
     </div>
   );
@@ -147,36 +147,36 @@ function ReviewCard({ title, children }: { title: string; children: React.ReactN
 function ReviewRow({ label, value, capitalize }: { label: string; value: string; capitalize?: boolean }) {
   return (
     <div className="flex justify-between gap-2 text-sm">
-      <span className="flex-shrink-0 text-gray-500">{label}</span>
-      <span className={`text-right font-medium text-gray-900 ${capitalize ? 'capitalize' : ''}`}>{value || '—'}</span>
+      <span className="flex-shrink-0 text-slate-500">{label}</span>
+      <span className={`text-right font-medium text-slate-900 ${capitalize ? 'capitalize' : ''}`}>{value || '—'}</span>
     </div>
   );
 }
 
 function CredentialsBox({ username, password }: { username: string; password: string }) {
   return (
-    <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+    <div className="rounded-xl border border-brand-200 bg-brand-50 p-4">
       <div className="mb-3 flex items-center gap-2">
-        <Lock className="h-4 w-4 text-blue-600" />
-        <span className="text-sm font-semibold text-blue-800">Parent Portal Credentials</span>
+        <Lock className="h-4 w-4 text-brand-600" />
+        <span className="text-sm font-semibold text-brand-800">Parent Portal Credentials</span>
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-blue-700">Username:</span>
+          <span className="text-brand-700">Username:</span>
           <div className="flex items-center gap-1">
-            <code className="rounded bg-white px-2 py-0.5 font-mono text-blue-800">{username}</code>
+            <code className="rounded bg-white px-2 py-0.5 font-mono text-brand-800">{username}</code>
             <CopyButton text={username} />
           </div>
         </div>
         <div className="flex items-center justify-between text-sm">
-          <span className="text-blue-700">Password:</span>
+          <span className="text-brand-700">Password:</span>
           <div className="flex items-center gap-1">
-            <code className="rounded bg-white px-2 py-0.5 font-mono text-blue-800">{password}</code>
+            <code className="rounded bg-white px-2 py-0.5 font-mono text-brand-800">{password}</code>
             <CopyButton text={password} />
           </div>
         </div>
       </div>
-      <p className="mt-3 text-xs text-blue-600">Share these credentials with the parent. Advise them to change password after first login.</p>
+      <p className="mt-3 text-xs text-brand-600">Share these credentials with the parent. Advise them to change password after first login.</p>
     </div>
   );
 }
@@ -188,31 +188,31 @@ interface StepProps { formData: FormData; errors: Record<string, string>; update
 function Step1({ formData, errors, update }: StepProps) {
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700">Personal Details</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Personal Details</h3>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Input label="Student Full Name" required value={formData.full_name} onChange={(e) => update({ full_name: e.target.value })} error={errors.full_name} placeholder="Enter full name" />
         <Input label="Father's Name" required value={formData.father_name} onChange={(e) => update({ father_name: e.target.value })} error={errors.father_name} placeholder="Father's full name" />
         <Input label="Mother's Name" required value={formData.mother_name} onChange={(e) => update({ mother_name: e.target.value })} error={errors.mother_name} placeholder="Mother's full name" />
         <Input label="Parent Email" type="email" required value={formData.parent_email} onChange={(e) => update({ parent_email: e.target.value })} error={errors.parent_email} placeholder="parent@example.com" />
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">Phone Number <span className="text-red-500">*</span></label>
+          <label className="mb-1.5 block text-sm font-medium text-slate-700">Phone Number <span className="text-red-500">*</span></label>
           <div className="flex">
-            <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">+91</span>
+            <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-slate-300 bg-slate-50 text-slate-500 text-sm">+91</span>
             <input type="tel" maxLength={10} value={formData.phone}
               onChange={(e) => { const d = e.target.value.replace(/\D/g, '').slice(0, 10); update({ phone: d, whatsapp: formData.same_as_phone ? d : formData.whatsapp }); }}
-              className="flex-1 rounded-r-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30" placeholder="10-digit mobile number" />
+              className="flex-1 rounded-r-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30" placeholder="10-digit mobile number" />
           </div>
           {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone}</p>}
         </div>
         <div>
-          <label className="mb-1.5 block text-sm font-medium text-gray-700">WhatsApp Number</label>
+          <label className="mb-1.5 block text-sm font-medium text-slate-700">WhatsApp Number</label>
           <div className="flex">
-            <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">+91</span>
+            <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-slate-300 bg-slate-50 text-slate-500 text-sm">+91</span>
             <input type="tel" maxLength={10} value={formData.whatsapp} disabled={formData.same_as_phone}
               onChange={(e) => update({ whatsapp: e.target.value.replace(/\D/g, '').slice(0, 10) })}
-              className="flex-1 rounded-r-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:bg-gray-50 disabled:text-gray-500 disabled:cursor-not-allowed" placeholder="10-digit mobile number" />
+              className="flex-1 rounded-r-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 disabled:bg-slate-50 disabled:text-slate-500 disabled:cursor-not-allowed" placeholder="10-digit mobile number" />
           </div>
-          <label className="mt-1.5 flex cursor-pointer items-center gap-2 text-xs text-gray-600">
+          <label className="mt-1.5 flex cursor-pointer items-center gap-2 text-xs text-slate-600">
             <input type="checkbox" checked={formData.same_as_phone} onChange={(e) => update({ same_as_phone: e.target.checked, whatsapp: e.target.checked ? formData.phone : formData.whatsapp })} className="rounded" />
             Same as phone number
           </label>
@@ -232,7 +232,7 @@ function Step1({ formData, errors, update }: StepProps) {
 function Step2({ formData, errors, update }: StepProps) {
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700">Address Details</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Address Details</h3>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2"><Input label="Address Line 1" required value={formData.address_line1} onChange={(e) => update({ address_line1: e.target.value })} error={errors.address_line1} placeholder="House/Flat No., Street, Area" /></div>
         <div className="sm:col-span-2"><Input label="Address Line 2" value={formData.address_line2} onChange={(e) => update({ address_line2: e.target.value })} placeholder="Landmark, Colony (optional)" /></div>
@@ -253,7 +253,7 @@ function Step3({ formData, errors, update, inchargeSections }: StepProps & {
 }) {
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700">Class & Admission Details</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Class & Admission Details</h3>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Select label="Class / Section" required value={formData.section_id} onChange={(e) => update({ section_id: e.target.value })} error={errors.section_id}>
           <option value="">Select class</option>
@@ -278,7 +278,7 @@ function Step3({ formData, errors, update, inchargeSections }: StepProps & {
 function Step4({ formData, errors, update }: StepProps) {
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700">Document Uploads</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Document Uploads</h3>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <UploadField label="Previous School TC" file={formData.prev_tc_file} onChange={(f) => update({ prev_tc_file: f })} accept=".pdf,image/*" note="(if applicable, optional)" />
         <UploadField label="Student Aadhar Card" required file={formData.student_aadhar} onChange={(f) => update({ student_aadhar: f })} accept=".pdf,image/*" error={errors.student_aadhar} />
@@ -303,7 +303,7 @@ function Step5({ formData, credentials, sectionLabel }: {
   ];
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-gray-700">Review & Credentials</h3>
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Review & Credentials</h3>
       <ReviewCard title="Personal Details">
         <ReviewRow label="Name" value={formData.full_name} />
         <ReviewRow label="Father's Name" value={formData.father_name} />
@@ -324,14 +324,14 @@ function Step5({ formData, credentials, sectionLabel }: {
         <div className="grid grid-cols-2 gap-2">
           {docs.map(({ label, file }) => (
             <div key={label} className="flex items-center gap-2">
-              {file ? <CheckCircle className="h-4 w-4 flex-shrink-0 text-emerald-500" /> : <span className="text-gray-400">—</span>}
-              <span className={`text-sm ${file ? 'text-gray-700' : 'text-gray-400'}`}>{label}</span>
+              {file ? <CheckCircle className="h-4 w-4 flex-shrink-0 text-emerald-500" /> : <span className="text-slate-400">—</span>}
+              <span className={`text-sm ${file ? 'text-slate-700' : 'text-slate-400'}`}>{label}</span>
             </div>
           ))}
         </div>
       </ReviewCard>
       {credentials === null
-        ? <div className="flex items-center justify-center rounded-xl border border-blue-100 bg-blue-50 p-4"><div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-400 border-t-transparent mr-2" /><span className="text-sm text-blue-600">Loading credentials…</span></div>
+        ? <div className="flex items-center justify-center rounded-xl border border-brand-100 bg-brand-50 p-4"><div className="h-5 w-5 animate-spin rounded-full border-2 border-brand-400 border-t-transparent mr-2" /><span className="text-sm text-brand-600">Loading credentials…</span></div>
         : <CredentialsBox username={credentials.username} password={credentials.password} />
       }
     </div>
@@ -485,10 +485,10 @@ export default function TeacherNewAdmission() {
   if (inchargeSections.length === 0) {
     return (
       <DashboardLayout title="New Admission">
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-20 text-center">
-          <Users className="h-12 w-12 text-gray-300 mb-3" />
-          <p className="font-medium text-gray-600">No class assigned as incharge</p>
-          <p className="mt-1 text-sm text-gray-400">Only class teachers can admit students</p>
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 py-20 text-center">
+          <Users className="h-12 w-12 text-slate-300 mb-3" />
+          <p className="font-medium text-slate-600">No class assigned as incharge</p>
+          <p className="mt-1 text-sm text-slate-400">Only class teachers can admit students</p>
         </div>
       </DashboardLayout>
     );
@@ -501,8 +501,8 @@ export default function TeacherNewAdmission() {
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 mx-auto mb-4">
             <CheckCircle className="h-8 w-8 text-emerald-600" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Student Admitted!</h2>
-          <p className="text-gray-500 mb-6">{formData.full_name} has been successfully admitted.</p>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Student Admitted!</h2>
+          <p className="text-slate-500 mb-6">{formData.full_name} has been successfully admitted.</p>
           {credentials && <CredentialsBox username={credentials.username} password={credentials.password} />}
           <Button className="mt-6" onClick={() => { setFormData({ ...INITIAL_FORM, admission_number: generateAdmissionNumber(), section_id: formData.section_id }); setCurrentStep(1); setSubmitted(false); }}>
             Admit Another Student
@@ -516,7 +516,7 @@ export default function TeacherNewAdmission() {
     <DashboardLayout title="New Admission">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center mb-6 gap-3">
-          <h1 className="text-2xl font-bold text-gray-900">New Student Admission</h1>
+          <h1 className="text-2xl font-bold text-slate-900">New Student Admission</h1>
         </div>
 
         {/* Step indicator */}
@@ -529,13 +529,13 @@ export default function TeacherNewAdmission() {
               return (
                 <React.Fragment key={step}>
                   <div className="flex flex-col items-center">
-                    <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors ${done ? 'bg-blue-600 text-white' : active ? 'bg-blue-600 text-white ring-4 ring-blue-100' : 'bg-gray-100 text-gray-400'}`}>
+                    <div className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold transition-colors ${done ? 'bg-brand-600 text-white' : active ? 'bg-brand-600 text-white ring-4 ring-brand-100' : 'bg-slate-100 text-slate-400'}`}>
                       {done ? <CheckCircle className="h-4 w-4" /> : step}
                     </div>
-                    <span className={`mt-1 text-xs font-medium ${active ? 'text-blue-600' : done ? 'text-gray-600' : 'text-gray-400'}`}>{label}</span>
+                    <span className={`mt-1 text-xs font-medium ${active ? 'text-brand-600' : done ? 'text-slate-600' : 'text-slate-400'}`}>{label}</span>
                   </div>
                   {i < STEP_LABELS.length - 1 && (
-                    <div className={`flex-1 h-0.5 mb-5 mx-1 transition-colors ${done ? 'bg-blue-600' : 'bg-gray-200'}`} />
+                    <div className={`flex-1 h-0.5 mb-5 mx-1 transition-colors ${done ? 'bg-brand-600' : 'bg-slate-200'}`} />
                   )}
                 </React.Fragment>
               );
@@ -544,7 +544,7 @@ export default function TeacherNewAdmission() {
         </div>
 
         {/* Step content */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+        <div className="rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)] p-6 shadow-sm">
           {currentStep === 1 && <Step1 formData={formData} errors={errors} update={update} />}
           {currentStep === 2 && <Step2 formData={formData} errors={errors} update={update} />}
           {currentStep === 3 && <Step3 formData={formData} errors={errors} update={update} inchargeSections={inchargeSections} />}
@@ -552,7 +552,7 @@ export default function TeacherNewAdmission() {
           {currentStep === 5 && <Step5 formData={formData} credentials={credentials} sectionLabel={currentSection?.label ?? ''} />}
 
           {/* Navigation */}
-          <div className="mt-6 flex items-center justify-between border-t border-gray-100 pt-4">
+          <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4">
             {currentStep > 1
               ? <Button variant="outline" onClick={handleBack} icon={<ArrowLeft className="h-4 w-4" />}>Back</Button>
               : <div />

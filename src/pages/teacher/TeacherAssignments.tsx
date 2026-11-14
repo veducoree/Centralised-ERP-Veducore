@@ -46,29 +46,29 @@ export default function TeacherAssignments() {
         {loading ? (
           <LoadingSpinner />
         ) : assignments.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-            <Layers className="h-12 w-12 text-gray-300 mb-3" />
-            <p className="font-medium text-gray-600">No assignments yet</p>
-            <p className="mt-1 text-sm text-gray-400">
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+            <Layers className="h-12 w-12 text-slate-300 mb-3" />
+            <p className="font-medium text-slate-600">No assignments yet</p>
+            <p className="mt-1 text-sm text-slate-400">
               Contact your admin to get class assignments
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <div className="overflow-x-auto rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50/50">
+              <thead className="border-b border-slate-200 bg-slate-50/50">
                 <tr>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Class</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Section</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Subject</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Class</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Section</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Subject</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 {assignments.map((a) => (
-                  <tr key={a.id} className="hover:bg-gray-50/50">
-                    <td className="px-4 py-3 font-medium text-gray-900">{a.class?.name}</td>
-                    <td className="px-4 py-3 text-gray-700">{a.section?.name}</td>
-                    <td className="px-4 py-3 text-gray-700">{a.subject?.name || '—'}</td>
+                  <tr key={a.id} className="hover:bg-slate-50/50">
+                    <td className="px-4 py-3 font-medium text-slate-900">{a.class?.name}</td>
+                    <td className="px-4 py-3 text-slate-700">{a.section?.name}</td>
+                    <td className="px-4 py-3 text-slate-700">{a.subject?.name || '—'}</td>
                   </tr>
                 ))}
               </tbody>

@@ -279,27 +279,27 @@ export default function TeacherExamMarks() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setView('list')}
-              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800"
+              className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to Exams
             </button>
           </div>
 
-          <div className="rounded-xl border border-gray-200 bg-white p-5">
+          <div className="rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)] p-5">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-base font-semibold text-gray-900">{selectedExamDef.exam_name}</h2>
-                <p className="text-sm text-gray-500">
+                <h2 className="text-base font-semibold text-slate-900">{selectedExamDef.exam_name}</h2>
+                <p className="text-sm text-slate-500">
                   {selectedSubject.name} &middot; {sectionLabelFor(selectedExamDef.section_id)} &middot;{' '}
                   {getRecordTypeLabel(selectedExamDef.record_type)}
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-slate-500">
                   Max Marks: {selectedExamDef.max_marks} &middot; Date: {formatDate(selectedExamDef.date)}
                 </p>
               </div>
               <div className="mt-2 flex items-center gap-3 sm:mt-0">
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-slate-500">
                   {filled}/{totalStudents} filled
                 </span>
                 <Button
@@ -314,26 +314,26 @@ export default function TeacherExamMarks() {
             </div>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+          <div className="overflow-x-auto rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-200 bg-gray-50/50">
+              <thead className="border-b border-slate-200 bg-slate-50/50">
                 <tr>
-                  <th className="px-4 py-3 font-semibold text-gray-600 w-8">#</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Student Name</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Adm. No.</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600 w-32">
+                  <th className="px-4 py-3 font-semibold text-slate-600 w-8">#</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Student Name</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Adm. No.</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600 w-32">
                     Marks{' '}
-                    <span className="font-normal text-gray-400">/ {selectedExamDef.max_marks}</span>
+                    <span className="font-normal text-slate-400">/ {selectedExamDef.max_marks}</span>
                   </th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Comment (optional)</th>
+                  <th className="px-4 py-3 font-semibold text-slate-600">Comment (optional)</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-slate-100">
                 {sectionStudents.map((student, idx) => (
-                  <tr key={student.id} className="hover:bg-gray-50/50">
-                    <td className="px-4 py-2.5 text-gray-400 text-xs">{idx + 1}</td>
-                    <td className="px-4 py-2.5 font-medium text-gray-900">{student.full_name}</td>
-                    <td className="px-4 py-2.5 text-gray-500">{student.admission_number}</td>
+                  <tr key={student.id} className="hover:bg-slate-50/50">
+                    <td className="px-4 py-2.5 text-slate-400 text-xs">{idx + 1}</td>
+                    <td className="px-4 py-2.5 font-medium text-slate-900">{student.full_name}</td>
+                    <td className="px-4 py-2.5 text-slate-500">{student.admission_number}</td>
                     <td className="px-4 py-2.5">
                       <input
                         type="number"
@@ -343,7 +343,7 @@ export default function TeacherExamMarks() {
                         onChange={(e) =>
                           setMarksInput({ ...marksInput, [student.id]: e.target.value })
                         }
-                        className="w-24 rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                        className="w-24 rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                         placeholder="—"
                       />
                     </td>
@@ -354,7 +354,7 @@ export default function TeacherExamMarks() {
                         onChange={(e) =>
                           setCommentInput({ ...commentInput, [student.id]: e.target.value })
                         }
-                        className="w-full rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                        className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30"
                         placeholder="Optional comment..."
                       />
                     </td>
@@ -362,7 +362,7 @@ export default function TeacherExamMarks() {
                 ))}
               </tbody>
             </table>
-            <div className="flex justify-end border-t border-gray-100 px-4 py-3">
+            <div className="flex justify-end border-t border-slate-100 px-4 py-3">
               <Button
                 onClick={handleSaveMarks}
                 disabled={isLocked(selectedExamDef)}
@@ -408,10 +408,10 @@ export default function TeacherExamMarks() {
         {loading ? (
           <LoadingSpinner />
         ) : visibleExamDefs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 py-16 text-center">
-            <ClipboardList className="h-12 w-12 text-gray-300 mb-3" />
-            <p className="font-medium text-gray-600">No exams created yet</p>
-            <p className="mt-1 text-sm text-gray-400">
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+            <ClipboardList className="h-12 w-12 text-slate-300 mb-3" />
+            <p className="font-medium text-slate-600">No exams created yet</p>
+            <p className="mt-1 text-sm text-slate-400">
               Click &ldquo;Create Exam&rdquo; to add Unit Test 1, Mid Term, Final Exam etc.
             </p>
           </div>
@@ -422,26 +422,26 @@ export default function TeacherExamMarks() {
               return (
                 <div
                   key={def.id}
-                  className="rounded-xl border border-gray-200 bg-white overflow-hidden"
+                  className="rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)] overflow-hidden"
                 >
                   {/* Card header */}
-                  <div className="flex items-center gap-3 px-5 py-4 border-b border-gray-100 bg-gray-50/50">
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                  <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100 bg-slate-50/50">
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-brand-100 text-brand-700">
                       <ClipboardList className="h-4 w-4" />
                     </div>
                     <div className="flex-1 min-w-0 flex flex-wrap items-center gap-2">
-                      <p className="text-sm font-semibold text-gray-900">{def.exam_name}</p>
+                      <p className="text-sm font-semibold text-slate-900">{def.exam_name}</p>
                       <Badge variant="info">{getRecordTypeLabel(def.record_type)}</Badge>
-                      <span className="text-xs text-gray-500">{sectionLabelFor(def.section_id)}</span>
-                      <span className="text-xs text-gray-400">&middot; Max: {def.max_marks}</span>
-                      <span className="text-xs text-gray-400">&middot; {formatDate(def.date)}</span>
+                      <span className="text-xs text-slate-500">{sectionLabelFor(def.section_id)}</span>
+                      <span className="text-xs text-slate-400">&middot; Max: {def.max_marks}</span>
+                      <span className="text-xs text-slate-400">&middot; {formatDate(def.date)}</span>
                       {def.exam_id && <Badge variant="default">School exam</Badge>}
                       {isLocked(def) && <span className="inline-flex items-center gap-1 text-xs text-emerald-700"><Lock className="h-3 w-3" /> Results published</span>}
                     </div>
                     {!def.exam_id && (
                       <button
                         onClick={() => setDeleteExamId(def.id)}
-                        className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
                         aria-label="Delete exam"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -451,22 +451,22 @@ export default function TeacherExamMarks() {
 
                   {/* Subject rows */}
                   {subjectsForExam.length === 0 ? (
-                    <div className="px-5 py-3 text-xs text-gray-400">
+                    <div className="px-5 py-3 text-xs text-slate-400">
                       No subjects assigned for this section.
                     </div>
                   ) : (
-                    <div className="divide-y divide-gray-50">
+                    <div className="divide-y divide-slate-50">
                       {subjectsForExam.map((sub) => {
                         const marked = countMarked(def, sub);
                         return (
                           <div
                             key={sub.id}
-                            className="flex items-center gap-4 px-5 py-3 hover:bg-blue-50/30 transition-colors"
+                            className="flex items-center gap-4 px-5 py-3 hover:bg-brand-50/30 transition-colors"
                           >
                             <div className="flex-1 min-w-0">
-                              <span className="text-sm font-medium text-gray-800">{sub.name}</span>
+                              <span className="text-sm font-medium text-slate-800">{sub.name}</span>
                             </div>
-                            <span className="text-xs text-gray-400 whitespace-nowrap">
+                            <span className="text-xs text-slate-400 whitespace-nowrap">
                               {marked} student{marked !== 1 ? 's' : ''} marked
                             </span>
                             <Button
