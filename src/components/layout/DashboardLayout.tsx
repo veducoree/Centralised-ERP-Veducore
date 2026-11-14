@@ -462,7 +462,7 @@ export function DashboardLayout({
       {/* ── Full-width navbar — sits above everything including sidebar ── */}
       <header className="fixed top-0 left-0 right-0 z-40 flex h-[72px] items-center gap-3 border-b border-[#E8EAF3] bg-white/90 pl-4 pr-4 backdrop-blur-md sm:pl-6 sm:pr-6">
 
-          {/* School logo + name + AY — always visible in navbar */}
+          {/* School logo + name — always visible in navbar */}
           <div className="flex min-w-0 items-center gap-3">
             {school?.logo_url ? (
               <img
@@ -487,16 +487,9 @@ export function DashboardLayout({
               ) : (
                 <div className="h-4 w-28 animate-pulse rounded bg-slate-200" />
               )}
-              <div className="mt-0.5 flex items-center gap-1.5">
-                {school && schoolBranding(school).enabled && portal !== 'Veducore' && (
-                  <span className="hidden truncate text-[11px] font-medium text-slate-500 sm:inline">{portal}</span>
-                )}
-                {school?.academic_year && (
-                  <span className="inline-flex items-center rounded-full bg-[#EEF0FD] px-2 py-0.5 text-[10px] font-semibold text-[#5B6EE8]">
-                    AY {school.academic_year}
-                  </span>
-                )}
-              </div>
+              {school && schoolBranding(school).enabled && portal !== 'Veducore' && (
+                <p className="mt-0.5 hidden truncate text-[11px] font-medium text-slate-500 sm:block">{portal}</p>
+              )}
             </div>
           </div>
 
