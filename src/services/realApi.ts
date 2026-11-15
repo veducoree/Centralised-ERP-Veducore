@@ -1693,6 +1693,24 @@ export async function updateHoliday(id: string, updates: Partial<Holiday>) {
   return data as Holiday | null;
 }
 
+/** Sets the type of several dates at once (one row per school + date). */
+export async function upsertHolidays(rows: { school_id: string; date: string; type: 'working' | 'holiday' | 'festival'; label: string | null }[]) {
+  if (!rows.length) return [] as Holiday[];
+  const { data, error } = await supabase
+    .from('holidays')
+    .upsert(rows, { onConflict: 'school_id,date' })
+    .select();
+  if (error) throw new Error(error.message);
+  return (data || []) as Holiday[];
+}
+
+/** Removes the entries for these dates, so they fall back to the weekly pattern. */
+export async function clearHolidayDates(schoolId: string, dates: string[]) {
+  if (!dates.length) return;
+  const { error } = await supabase.from('holidays').delete().eq('school_id', schoolId).in('date', dates);
+  if (error) throw new Error(error.message);
+}
+
 export async function deleteHoliday(id: string) {
   const { error } = await supabase.from('holidays').delete().eq('id', id);
   if (error) throw error;
@@ -1874,171 +1892,94 @@ function normalizeBusesAndStops(
   return { buses, stops: allStops.length > 0 ? allStops : rawStops };
 }
 
+/**
+ * Parent-side transport data, read from the transport tables
+ * (migration 019/041) — the same rows the admin manages.
+ * Only active vehicles are offered to parents. Assignments are keyed by
+ * student id: a pending application wins, then the approved one, then the
+ * most recent record (so a rejection reason stays visible).
+ */
 export async function fetchSchoolTransportData(schoolId: string): Promise<{
   buses: TransportBus[];
   stops: TransportStop[];
   assignments: Record<string, StudentTransportAssignment>;
 }> {
-  let localBuses: TransportBus[] = [];
-  let localStops: TransportStop[] = [];
-  let localAssignments: Record<string, StudentTransportAssignment> = {};
-  try {
-    const rawBuses = localStorage.getItem(TRANSPORT_BUSES_KEY(schoolId));
-    if (rawBuses) localBuses = JSON.parse(rawBuses);
-    const rawStops = localStorage.getItem(TRANSPORT_STOPS_KEY(schoolId));
-    if (rawStops) localStops = JSON.parse(rawStops);
-    const rawAssign = localStorage.getItem(STUDENT_TRANSPORT_KEY(schoolId));
-    if (rawAssign) localAssignments = JSON.parse(rawAssign);
-  } catch {
-    // ignore localStorage parse errors
+  const [busRes, assignRes] = await Promise.all([
+    supabase
+      .from('transport_buses')
+      .select('*, stops:transport_stops(*)')
+      .eq('school_id', schoolId)
+      .eq('status', 'active')
+      .order('created_at'),
+    supabase
+      .from('student_transport_assignments')
+      .select('*, bus:transport_buses(bus_number,route_name,vehicle_type,driver_name,driver_phone), stop:transport_stops(stop_name,area_landmark,pickup_time,drop_time,amount,fare_period)')
+      .eq('school_id', schoolId)
+      .order('assigned_at', { ascending: false }),
+  ]);
+
+  const rawBuses = (busRes.data || []) as TransportBus[];
+  const buses = rawBuses.map((b) => {
+    const sorted = [...(b.stops || [])].sort((x, y) => (x.stop_order ?? 0) - (y.stop_order ?? 0));
+    return { ...b, vehicle_type: b.vehicle_type || 'bus', stops: sorted, total_stops: sorted.length };
+  });
+  const stops = buses.flatMap((b) => b.stops.map((s) => ({
+    ...s,
+    amount: Number(s.amount),
+    bus_id: b.id,
+    bus_number: b.bus_number,
+    route_name: b.route_name,
+    vehicle_type: b.vehicle_type,
+    driver_name: b.driver_name,
+    driver_phone: b.driver_phone,
+  }))) as TransportStop[];
+
+  type Joined = StudentTransportAssignment & {
+    bus?: { bus_number: string; route_name: string; vehicle_type?: 'bus' | 'van'; driver_name?: string; driver_phone?: string };
+    stop?: { stop_name: string; area_landmark?: string; pickup_time?: string; drop_time?: string; amount: number; fare_period?: StudentTransportAssignment['fare_period'] };
+  };
+  const rank = (s?: string) => (s === 'pending' ? 0 : s === 'approved' || s === 'active' ? 1 : 2);
+  const assignments: Record<string, StudentTransportAssignment> = {};
+  for (const a of (assignRes.data || []) as Joined[]) {
+    const flat: StudentTransportAssignment = {
+      ...a,
+      bus_number: a.bus?.bus_number ?? a.fare_snapshot?.bus_number,
+      route_name: a.bus?.route_name ?? a.fare_snapshot?.route_name,
+      vehicle_type: a.bus?.vehicle_type ?? a.fare_snapshot?.vehicle_type ?? 'bus',
+      driver_name: a.bus?.driver_name,
+      driver_phone: a.bus?.driver_phone,
+      stop_name: a.stop?.stop_name ?? a.fare_snapshot?.stop_name ?? '',
+      area_landmark: a.stop?.area_landmark,
+      pickup_time: a.stop?.pickup_time,
+      drop_time: a.stop?.drop_time,
+      amount: Number(a.fare_snapshot?.amount ?? a.stop?.amount ?? 0),
+      fare_period: a.fare_snapshot?.fare_period ?? a.stop?.fare_period,
+    };
+    const prev = assignments[a.student_id];
+    if (!prev || rank(flat.status) < rank(prev.status)) assignments[a.student_id] = flat;
   }
 
-  try {
-    const { data } = await supabase
-      .from('schools')
-      .select('settings')
-      .eq('id', schoolId)
-      .maybeSingle();
-    const settings = (data?.settings || {}) as Record<string, unknown>;
-    const dbBuses = Array.isArray(settings.transport_buses)
-      ? (settings.transport_buses as TransportBus[])
-      : null;
-    const dbStops = Array.isArray(settings.transport_stops)
-      ? (settings.transport_stops as TransportStop[])
-      : null;
-    const dbAssignments =
-      settings.student_transport && typeof settings.student_transport === 'object'
-        ? (settings.student_transport as Record<string, StudentTransportAssignment>)
-        : null;
-
-    const chosenBuses = dbBuses && dbBuses.length > 0 ? dbBuses : localBuses;
-    const chosenStops = dbStops && dbStops.length > 0 ? dbStops : localStops;
-    const normalized = normalizeBusesAndStops(chosenBuses, chosenStops);
-
-    const finalAssignments: Record<string, StudentTransportAssignment> =
-      dbAssignments && Object.keys(dbAssignments).length > 0
-        ? { ...localAssignments, ...dbAssignments }
-        : { ...localAssignments };
-
-    // Also merge any parent transport applications stored in audit_logs
-    try {
-      const { data: appLogs } = await supabase
-        .from('audit_logs')
-        .select('entity_id, metadata, created_at')
-        .eq('school_id', schoolId)
-        .eq('action', 'transport_application')
-        .order('created_at', { ascending: true });
-
-      if (appLogs && appLogs.length > 0) {
-        for (const row of appLogs) {
-          const meta = row.metadata as unknown as StudentTransportAssignment | null;
-          const stuId = meta?.student_id || row.entity_id;
-          if (stuId && meta && meta.stop_id) {
-            const existing = finalAssignments[stuId];
-            if (
-              !existing ||
-              new Date(meta.assigned_at || row.created_at).getTime() >
-                new Date(existing.assigned_at || 0).getTime()
-            ) {
-              finalAssignments[stuId] = meta;
-            }
-          }
-        }
-      }
-    } catch {
-      // ignore if audit_logs query is restricted
-    }
-
-    try {
-      localStorage.setItem(TRANSPORT_BUSES_KEY(schoolId), JSON.stringify(normalized.buses));
-      localStorage.setItem(TRANSPORT_STOPS_KEY(schoolId), JSON.stringify(normalized.stops));
-      localStorage.setItem(STUDENT_TRANSPORT_KEY(schoolId), JSON.stringify(finalAssignments));
-    } catch {
-      // ignore
-    }
-
-    return {
-      buses: normalized.buses,
-      stops: normalized.stops,
-      assignments: finalAssignments,
-    };
-  } catch {
-    const normalized = normalizeBusesAndStops(localBuses, localStops);
-    return {
-      buses: normalized.buses,
-      stops: normalized.stops,
-      assignments: localAssignments,
-    };
-  }
+  return { buses, stops, assignments };
 }
 
+/** Parent applies for a stop. The DB function validates, replaces any earlier
+ *  pending application for the child, and notifies the school's admins. */
 export async function applyForTransport(
-  schoolId: string,
+  _schoolId: string,
   assignment: StudentTransportAssignment
 ): Promise<StudentTransportAssignment> {
-  const payload: StudentTransportAssignment = {
+  const { data, error } = await supabase.rpc('apply_for_transport', {
+    p_student: assignment.student_id,
+    p_stop: assignment.stop_id,
+  });
+  if (error) throw new Error(error.message);
+  return {
     ...assignment,
-    status: assignment.status || 'pending',
+    id: data as string,
+    status: 'pending',
     applied_by_parent: true,
     assigned_at: new Date().toISOString(),
   };
-
-  // 1. Update localStorage immediately
-  try {
-    const rawAssign = localStorage.getItem(STUDENT_TRANSPORT_KEY(schoolId));
-    const currentAssign: Record<string, StudentTransportAssignment> = rawAssign
-      ? JSON.parse(rawAssign)
-      : {};
-    currentAssign[payload.student_id] = payload;
-    localStorage.setItem(STUDENT_TRANSPORT_KEY(schoolId), JSON.stringify(currentAssign));
-  } catch {
-    // ignore
-  }
-
-  // 2. Insert into audit_logs (works for all authenticated parents via audit_logs_insert policy and readable by Admin)
-  try {
-    await supabase.from('audit_logs').insert({
-      school_id: schoolId,
-      action: 'transport_application',
-      entity_type: 'student_transport',
-      entity_id: payload.student_id,
-      metadata: payload as unknown as Record<string, unknown>,
-    });
-  } catch {
-    // ignore
-  }
-
-  // 3. Also attempt to update schools.settings.student_transport directly
-  try {
-    const { data: currentSchool } = await supabase
-      .from('schools')
-      .select('settings')
-      .eq('id', schoolId)
-      .maybeSingle();
-
-    const existingSettings =
-      currentSchool?.settings && typeof currentSchool.settings === 'object'
-        ? (currentSchool.settings as Record<string, unknown>)
-        : {};
-    const existingStudentTransport =
-      existingSettings.student_transport && typeof existingSettings.student_transport === 'object'
-        ? (existingSettings.student_transport as Record<string, StudentTransportAssignment>)
-        : {};
-
-    await updateSchool(schoolId, {
-      settings: {
-        ...existingSettings,
-        student_transport: {
-          ...existingStudentTransport,
-          [payload.student_id]: payload,
-        },
-      },
-    });
-  } catch {
-    // ignore if RLS blocks direct school update by parent; audit_logs + localStorage already saved it
-  }
-
-  return payload;
 }
 
 export async function saveSchoolTransportData(
@@ -2235,6 +2176,12 @@ export async function createAdmissionWithFees(params: {
   class_id: string;
   section_id: string;
   address: string;
+  parent_phone?: string | null;
+  whatsapp_number?: string | null;
+  previous_school?: string | null;
+  previous_board?: string | null;
+  tc_number?: string | null;
+  tc_date?: string | null;
   admission_date: string;
   // Fees fields
   academic_year: string;
@@ -2268,6 +2215,13 @@ export async function createAdmissionWithFees(params: {
     class_id: params.class_id,
     section_id: params.section_id,
     address: params.address,
+    // Saved with the student so the parent's number and history aren't lost.
+    ...(params.parent_phone ? { parent_phone: params.parent_phone, emergency_contact: params.parent_phone } : {}),
+    ...(params.whatsapp_number ? { whatsapp_number: params.whatsapp_number } : {}),
+    ...(params.previous_school ? { previous_school: params.previous_school } : {}),
+    ...(params.previous_board ? { previous_board: params.previous_board } : {}),
+    ...(params.tc_number ? { tc_number: params.tc_number } : {}),
+    ...(params.tc_date ? { tc_date: params.tc_date } : {}),
     admission_date: params.admission_date,
     status: 'active',
     avatar_url: null,
@@ -2455,17 +2409,11 @@ export async function fetchSidebarPreference(
       query = query.is('school_id', null);
     }
     const { data, error } = await query.maybeSingle();
-    // 404 = table doesn't exist yet (migration pending) — treat as no preference
-    if (error) {
-      if ((error as any).code === 'PGRST116' || error.message?.includes('404') || error.message?.includes('relation') || (error as any).status === 404) {
-        return null;
-      }
-      throw error;
-    }
+    if (error) throw error;
     return data as SidebarPreference | null;
-  } catch {
-    // Any network or DB error — fail silently, use role default
-    return null;
+  } catch (err) {
+    // Let the caller keep its cached copy instead of treating a failed read as "no preference".
+    throw err instanceof Error ? err : new Error('Could not load sidebar preferences');
   }
 }
 
@@ -2496,14 +2444,11 @@ export async function saveSidebarPreference(
       )
       .select()
       .maybeSingle();
-    if (error) {
-      // Table doesn't exist yet — silently ignore
-      if ((error as any).status === 404 || error.message?.includes('relation')) return null;
-      throw error;
-    }
+    if (error) throw new Error(error.message);
     return data as SidebarPreference | null;
-  } catch {
-    return null;
+  } catch (err) {
+    // Surface failures so the UI can revert and tell the user.
+    throw err instanceof Error ? err : new Error('Could not save sidebar preferences');
   }
 }
 
@@ -2515,11 +2460,12 @@ export async function resetSidebarPreference(
   schoolId: string | null
 ): Promise<void> {
   if (!supabase) return;
-  const { error } = await supabase
+  let q = supabase
     .from('sidebar_preferences')
     .update({ ordered_paths: null, updated_at: new Date().toISOString() })
-    .eq('profile_id', profileId)
-    .eq('school_id', schoolId ?? (null as unknown as string));
+    .eq('profile_id', profileId);
+  q = schoolId ? q.eq('school_id', schoolId) : q.is('school_id', null);
+  const { error } = await q;
   if (error) throw error;
 }
 
@@ -2818,7 +2764,7 @@ export async function fetchTransportAll(schoolId: string): Promise<{
         .order('created_at'),
       supabase
         .from('student_transport_assignments')
-        .select('*, bus:transport_buses(bus_number,route_name,driver_name,driver_phone), stop:transport_stops(stop_name,area_landmark,pickup_time,drop_time,amount,fare_period,distance_km)')
+        .select('*, bus:transport_buses(bus_number,route_name,vehicle_type,driver_name,driver_phone), stop:transport_stops(stop_name,area_landmark,pickup_time,drop_time,amount,fare_period,distance_km)')
         .eq('school_id', schoolId)
         .order('assigned_at', { ascending: false }),
     ]);
@@ -2829,11 +2775,17 @@ export async function fetchTransportAll(schoolId: string): Promise<{
       throw busRes.error;
     }
 
-    const buses = (busRes.data || []) as import('@/types').TransportBus[];
+    const buses = ((busRes.data || []) as import('@/types').TransportBus[]).map((b) => {
+      const sorted = [...(b.stops || [])]
+        .map((st) => ({ ...st, amount: Number(st.amount) }))
+        .sort((x, y) => (x.stop_order ?? 0) - (y.stop_order ?? 0));
+      return { ...b, vehicle_type: b.vehicle_type || 'bus', stops: sorted, total_stops: sorted.length };
+    });
     const stops = buses.flatMap((b) => (b.stops || []).map((s) => ({
       ...s,
       bus_number: b.bus_number,
       route_name: b.route_name,
+      vehicle_type: b.vehicle_type,
       driver_name: b.driver_name,
       driver_phone: b.driver_phone,
     }))) as import('@/types').TransportStop[];
@@ -2841,7 +2793,7 @@ export async function fetchTransportAll(schoolId: string): Promise<{
     // Flatten joined assignment data into the flat shape the UI expects
     const rawAssignments = (assignRes.data || []) as Array<
       import('@/types').StudentTransportAssignment & {
-        bus?: { bus_number: string; route_name: string; driver_name?: string; driver_phone?: string };
+        bus?: { bus_number: string; route_name: string; vehicle_type?: import('@/types').VehicleType; driver_name?: string; driver_phone?: string };
         stop?: { stop_name: string; area_landmark?: string; pickup_time?: string; drop_time?: string; amount: number; fare_period?: string; distance_km?: number };
       }
     >;
@@ -2850,6 +2802,7 @@ export async function fetchTransportAll(schoolId: string): Promise<{
       ...a,
       bus_number: a.bus?.bus_number ?? a.bus_number,
       route_name: a.bus?.route_name ?? a.route_name,
+      vehicle_type: a.bus?.vehicle_type ?? a.fare_snapshot?.vehicle_type ?? 'bus',
       driver_name: a.bus?.driver_name ?? a.driver_name,
       driver_phone: a.bus?.driver_phone ?? a.driver_phone,
       stop_name: a.stop?.stop_name ?? a.stop_name,
@@ -2881,6 +2834,10 @@ export async function saveTransportBus(
     conductor_name?: string;
     conductor_phone?: string;
     status?: string;
+    vehicle_type?: import('@/types').VehicleType;
+    insurance_expiry?: string | null;
+    fitness_expiry?: string | null;
+    permit_expiry?: string | null;
   },
   stops: Array<{
     id?: string;

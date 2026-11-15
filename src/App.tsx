@@ -53,8 +53,6 @@ const TeacherDashboard = lazy(() => import('@/pages/teacher/TeacherDashboard'));
 const TeacherClasses = lazy(() => import('@/pages/teacher/TeacherClasses'));
 const TeacherAssignments = lazy(() => import('@/pages/teacher/TeacherAssignments'));
 const TeacherStudents = lazy(() => import('@/pages/teacher/TeacherStudents'));
-const TeacherAddStudent = lazy(() => import('@/pages/teacher/TeacherAddStudent'));
-const TeacherNewAdmission = lazy(() => import('@/pages/teacher/TeacherNewAdmission'));
 const TeacherAttendance = lazy(() => import('@/pages/teacher/TeacherAttendance'));
 const TeacherMyAttendance = lazy(() => import('@/pages/teacher/TeacherMyAttendance'));
 const TeacherExamMarks = lazy(() => import('@/pages/teacher/TeacherExamMarks'));
@@ -104,8 +102,6 @@ function RoutePrefetcher() {
         import('@/pages/teacher/TeacherClasses');
         import('@/pages/teacher/TeacherAssignments');
         import('@/pages/teacher/TeacherStudents');
-        import('@/pages/teacher/TeacherAddStudent');
-        import('@/pages/teacher/TeacherNewAdmission');
         import('@/pages/teacher/TeacherAttendance');
         import('@/pages/teacher/TeacherExamMarks');
         import('@/pages/teacher/TeacherRecords');
@@ -186,8 +182,8 @@ function App() {
             <Route path="/teacher/assignments" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherAssignments /></ProtectedRoute>} />
             <Route path="/teacher/subjects" element={<Navigate to="/teacher/classes" replace />} />
             <Route path="/teacher/students" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherStudents /></ProtectedRoute>} />
-            <Route path="/teacher/add-student" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherAddStudent /></ProtectedRoute>} />
-            <Route path="/teacher/new-admission" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherNewAdmission /></ProtectedRoute>} />
+            {/* Students are added only by the school office (admin). */}
+            <Route path="/teacher/add-student" element={<Navigate to="/teacher/students" replace />} />
             <Route path="/teacher/attendance" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherAttendance /></ProtectedRoute>} />
             <Route path="/teacher/my-attendance" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherMyAttendance /></ProtectedRoute>} />
             <Route path="/teacher/exam-marks" element={<ProtectedRoute allowedRoles={['teacher']}><TeacherExamMarks /></ProtectedRoute>} />

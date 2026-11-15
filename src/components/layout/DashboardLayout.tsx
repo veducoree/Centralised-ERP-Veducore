@@ -4,8 +4,8 @@ import {
   LayoutDashboard, Users, GraduationCap, BookOpen, ClipboardList,
   IndianRupee, FileText, Bell, Settings, LogOut,
   X, UserCircle, ChevronDown, Shield, User,
-  Megaphone, UserPlus, ClipboardCheck, CalendarDays, Bus,
-  LayoutGrid, GripVertical, RotateCcw, Pencil, Check, ChevronRight, ChevronLeft, UserRound, Boxes, Library, CalendarClock, CalendarRange, UserCog, ArrowUpCircle, CalendarCheck2, LifeBuoy,
+  Megaphone, ClipboardCheck, CalendarDays, Bus,
+  LayoutGrid, GripVertical, RotateCcw, Pencil, Check, Plus, Loader2, ChevronRight, ChevronLeft, UserRound, Boxes, Library, CalendarClock, CalendarRange, UserCog, ArrowUpCircle, CalendarCheck2, LifeBuoy,
 } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
@@ -28,6 +28,7 @@ import type { School } from '@/types';
 import {
   SidebarPrefProvider as _SidebarPrefProvider, useSidebarPref, FIXED_PATHS,
 } from '@/context/SidebarPrefContext';
+import { useToast } from '@/components/ui/Toast';
 import { ConfirmDialog } from '@/components/ui/Modal';
 
 // ── Nav config ────────────────────────────────────────────────────────────────
@@ -66,7 +67,6 @@ export const teacherNav: NavItem[] = [
   { label: 'My Classes',       path: '/teacher/classes',     icon: <BookOpen className="h-5 w-5" /> },
   { label: 'My Timetable',     path: '/teacher/schedule',    icon: <CalendarClock className="h-5 w-5" /> },
   { label: 'Students',         path: '/teacher/students',    icon: <Users className="h-5 w-5" /> },
-  { label: 'Add Student',      path: '/teacher/add-student', icon: <UserPlus className="h-5 w-5" /> },
   { label: 'Class Attendance', path: '/teacher/attendance',  icon: <ClipboardList className="h-5 w-5" /> },
   { label: 'My Attendance',    path: '/teacher/my-attendance', icon: <CalendarCheck2 className="h-5 w-5" /> },
   { label: 'Exam Marks',       path: '/teacher/exam-marks',  icon: <ClipboardCheck className="h-5 w-5" /> },
@@ -210,11 +210,18 @@ function Sidebar({
   school, roleLabel, activeNavPath, onNavigate, firstFocusRef,
 }: SidebarProps) {
   const location = useLocation();
-  const { pinnedItems: allPinned, isFixed, togglePin, reorder, reset, isCustomised } = useSidebarPref();
+  const { pinnedItems: allPinned, isFixed, togglePin, reorder, reset, isCustomised, hiddenItems: allHidden, flush, saving } = useSidebarPref();
   const { canPath } = usePermissions();
+  const toast = useToast();
   // Staff only see the modules their role allows.
   const pinnedItems = allPinned.filter((i) => canPath(i.path));
+  const hiddenItems = allHidden.filter((i) => canPath(i.path));
   const [editMode, setEditMode] = useState(false);
+
+  async function finishEditing() {
+    setEditMode(false);
+    if (await flush()) toast('Sidebar saved', 'success');
+  }
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -224,7 +231,8 @@ function Sidebar({
 
   function handleMouseLeave() {
     if (hoverTimer.current) clearTimeout(hoverTimer.current);
-    onCollapse();
+    // Stay open while editing so a drag that strays outside doesn't collapse it.
+    if (!editMode) onCollapse();
   }
 
   const sensors = useSensors(
@@ -284,6 +292,28 @@ function Sidebar({
             </ul>
           </SortableContext>
         </DndContext>
+
+        {/* Hidden modules — add back while editing */}
+        {editMode && expanded && hiddenItems.length > 0 && (
+          <div className="mt-4">
+            <p className="mb-1.5 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400">Hidden modules</p>
+            <ul className="space-y-1">
+              {hiddenItems.map((item) => (
+                <li key={item.path}>
+                  <button
+                    type="button"
+                    onClick={() => togglePin(item.path)}
+                    className="group flex w-full items-center gap-3 rounded-[14px] border border-dashed border-slate-200 px-3 py-2 text-sm font-medium text-slate-500 transition-colors hover:border-[#5B6EE8] hover:bg-[#F8F9FF] hover:text-[#5B6EE8]"
+                  >
+                    <span className="text-slate-400 group-hover:text-[#5B6EE8]">{item.icon}</span>
+                    <span className="flex-1 truncate text-left">{item.label}</span>
+                    <Plus className="h-4 w-4 flex-shrink-0" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </nav>
 
       {/* ── Bottom ── */}
@@ -293,7 +323,10 @@ function Sidebar({
             {/* Edit mode hint */}
             {editMode && (
               <div className="flex items-center justify-between rounded-xl bg-[#F8F9FF] px-3 py-2 mb-1">
-                <span className="text-xs font-medium text-slate-500">Drag to reorder · × to unpin</span>
+                <span className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                  {saving && <Loader2 className="h-3 w-3 animate-spin" />}
+                  Drag to reorder · × to hide
+                </span>
                 {isCustomised && (
                   <button
                     onClick={() => setResetConfirmOpen(true)}
@@ -307,7 +340,7 @@ function Sidebar({
 
             {/* Customise button */}
             <button
-              onClick={() => setEditMode((v) => !v)}
+              onClick={() => (editMode ? void finishEditing() : setEditMode(true))}
               className={cn(
                 'flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-sm font-medium transition-all duration-200 whitespace-nowrap overflow-hidden',
                 editMode

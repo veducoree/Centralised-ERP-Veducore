@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { appLink } from '../../../lib/appUrl';
 import { KeyRound, Plus, ShieldCheck, Sparkles, Trash2, UserPlus, Users } from 'lucide-react';
 import { callManageSchools, errMsg, fmtDate, generatePassword, timeAgo, type Me, type TeamRole } from '../api';
 import { Badge, Button, Card, EmptyState, ErrorBanner, Field, LoadingBlock, Modal, ROLES, cx, inputCls, toast } from '../ui';
@@ -101,7 +102,7 @@ function AddMemberModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
     setSaving(true);
     try {
       await callManageSchools({ action: 'team-add', ...f });
-      navigator.clipboard.writeText(`Veducore Superadmin\n${window.location.origin}/superadmin\nEmail: ${f.email}\nPassword: ${f.password}`).catch(() => {});
+      navigator.clipboard.writeText(`Veducore Superadmin\n${appLink('/superadmin')}\nEmail: ${f.email}\nPassword: ${f.password}`).catch(() => {});
       toast('Member added — login details copied to clipboard');
       onAdded();
     } catch (e) {

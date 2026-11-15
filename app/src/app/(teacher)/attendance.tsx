@@ -3,11 +3,9 @@ import {
   View,
   Text,
   ScrollView,
-  RefreshControl,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,7 +19,10 @@ import {
   fetchStudentsBySection,
   fetchAttendance,
   upsertAttendance,
+  fetchHolidays,
+  fetchSchool,
 } from '@/services/api';
+import { weeklyOffDays, makeOffDay, type HolidayRow } from '@/lib/holidays';
 import { COLORS, SPACING, RADIUS, SHADOW, formatDate } from '@/lib/utils';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Avatar } from '@/components/ui/Avatar';
@@ -35,6 +36,8 @@ import type {
   Attendance,
   AttendanceStatus,
 } from '@/types';
+import { appAlert } from '@/components/ui/AppDialog';
+import { RefreshScrollView } from '@/components/ui/RefreshScrollView';
 
 interface SectionOption {
   sectionId: string;
@@ -99,8 +102,27 @@ export default function TeacherAttendance() {
     return d.toISOString().split('T')[0];
   }, []);
 
+  // Holidays + weekly offs (Settings → Weekly Working Days).
+  const [holidayRows, setHolidayRows] = useState<HolidayRow[]>([]);
+  const [offDays, setOffDays] = useState<number[]>([0]);
+  const offDay = useMemo(() => makeOffDay(holidayRows, offDays), [holidayRows, offDays]);
+  const selectedOff = offDay(selectedDate);
+
   // Compute 24-hour editability status
   const editStatus = useMemo(() => {
+    if (selectedOff) {
+      const weekly = selectedOff === 'Sunday' || selectedOff === 'Saturday';
+      return {
+        isEditable: false,
+        badgeText: weekly ? `${selectedOff} · Weekly off` : `Holiday · ${selectedOff}`,
+        badgeColor: '#B45309',
+        badgeBg: '#FFFBEB',
+        icon: 'sunny' as const,
+        message: weekly
+          ? `${selectedOff} is a weekly off. School is closed, so attendance isn't taken.`
+          : `${selectedOff} — school holiday. Attendance isn't taken on holidays.`,
+      };
+    }
     if (selectedDate > todayStr) {
       return {
         isEditable: false,
@@ -174,7 +196,7 @@ export default function TeacherAttendance() {
       icon: 'lock-closed' as const,
       message: 'Historical Record: Attendance older than 24 hours cannot be modified.',
     };
-  }, [selectedDate, todayStr, yesterdayStr, existingAttendance]);
+  }, [selectedDate, todayStr, yesterdayStr, existingAttendance, selectedOff]);
 
   const { user } = useAuth();
 
@@ -184,6 +206,9 @@ export default function TeacherAttendance() {
     try {
       const teacher = await fetchTeacherByUserId(user.id);
       if (!teacher) return;
+      Promise.all([fetchHolidays(teacher.school_id), fetchSchool(teacher.school_id, true)])
+        .then(([h, sch]) => { setHolidayRows(h); setOffDays(weeklyOffDays(sch)); })
+        .catch(() => {});
 
       // Only the class teacher marks a section's attendance.
       const opts: SectionOption[] = (await fetchMyAttendanceSections()).map(x => ({
@@ -247,7 +272,7 @@ export default function TeacherAttendance() {
 
   const setStatus = (studentId: string, status: AttendanceStatus) => {
     if (!editStatus.isEditable) {
-      Alert.alert('Attendance Locked', editStatus.message);
+      appAlert('Attendance Locked', editStatus.message);
       return;
     }
     setStatuses(prev => ({ ...prev, [studentId]: status }));
@@ -255,7 +280,7 @@ export default function TeacherAttendance() {
 
   const markAll = (status: AttendanceStatus) => {
     if (!editStatus.isEditable) {
-      Alert.alert('Attendance Locked', editStatus.message);
+      appAlert('Attendance Locked', editStatus.message);
       return;
     }
     const all: Record<string, AttendanceStatus> = {};
@@ -269,7 +294,7 @@ export default function TeacherAttendance() {
     if (!selectedSectionId || students.length === 0) return;
 
     if (!editStatus.isEditable) {
-      Alert.alert('Attendance Locked', editStatus.message);
+      appAlert('Attendance Locked', editStatus.message);
       return;
     }
 
@@ -298,7 +323,7 @@ export default function TeacherAttendance() {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
 
-      Alert.alert(
+      appAlert(
         'Attendance Saved ✅',
         `Attendance for ${selectedDate} (${sectionLabel}) has been saved.\n\nParents of absent and late students are notified automatically.`
       );
@@ -307,7 +332,7 @@ export default function TeacherAttendance() {
     } catch (err) {
       console.error('Error saving attendance:', err);
       const msg = err instanceof Error ? err.message : '';
-      Alert.alert('Error', /row-level security|policy/i.test(msg)
+      appAlert('Error', /row-level security|policy/i.test(msg)
         ? 'Only the class teacher can mark attendance for this section.'
         : 'Failed to save attendance. Please try again.');
     } finally {
@@ -321,7 +346,7 @@ export default function TeacherAttendance() {
     d.setDate(d.getDate() + days);
     const nextDate = d.toISOString().split('T')[0];
     if (nextDate > todayStr) {
-      Alert.alert('Future Attendance Restricted', 'Attendance cannot be marked or viewed for future dates.');
+      appAlert('Future Attendance Restricted', 'Attendance cannot be marked or viewed for future dates.');
       return;
     }
     setSelectedDate(nextDate);
@@ -368,18 +393,10 @@ export default function TeacherAttendance() {
       <View style={styles.content}>
         <Header title="Student Attendance" />
 
-        <ScrollView
+        <RefreshScrollView refreshing={refreshing} onRefresh={onRefresh}
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={COLORS.primary}
-              colors={[COLORS.primary]}
-            />
-          }>
+          showsVerticalScrollIndicator={false}>
 
           {/* Section Picker Carousel */}
           <Text style={styles.sectionHeaderTitle}>Select Class / Section</Text>
@@ -590,7 +607,7 @@ export default function TeacherAttendance() {
           )}
 
           <View style={{ height: 110 }} />
-        </ScrollView>
+        </RefreshScrollView>
 
         {/* Floating Bottom Bar: Save Button if editable, Locked Banner if outside 24h */}
         {students.length > 0 && (
@@ -655,8 +672,8 @@ const styles = StyleSheet.create({
     ...SHADOW.sm,
   },
   sectionChipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: '#0B1736',
+    borderColor: '#0B1736',
   },
   sectionChipText: { fontSize: 13, fontWeight: '600', color: COLORS.textMuted },
   sectionChipTextActive: { color: '#FFFFFF', fontWeight: '700' },
@@ -730,7 +747,7 @@ const styles = StyleSheet.create({
   lockedNoticeCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADIUS.md,
@@ -791,7 +808,7 @@ const styles = StyleSheet.create({
     height: 34,
     paddingHorizontal: 6,
     borderRadius: 10,
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderWidth: 1,
     borderColor: 'transparent',
   },

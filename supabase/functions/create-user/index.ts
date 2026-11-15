@@ -53,12 +53,15 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Verify caller is admin
     const { data: profile } = await adminClient
       .from("profiles")
       .select("role, school_id, status, staff_role_id")
       .eq("id", userData.user.id)
       .maybeSingle();
+
+    const body: CreateUserBody = await req.json();
+    const { email, password, full_name, role, school_id, phone, extra } = body;
+    const studentId = (extra?.student_id as string | undefined) ?? null;
 
     if (!profile || profile.role !== "admin" || profile.status !== "active") {
       return new Response(
@@ -66,9 +69,6 @@ Deno.serve(async (req: Request) => {
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    const body: CreateUserBody = await req.json();
-    const { email, password, full_name, role, school_id, phone, extra } = body;
 
     if (!email || !password || !full_name || !role || !school_id) {
       return new Response(
@@ -123,6 +123,34 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({ error: "Cannot create users for another school" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // Links a parent record to the student this account is for.
+    const linkStudent = async (parentId: string) => {
+      if (!studentId) return;
+      const { error: linkErr } = await adminClient.from("parent_students").insert({
+        school_id,
+        parent_id: parentId,
+        student_id: studentId,
+        relationship: (extra?.relationship as string | undefined) ?? "guardian",
+      });
+      if (linkErr && linkErr.code !== "23505") console.error("Parent link error:", linkErr);
+    };
+
+    // Siblings share one parent login: reuse it instead of failing on the email.
+    let orphanParentId: string | null = null;
+    if (role === "parent") {
+      const { data: existing } = await adminClient
+        .from("parents").select("id, user_id").eq("school_id", school_id).ilike("email", email).maybeSingle();
+      if (existing?.user_id) {
+        await linkStudent(existing.id);
+        return new Response(
+          JSON.stringify({ id: existing.user_id, email, username: email, existing: true, message: "Linked to the existing parent account" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      // A parent row made earlier without a login: attach the new login to it.
+      orphanParentId = existing?.id ?? null;
     }
 
     // Create auth user with service role
@@ -190,7 +218,7 @@ Deno.serve(async (req: Request) => {
         console.error("Teacher insert error:", teacherErr);
       }
     } else if (role === "parent") {
-      const { error: parentErr } = await adminClient.from("parents").insert({
+      const parentRow = {
         user_id: newUserId,
         school_id,
         full_name,
@@ -200,10 +228,16 @@ Deno.serve(async (req: Request) => {
         address: extra?.address || null,
         status: "active",
         password,
-      });
+      };
+      const { error: parentErr } = orphanParentId
+        ? await adminClient.from("parents").update(parentRow).eq("id", orphanParentId)
+        : await adminClient.from("parents").insert(parentRow);
       if (parentErr) {
         console.error("Parent insert error:", parentErr);
       }
+      const { data: newParent } = await adminClient
+        .from("parents").select("id").eq("user_id", newUserId).maybeSingle();
+      if (newParent) await linkStudent(newParent.id);
     }
 
     // Audit log
@@ -228,7 +262,7 @@ Deno.serve(async (req: Request) => {
     );
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: err.message || "Internal server error" }),
+      JSON.stringify({ error: (err instanceof Error && err.message) || "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }

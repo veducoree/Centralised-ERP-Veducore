@@ -586,13 +586,13 @@ const ACTIONS: Record<string, { roles: Role[]; run: (ctx: Ctx) => Promise<unknow
     roles: MANAGERS,
     run: async (ctx) => {
       const schoolId = need(ctx.body.school_id, "school_id");
-      const redirectTo = str(ctx.body.redirect_to) ?? undefined;
+      const redirectTo = str(ctx.body.redirect_to) ?? `${Deno.env.get("PUBLIC_APP_URL") ?? "https://centralised-erp-veducoree.vercel.app"}/admin/dashboard`;
       const adminProfile = await adminProfileFor(ctx.db, schoolId);
       if (!adminProfile?.email) throw new HttpError(404, "This school has no admin account");
       const { data, error } = await ctx.db.auth.admin.generateLink({
         type: "magiclink",
         email: adminProfile.email,
-        options: redirectTo ? { redirectTo } : undefined,
+        options: { redirectTo },
       });
       if (error || !data?.properties?.action_link) throw new HttpError(400, error?.message ?? "Could not create sign-in link");
       await audit(ctx, "school.impersonated", schoolId, { admin_email: adminProfile.email });

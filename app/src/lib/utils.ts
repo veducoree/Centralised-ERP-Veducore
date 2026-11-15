@@ -37,15 +37,19 @@ export function getDayName(dayIndex: number): string {
   return days[dayIndex] ?? '';
 }
 
+/** Veducore navy → royal blue, used for hero cards. */
+export const HERO_GRADIENT = ['#0B1736', '#132E6B', '#1D4FBF'] as const;
+
 export const COLORS = {
-  primary: '#5B6EE8',
-  primaryLight: '#7B8CF7',
-  primaryDark: '#3B4DC8',
-  primaryBg: '#EEF0FD',
+  primary: '#1E5BD8',
+  ink: '#0B1736',
+  primaryLight: '#3B82F6',
+  primaryDark: '#1544AE',
+  primaryBg: '#EBF2FE',
   accent: '#EC4899',
-  bg: '#F4F5FB',
-  background: '#F4F5FB',
-  canvas: '#F4F5FB',
+  bg: '#F5F7FA',
+  background: '#F5F7FA',
+  canvas: '#F5F7FA',
   card: '#FFFFFF',
   surface: '#FFFFFF',
   text: '#0F172A',
@@ -100,35 +104,35 @@ export const RADIUS = {
 // Matches the website's cards: soft brand-tinted shadow, no border.
 export const SHADOW = {
   card: {
-    shadowColor: '#5B6EE8',
+    shadowColor: '#1E5BD8',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 14,
     elevation: 2,
   },
   hover: {
-    shadowColor: '#5B6EE8',
+    shadowColor: '#1E5BD8',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.14,
     shadowRadius: 20,
     elevation: 4,
   },
   sm: {
-    shadowColor: '#5B6EE8',
+    shadowColor: '#1E5BD8',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 6,
     elevation: 1,
   },
   md: {
-    shadowColor: '#5B6EE8',
+    shadowColor: '#1E5BD8',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.08,
     shadowRadius: 14,
     elevation: 2,
   },
   lg: {
-    shadowColor: '#5B6EE8',
+    shadowColor: '#1E5BD8',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
     shadowRadius: 20,
@@ -138,13 +142,13 @@ export const SHADOW = {
 
 export const GLASS_BG = {
   gradientStart: '#FFFFFF',
-  gradientMid: '#F4F5FB',
+  gradientMid: '#F5F7FA',
   gradientEnd: '#F1F5F9',
 };
 
 export const GLASS = {
   bg: '#FFFFFF',
-  bgSubtle: '#F4F5FB',
+  bgSubtle: '#F5F7FA',
   bgMedium: '#F1F5F9',
   bgHover: '#E2E8F0',
   border: '#E2E8F0',
@@ -155,10 +159,10 @@ export const GLASS = {
   text: '#0F172A',
   textMuted: '#64748B',
   textDim: '#94A3B8',
-  accent: '#5B6EE8',
-  accentLight: '#7B8CF7',
-  accentDark: '#3B4DC8',
-  accentGlow: '#EEF0FD',
+  accent: '#1E5BD8',
+  accentLight: '#3B82F6',
+  accentDark: '#1544AE',
+  accentGlow: '#EBF2FE',
   success: '#10B981',
   warning: '#F59E0B',
   error: '#EF4444',

@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, type SVGProps, type ReactElement } from 'react';
 import {
   Bus, Plus, MapPin, IndianRupee, Users, Trash2, Pencil,
-  UserPlus, CheckCircle2, ArrowRight, Navigation, Phone,
-  Clock, AlertTriangle,
+  UserPlus, ArrowRight, Navigation, Phone, Clock, AlertTriangle,
+  ShieldCheck, Check, X, Inbox, Armchair, Wrench, Ban,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, StatCard } from '@/components/ui/Card';
@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Form';
 import { Modal, ConfirmDialog } from '@/components/ui/Modal';
 import { SearchInput, PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
-import { Badge } from '@/components/ui/Badge';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
 import {
@@ -33,33 +32,108 @@ import type {
   Student,
   Class,
   Section,
+  VehicleType,
 } from '@/types';
 import { formatCurrency, formatDate, getInitials } from '@/lib/utils';
 
 // ─────────────────────────────────────────────────────────────
+// Constants & helpers
+// ─────────────────────────────────────────────────────────────
 const FARE_PERIODS = ['Monthly', 'Quarterly', 'Yearly'] as const;
 type FarePeriod = typeof FARE_PERIODS[number];
 
-const BUS_STATUSES = ['active', 'maintenance', 'inactive'] as const;
-const busStatusLabel: Record<string, string> = {
-  active: 'Active', maintenance: 'Maintenance', inactive: 'Inactive',
+const STATUSES = ['active', 'maintenance', 'inactive'] as const;
+const statusLabel: Record<string, string> = {
+  active: 'Running', maintenance: 'In Maintenance', inactive: 'Inactive',
 };
 
+/** Van outline icon in lucide style (lucide-react 0.446 has no van). */
+function VanIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M13 6v5a1 1 0 0 0 1 1h6.102a1 1 0 0 1 .712.298l.898.91a1 1 0 0 1 .288.702V17a1 1 0 0 1-1 1h-3" />
+      <path d="M5 18H3a1 1 0 0 1-1-1V8a2 2 0 0 1 2-2h12c1.1 0 2.1.8 2.4 1.8l1.176 4.2" />
+      <path d="M9 18h5" />
+      <circle cx="16" cy="18" r="2" />
+      <circle cx="7" cy="18" r="2" />
+    </svg>
+  );
+}
+
+interface VehicleMeta {
+  label: string;
+  plural: string;
+  Icon: (p: { className?: string }) => ReactElement;
+  defaultCapacity: number;
+  maxCapacity: number;
+  hint: string;
+  helperLabel: string;
+  /** tile, chip and accent classes */
+  tile: string;
+  chip: string;
+  accent: string;
+}
+
+const VEHICLE: Record<VehicleType, VehicleMeta> = {
+  bus: {
+    label: 'Bus', plural: 'Buses',
+    Icon: ({ className }) => <Bus className={className} />,
+    defaultCapacity: 40, maxCapacity: 80,
+    hint: 'Large vehicle · 25–80 seats · long routes',
+    helperLabel: 'Conductor',
+    tile: 'bg-[#EEF0FD] text-[#5B6EE8]',
+    chip: 'bg-[#EEF0FD] text-[#4A5BD4]',
+    accent: 'border-[#5B6EE8] ring-[#5B6EE8]/20 bg-[#F6F7FF]',
+  },
+  van: {
+    label: 'Van', plural: 'Vans',
+    Icon: ({ className }) => <VanIcon className={className} />,
+    defaultCapacity: 12, maxCapacity: 25,
+    hint: 'Small vehicle · 7–25 seats · narrow lanes, short routes',
+    helperLabel: 'Helper / Attendant',
+    tile: 'bg-amber-50 text-amber-600',
+    chip: 'bg-amber-50 text-amber-700',
+    accent: 'border-amber-500 ring-amber-500/20 bg-amber-50/50',
+  },
+};
+
+const vt = (v?: string): VehicleType => (v === 'van' ? 'van' : 'bus');
+const isLive = (s?: string) => s === 'approved' || s === 'active';
+const periodWord = (p?: string) => (p || 'Monthly').toLowerCase().replace('ly', '');
+const toMonthly = (amount: number, period?: string) =>
+  period === 'Yearly' ? amount / 12 : period === 'Quarterly' ? amount / 3 : amount;
+const today = () => new Date().toISOString().split('T')[0];
+
+function daysUntil(date?: string | null): number | null {
+  if (!date) return null;
+  const ms = new Date(date + 'T00:00:00').getTime() - new Date(today() + 'T00:00:00').getTime();
+  return Math.round(ms / 86400000);
+}
+
+function friendlyError(err: unknown, fallback: string) {
+  const e = err as { code?: string; message?: string } | null;
+  if (e?.code === '23503') return 'This stop or vehicle has student records linked to it. Mark the vehicle Inactive instead of deleting.';
+  if (e?.code === '23505') return 'This student already has an assignment in that state. Refresh and try again.';
+  return e?.message || fallback;
+}
+
 interface DraftStop {
-  id?: string;          // present when editing an existing stop
+  id?: string;
   stop_name: string;
   area_landmark: string;
   amount: string;
   fare_period: FarePeriod;
   pickup_time: string;
   drop_time: string;
-  distance_km: string;
 }
 
 const emptyStop = (): DraftStop => ({
-  stop_name: '', area_landmark: '', amount: '',
-  fare_period: 'Monthly', pickup_time: '', drop_time: '', distance_km: '',
+  stop_name: '', area_landmark: '', amount: '', fare_period: 'Monthly', pickup_time: '', drop_time: '',
 });
+
+type Tab = 'vehicles' | 'students';
+type TypeFilter = 'all' | VehicleType;
 
 // ─────────────────────────────────────────────────────────────
 export default function AdminTransport() {
@@ -67,64 +141,72 @@ export default function AdminTransport() {
   const toast = useToast();
 
   // ── Core data ────────────────────────────────────────────
-  const [buses, setBuses]           = useState<TransportBus[]>([]);
-  const [stops, setStops]           = useState<TransportStop[]>([]);
+  const [vehicles, setVehicles]       = useState<TransportBus[]>([]);
+  const [stops, setStops]             = useState<TransportStop[]>([]);
   const [assignments, setAssignments] = useState<StudentTransportAssignment[]>([]);
-  const [students, setStudents]     = useState<Student[]>([]);
-  const [classes, setClasses]       = useState<(Class & { sections?: Section[] })[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [saving, setSaving]         = useState(false);
+  const [students, setStudents]       = useState<Student[]>([]);
+  const [classes, setClasses]         = useState<(Class & { sections?: Section[] })[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [saving, setSaving]           = useState(false);
+  const [busyId, setBusyId]           = useState<string | null>(null);
 
-  // ── Bus form ─────────────────────────────────────────────
-  const [busModalOpen, setBusModalOpen]   = useState(false);
-  const [editingBus, setEditingBus]       = useState<TransportBus | null>(null);
-  const [busNumber, setBusNumber]         = useState('');
-  const [routeName, setRouteName]         = useState('');
-  const [busCapacity, setBusCapacity]     = useState('40');
-  const [driverName, setDriverName]       = useState('');
-  const [driverPhone, setDriverPhone]     = useState('');
-  const [conductorName, setConductorName] = useState('');
-  const [conductorPhone, setConductorPhone] = useState('');
-  const [busStatus, setBusStatus]         = useState('active');
-  const [stopsDraft, setStopsDraft]       = useState<DraftStop[]>([emptyStop(), emptyStop(), emptyStop()]);
-  const [deleteBusId, setDeleteBusId]     = useState<string | null>(null);
+  // ── View state ───────────────────────────────────────────
+  const [tab, setTab]               = useState<Tab>('vehicles');
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
+  const [vehicleSearch, setVehicleSearch] = useState('');
+
+  // ── Vehicle form ─────────────────────────────────────────
+  const [vehicleModalOpen, setVehicleModalOpen] = useState(false);
+  const [editingVehicle, setEditingVehicle]     = useState<TransportBus | null>(null);
+  const [vehicleType, setVehicleType]   = useState<VehicleType>('bus');
+  const [regNumber, setRegNumber]       = useState('');
+  const [routeName, setRouteName]       = useState('');
+  const [capacity, setCapacity]         = useState('40');
+  const [capacityTouched, setCapacityTouched] = useState(false);
+  const [driverName, setDriverName]     = useState('');
+  const [driverPhone, setDriverPhone]   = useState('');
+  const [helperName, setHelperName]     = useState('');
+  const [helperPhone, setHelperPhone]   = useState('');
+  const [vehicleStatus, setVehicleStatus] = useState('active');
+  const [insuranceExpiry, setInsuranceExpiry] = useState('');
+  const [fitnessExpiry, setFitnessExpiry]     = useState('');
+  const [permitExpiry, setPermitExpiry]       = useState('');
+  const [stopsDraft, setStopsDraft]     = useState<DraftStop[]>([emptyStop()]);
+  const [deleteVehicleId, setDeleteVehicleId] = useState<string | null>(null);
 
   // ── Assign modal ─────────────────────────────────────────
-  const [assignModalOpen, setAssignModalOpen] = useState(false);
+  const [assignModalOpen, setAssignModalOpen]     = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<StudentTransportAssignment | null>(null);
   const [assignClassFilter, setAssignClassFilter] = useState('');
   const [assignStudentId, setAssignStudentId]     = useState('');
-  const [assignBusId, setAssignBusId]             = useState('');
+  const [assignVehicleId, setAssignVehicleId]     = useState('');
   const [assignStopId, setAssignStopId]           = useState('');
-  const [assignStartDate, setAssignStartDate]     = useState(() => new Date().toISOString().split('T')[0]);
+  const [assignStartDate, setAssignStartDate]     = useState(today);
   const [autoCreateFee, setAutoCreateFee]         = useState(true);
   const [assignDueDate, setAssignDueDate]         = useState(() => {
     const d = new Date(); d.setDate(d.getDate() + 10); return d.toISOString().split('T')[0];
   });
 
-  // ── Reject modal ─────────────────────────────────────────
+  // ── Reject / stop modals ─────────────────────────────────
   const [rejectAssignmentId, setRejectAssignmentId] = useState<string | null>(null);
   const [rejectReason, setRejectReason]             = useState('');
+  const [stopAssignmentId, setStopAssignmentId]     = useState<string | null>(null);
 
-  // ── Stop transport modal ──────────────────────────────────
-  const [stopAssignmentId, setStopAssignmentId] = useState<string | null>(null);
-
-  // ── Table filters ─────────────────────────────────────────
-  const [search, setSearch]           = useState('');
-  const [busFilter, setBusFilter]     = useState('');
+  // ── Student table filters ────────────────────────────────
+  const [search, setSearch]             = useState('');
+  const [vehicleFilter, setVehicleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
-  // ── Load all data from DB ─────────────────────────────────
+  // ── Load ─────────────────────────────────────────────────
   const loadData = useCallback(async () => {
     if (!profile?.school_id) return;
-    setLoading(true);
     try {
       const [transport, studentList, classList] = await Promise.all([
         fetchTransportAll(profile.school_id),
         fetchStudents(profile.school_id),
         fetchClasses(profile.school_id),
       ]);
-      setBuses(transport.buses);
+      setVehicles(transport.buses);
       setStops(transport.stops);
       setAssignments(transport.assignments);
       setStudents(studentList);
@@ -138,52 +220,145 @@ export default function AdminTransport() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // ── Bus form helpers ──────────────────────────────────────
-  function resetBusForm() {
-    setEditingBus(null);
-    setBusNumber(''); setRouteName(''); setBusCapacity('40');
-    setDriverName(''); setDriverPhone('');
-    setConductorName(''); setConductorPhone('');
-    setBusStatus('active');
-    setStopsDraft([emptyStop(), emptyStop(), emptyStop()]);
+  // ── Derived ──────────────────────────────────────────────
+  const vehicleMap = useMemo(() => new Map(vehicles.map((v) => [v.id, v])), [vehicles]);
+  const studentMap = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
+
+  const seatsUsed = useMemo(() => {
+    const m: Record<string, number> = {};
+    assignments.filter((a) => isLive(a.status) && a.bus_id)
+      .forEach((a) => { m[a.bus_id!] = (m[a.bus_id!] || 0) + 1; });
+    return m;
+  }, [assignments]);
+
+  const stopStudentCounts = useMemo(() => {
+    const m: Record<string, number> = {};
+    assignments.filter((a) => isLive(a.status)).forEach((a) => { m[a.stop_id] = (m[a.stop_id] || 0) + 1; });
+    return m;
+  }, [assignments]);
+
+  const busCount = vehicles.filter((v) => vt(v.vehicle_type) === 'bus').length;
+  const vanCount = vehicles.length - busCount;
+  const liveAssignments = assignments.filter((a) => isLive(a.status));
+  const pending = assignments.filter((a) => a.status === 'pending');
+  const runningVehicles = vehicles.filter((v) => (v.status || 'active') === 'active');
+  const totalSeats = runningVehicles.reduce((s, v) => s + (v.capacity ?? 0), 0);
+  const filledSeats = runningVehicles.reduce((s, v) => s + (seatsUsed[v.id] || 0), 0);
+  const monthlyRevenue = liveAssignments.reduce((sum, a) => sum + toMonthly(
+    Number(a.fare_snapshot?.amount ?? a.amount ?? 0),
+    a.fare_snapshot?.fare_period ?? a.fare_period,
+  ), 0);
+
+  const paperAlerts = useMemo(() => {
+    const out: { vehicle: TransportBus; doc: string; days: number }[] = [];
+    for (const v of vehicles) {
+      if (v.status === 'inactive') continue;
+      for (const [doc, date] of [['Insurance', v.insurance_expiry], ['Fitness', v.fitness_expiry], ['Permit', v.permit_expiry]] as const) {
+        const d = daysUntil(date);
+        if (d !== null && d <= 30) out.push({ vehicle: v, doc, days: d });
+      }
+    }
+    return out.sort((a, b) => a.days - b.days);
+  }, [vehicles]);
+
+  const visibleVehicles = useMemo(() => {
+    const q = vehicleSearch.trim().toLowerCase();
+    return vehicles.filter((v) => {
+      if (typeFilter !== 'all' && vt(v.vehicle_type) !== typeFilter) return false;
+      if (!q) return true;
+      return v.bus_number.toLowerCase().includes(q)
+        || v.route_name.toLowerCase().includes(q)
+        || (v.driver_name || '').toLowerCase().includes(q)
+        || v.stops.some((s) => s.stop_name.toLowerCase().includes(q));
+    });
+  }, [vehicles, typeFilter, vehicleSearch]);
+
+  const enrolled = useMemo(() => assignments
+    .map((a) => ({ assignment: a, student: studentMap.get(a.student_id) }))
+    .filter((e): e is { assignment: StudentTransportAssignment; student: Student } => Boolean(e.student)),
+  [assignments, studentMap]);
+
+  const filteredEnrolled = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return enrolled.filter(({ assignment, student }) => {
+      if (typeFilter !== 'all' && vt(assignment.vehicle_type) !== typeFilter) return false;
+      if (vehicleFilter && assignment.bus_id !== vehicleFilter) return false;
+      if (statusFilter && (statusFilter === 'approved' ? !isLive(assignment.status) : assignment.status !== statusFilter)) return false;
+      if (!q) return true;
+      return student.full_name.toLowerCase().includes(q)
+        || student.admission_number.toLowerCase().includes(q)
+        || (assignment.stop_name || '').toLowerCase().includes(q)
+        || (assignment.bus_number || '').toLowerCase().includes(q);
+    });
+  }, [enrolled, typeFilter, vehicleFilter, statusFilter, search]);
+
+  // ── Vehicle form ─────────────────────────────────────────
+  function resetVehicleForm(type: VehicleType = 'bus') {
+    setEditingVehicle(null);
+    setVehicleType(type);
+    setRegNumber(''); setRouteName('');
+    setCapacity(String(VEHICLE[type].defaultCapacity)); setCapacityTouched(false);
+    setDriverName(''); setDriverPhone(''); setHelperName(''); setHelperPhone('');
+    setVehicleStatus('active');
+    setInsuranceExpiry(''); setFitnessExpiry(''); setPermitExpiry('');
+    setStopsDraft([emptyStop()]);
   }
 
-  function openAddBus() { resetBusForm(); setBusModalOpen(true); }
-
-  function openEditBus(bus: TransportBus) {
-    setEditingBus(bus);
-    setBusNumber(bus.bus_number);
-    setRouteName(bus.route_name);
-    setBusCapacity(String(bus.capacity ?? 40));
-    setDriverName(bus.driver_name || '');
-    setDriverPhone(bus.driver_phone || '');
-    setConductorName(bus.conductor_name || '');
-    setConductorPhone(bus.conductor_phone || '');
-    setBusStatus(bus.status || 'active');
-    setStopsDraft(
-      bus.stops?.length > 0
-        ? bus.stops.map((s) => ({
-            id: s.id,
-            stop_name: s.stop_name,
-            area_landmark: s.area_landmark || '',
-            amount: String(s.amount),
-            fare_period: (s.fare_period as FarePeriod) || 'Monthly',
-            pickup_time: s.pickup_time || '',
-            drop_time: s.drop_time || '',
-            distance_km: s.distance_km !== undefined ? String(s.distance_km) : '',
-          }))
-        : [emptyStop()]
-    );
-    setBusModalOpen(true);
+  function openAddVehicle(type?: VehicleType) {
+    resetVehicleForm(type ?? (typeFilter === 'van' ? 'van' : 'bus'));
+    setVehicleModalOpen(true);
   }
 
-  async function handleSaveBus(e: React.FormEvent) {
+  function openEditVehicle(v: TransportBus) {
+    setEditingVehicle(v);
+    setVehicleType(vt(v.vehicle_type));
+    setRegNumber(v.bus_number);
+    setRouteName(v.route_name);
+    setCapacity(String(v.capacity ?? VEHICLE[vt(v.vehicle_type)].defaultCapacity));
+    setCapacityTouched(true);
+    setDriverName(v.driver_name || ''); setDriverPhone(v.driver_phone || '');
+    setHelperName(v.conductor_name || ''); setHelperPhone(v.conductor_phone || '');
+    setVehicleStatus(v.status || 'active');
+    setInsuranceExpiry(v.insurance_expiry || '');
+    setFitnessExpiry(v.fitness_expiry || '');
+    setPermitExpiry(v.permit_expiry || '');
+    setStopsDraft(v.stops.length > 0
+      ? v.stops.map((s) => ({
+          id: s.id,
+          stop_name: s.stop_name,
+          area_landmark: s.area_landmark || '',
+          amount: String(s.amount),
+          fare_period: (s.fare_period as FarePeriod) || 'Monthly',
+          pickup_time: s.pickup_time || '',
+          drop_time: s.drop_time || '',
+        }))
+      : [emptyStop()]);
+    setVehicleModalOpen(true);
+  }
+
+  function chooseType(t: VehicleType) {
+    setVehicleType(t);
+    if (!capacityTouched) setCapacity(String(VEHICLE[t].defaultCapacity));
+  }
+
+  const updateStop = (idx: number, patch: Partial<DraftStop>) =>
+    setStopsDraft((p) => p.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+
+  async function handleSaveVehicle(e: React.FormEvent) {
     e.preventDefault();
     if (!profile?.school_id) return;
-    const cleanBusNo = busNumber.trim();
-    const cleanRoute = routeName.trim();
-    if (!cleanBusNo) { toast('Bus Number is required', 'error'); return; }
-    if (!cleanRoute) { toast('Route Name is required', 'error'); return; }
+    const meta = VEHICLE[vehicleType];
+    const reg = regNumber.trim();
+    const route = routeName.trim();
+    const cap = parseInt(capacity, 10);
+    if (!reg) { toast(`${meta.label} number is required`, 'error'); return; }
+    if (!route) { toast('Route name is required', 'error'); return; }
+    if (!cap || cap < 1 || cap > meta.maxCapacity) {
+      toast(`${meta.label} capacity must be between 1 and ${meta.maxCapacity}`, 'error'); return;
+    }
+    if (editingVehicle && cap < (seatsUsed[editingVehicle.id] || 0)) {
+      toast(`${seatsUsed[editingVehicle.id]} students already ride this ${meta.label.toLowerCase()} — capacity can't be lower`, 'error'); return;
+    }
 
     const validStops = stopsDraft
       .map((r, idx) => ({
@@ -191,96 +366,116 @@ export default function AdminTransport() {
         stop_name: r.stop_name.trim(),
         area_landmark: r.area_landmark.trim() || undefined,
         amount: Number(r.amount),
-        fare_period: r.fare_period || 'Monthly',
-        pickup_time: r.pickup_time.trim() || undefined,
-        drop_time: r.drop_time.trim() || undefined,
-        distance_km: r.distance_km.trim() ? Number(r.distance_km) : undefined,
+        fare_period: r.fare_period,
+        pickup_time: r.pickup_time || undefined,
+        drop_time: r.drop_time || undefined,
         stop_order: idx + 1,
       }))
       .filter((r) => r.stop_name && !isNaN(r.amount) && r.amount > 0);
 
-    if (validStops.length === 0) {
-      toast('At least one valid stop with a fare amount is required', 'error');
-      return;
-    }
+    if (validStops.length === 0) { toast('Add at least one stop with a fare', 'error'); return; }
 
     setSaving(true);
     try {
-      await saveTransportBus(
-        profile.school_id,
-        {
-          ...(editingBus ? { id: editingBus.id } : {}),
-          bus_number: cleanBusNo,
-          route_name: cleanRoute,
-          capacity: parseInt(busCapacity, 10) || 40,
-          driver_name: driverName.trim() || undefined,
-          driver_phone: driverPhone.trim() || undefined,
-          conductor_name: conductorName.trim() || undefined,
-          conductor_phone: conductorPhone.trim() || undefined,
-          status: busStatus,
-        },
-        validStops
-      );
+      await saveTransportBus(profile.school_id, {
+        ...(editingVehicle ? { id: editingVehicle.id } : {}),
+        vehicle_type: vehicleType,
+        bus_number: reg,
+        route_name: route,
+        capacity: cap,
+        driver_name: driverName.trim() || undefined,
+        driver_phone: driverPhone.trim() || undefined,
+        conductor_name: helperName.trim() || undefined,
+        conductor_phone: helperPhone.trim() || undefined,
+        status: vehicleStatus,
+        insurance_expiry: insuranceExpiry || null,
+        fitness_expiry: fitnessExpiry || null,
+        permit_expiry: permitExpiry || null,
+      }, validStops);
       await loadData();
-      setBusModalOpen(false);
-      resetBusForm();
-      toast(editingBus ? `Updated ${cleanBusNo}` : `Added ${cleanBusNo} with ${validStops.length} stops`, 'success');
+      setVehicleModalOpen(false);
+      toast(editingVehicle ? `${meta.label} ${reg} updated` : `${meta.label} ${reg} added with ${validStops.length} stop${validStops.length > 1 ? 's' : ''}`, 'success');
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to save bus', 'error');
+      const msg = (err as { code?: string })?.code === '23505'
+        ? `A vehicle with number ${reg} already exists`
+        : friendlyError(err, 'Failed to save vehicle');
+      toast(msg, 'error');
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleConfirmDeleteBus() {
-    if (!deleteBusId) return;
-    // Check if any active assignments exist on this bus's stops
-    const busStopIds = new Set(
-      stops.filter((s) => s.bus_id === deleteBusId).map((s) => s.id)
-    );
-    const hasActive = assignments.some(
-      (a) => busStopIds.has(a.stop_id) &&
-             (a.status === 'active' || a.status === 'approved' || a.status === 'pending')
-    );
-    if (hasActive) {
-      toast('This bus has active student assignments. Stop or remove them first.', 'error');
-      setDeleteBusId(null);
+  async function handleConfirmDeleteVehicle() {
+    if (!deleteVehicleId) return;
+    const v = vehicleMap.get(deleteVehicleId);
+    const stopIds = new Set(v?.stops.map((s) => s.id));
+    const linked = assignments.filter((a) => a.bus_id === deleteVehicleId || stopIds.has(a.stop_id));
+    if (linked.some((a) => isLive(a.status) || a.status === 'pending')) {
+      toast('Students are still assigned or waiting on this vehicle. Stop or reject them first.', 'error');
+      setDeleteVehicleId(null);
+      return;
+    }
+    if (linked.length > 0) {
+      toast('This vehicle has past student records. Mark it Inactive to keep the history.', 'error');
+      setDeleteVehicleId(null);
       return;
     }
     setSaving(true);
     try {
-      await deleteTransportBusWithStops(deleteBusId);
+      await deleteTransportBusWithStops(deleteVehicleId);
       await loadData();
-      setDeleteBusId(null);
-      toast('Bus and all its stops deleted', 'success');
+      toast(`${VEHICLE[vt(v?.vehicle_type)].label} deleted`, 'success');
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to delete bus', 'error');
+      toast(friendlyError(err, 'Failed to delete vehicle'), 'error');
     } finally {
       setSaving(false);
+      setDeleteVehicleId(null);
     }
   }
 
-  // ── Assign student ────────────────────────────────────────
-  function openAssignModal(assignment?: StudentTransportAssignment) {
+  // ── Assign ───────────────────────────────────────────────
+  function firstStopOf(id: string) { return vehicleMap.get(id)?.stops[0]?.id || ''; }
+
+  function openAssignModal(assignment?: StudentTransportAssignment, presetVehicleId?: string) {
     setEditingAssignment(assignment || null);
     setAssignClassFilter('');
     setAssignStudentId(assignment?.student_id || '');
-    const defaultBusId = assignment?.bus_id || buses[0]?.id || '';
-    setAssignBusId(defaultBusId);
-    const busObj = buses.find((b) => b.id === defaultBusId) || buses[0];
-    setAssignStopId(assignment?.stop_id || busObj?.stops[0]?.id || '');
-    setAssignStartDate(new Date().toISOString().split('T')[0]);
+    const vid = assignment?.bus_id || presetVehicleId || runningVehicles[0]?.id || vehicles[0]?.id || '';
+    setAssignVehicleId(vid);
+    setAssignStopId(assignment?.stop_id || firstStopOf(vid));
+    setAssignStartDate(today());
     setAutoCreateFee(!assignment);
     setAssignModalOpen(true);
+  }
+
+  const assignableStudents = useMemo(
+    () => (assignClassFilter ? students.filter((s) => s.class_id === assignClassFilter) : students),
+    [students, assignClassFilter],
+  );
+  const assignVehicle = vehicleMap.get(assignVehicleId);
+  const assignStop = stops.find((s) => s.id === assignStopId);
+  const existingLive = !editingAssignment && assignStudentId
+    ? assignments.find((a) => a.student_id === assignStudentId && isLive(a.status))
+    : undefined;
+
+  function seatsLeft(v: TransportBus, ignoreStudentId?: string) {
+    const used = assignments.filter((a) => a.bus_id === v.id && isLive(a.status) && a.student_id !== ignoreStudentId).length;
+    return (v.capacity ?? 0) - used;
   }
 
   async function handleAssignStudent(e: React.FormEvent) {
     e.preventDefault();
     if (!profile?.school_id) return;
     if (!assignStudentId) { toast('Please select a student', 'error'); return; }
-    const stop = stops.find((s) => s.id === assignStopId);
-    if (!stop) { toast('Please select a stop', 'error'); return; }
-    const bus  = buses.find((b) => b.id === assignBusId) || buses.find((b) => b.id === stop.bus_id);
+    const stop = assignStop;
+    const vehicle = assignVehicle;
+    if (!stop || !vehicle) { toast('Please select a vehicle and stop', 'error'); return; }
+    if (seatsLeft(vehicle, assignStudentId) <= 0) {
+      toast(`${VEHICLE[vt(vehicle.vehicle_type)].label} ${vehicle.bus_number} is full (${vehicle.capacity} seats)`, 'error'); return;
+    }
+
+    // A student has at most one live assignment — moving them updates it.
+    const target = editingAssignment ?? existingLive;
 
     setSaving(true);
     try {
@@ -288,92 +483,103 @@ export default function AdminTransport() {
         amount: stop.amount,
         fare_period: (stop.fare_period as FarePeriod) || 'Monthly',
         stop_name: stop.stop_name,
-        bus_number: bus?.bus_number,
-        route_name: bus?.route_name,
+        bus_number: vehicle.bus_number,
+        route_name: vehicle.route_name,
+        vehicle_type: vt(vehicle.vehicle_type),
       };
-
       const saved = await createOrUpdateAssignment({
-        ...(editingAssignment?.id ? { id: editingAssignment.id } : {}),
+        ...(target?.id ? { id: target.id } : {}),
         school_id: profile.school_id,
         student_id: assignStudentId,
-        bus_id: stop.bus_id || assignBusId,
+        bus_id: vehicle.id,
         stop_id: stop.id,
         start_date: assignStartDate,
         status: 'approved',
-        applied_by_parent: false,
+        applied_by_parent: target?.applied_by_parent ?? false,
         fare_snapshot: fareSnapshot,
         approved_by: profile.id,
         approved_at: new Date().toISOString(),
       });
 
-      // Create fee record if requested
-      if (autoCreateFee) {
+      if (autoCreateFee && !editingAssignment) {
         try {
           const fee = await createFee({
             school_id: profile.school_id,
             student_id: assignStudentId,
-            fee_type: `Transport Fee (${bus?.bus_number || 'Bus'} - ${stop.stop_name})`,
+            fee_type: `Transport Fee (${VEHICLE[vt(vehicle.vehicle_type)].label} ${vehicle.bus_number} - ${stop.stop_name})`,
             amount: stop.amount,
-            due_date: assignDueDate || new Date().toISOString().split('T')[0],
+            due_date: assignDueDate || today(),
           });
-          // Link fee to assignment
-          if (fee?.id && saved?.id) {
-            await updateAssignmentStatus(saved.id, { status: 'approved', fee_id: fee.id });
-          }
-        } catch { /* non-fatal */ }
+          if (fee?.id && saved?.id) await updateAssignmentStatus(saved.id, { status: 'approved', fee_id: fee.id });
+        } catch { /* fee is optional — assignment already saved */ }
       }
+
+      notifyParent(assignStudentId, target ? 'Transport updated' : 'Transport assigned',
+        `${studentMap.get(assignStudentId)?.full_name || 'Your child'} will travel by ${VEHICLE[vt(vehicle.vehicle_type)].label} ${vehicle.bus_number} from ${stop.stop_name}`
+        + `${stop.pickup_time ? ` (pickup ${stop.pickup_time})` : ''}. Fare ${formatCurrency(stop.amount)}/${periodWord(stop.fare_period)}.`,
+        'success');
 
       await loadData();
       setAssignModalOpen(false);
-      toast(`Assigned ${stop.stop_name} (${formatCurrency(stop.amount)}/${(stop.fare_period || 'month').toLowerCase()})`, 'success');
+      toast(target ? 'Transport updated' : `Assigned to ${vehicle.bus_number} · ${stop.stop_name}`, 'success');
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to assign transport', 'error');
+      toast(friendlyError(err, 'Failed to assign transport'), 'error');
     } finally {
       setSaving(false);
     }
   }
 
-  // ── Approve ────────────────────────────────────────────────
-  async function handleApprove(assignment: StudentTransportAssignment) {
-    if (!profile?.school_id || !assignment.id) return;
+  function notifyParent(studentId: string, title: string, message: string, type: string) {
+    if (!profile?.school_id) return;
+    createNotification({
+      school_id: profile.school_id,
+      audience: 'student',
+      student_id: studentId,
+      category: 'transport',
+      title, message, type,
+    }).catch(() => { /* non-fatal */ });
+  }
 
-    // Capacity check
-    const bus = buses.find((b) => b.id === assignment.bus_id);
-    if (bus?.capacity) {
-      const approvedCount = assignments.filter(
-        (a) => a.bus_id === bus.id && (a.status === 'active' || a.status === 'approved')
-      ).length;
-      if (approvedCount >= bus.capacity) {
-        toast(`Bus ${bus.bus_number} is full (${bus.capacity} seats). Cannot approve more students.`, 'error');
-        return;
-      }
+  // ── Approve / reject / stop ──────────────────────────────
+  async function handleApprove(a: StudentTransportAssignment) {
+    if (!profile?.school_id || !a.id) return;
+    const vehicle = a.bus_id ? vehicleMap.get(a.bus_id) : undefined;
+    const stop = stops.find((s) => s.id === a.stop_id);
+    if (!vehicle || !stop) { toast('That stop no longer exists. Reject this application.', 'error'); return; }
+    const meta = VEHICLE[vt(vehicle.vehicle_type)];
+    if (vehicle.status !== 'active') { toast(`${meta.label} ${vehicle.bus_number} is not running right now`, 'error'); return; }
+    if (seatsLeft(vehicle, a.student_id) <= 0) {
+      toast(`${meta.label} ${vehicle.bus_number} is full (${vehicle.capacity} seats)`, 'error'); return;
     }
 
-    setSaving(true);
+    setBusyId(a.id);
     try {
-      const stop = stops.find((s) => s.id === assignment.stop_id);
       const fareSnapshot: TransportFareSnapshot = {
-        amount: stop?.amount ?? assignment.amount,
-        fare_period: (stop?.fare_period as FarePeriod) || assignment.fare_period || 'Monthly',
-        stop_name: stop?.stop_name ?? assignment.stop_name,
-        bus_number: bus?.bus_number ?? assignment.bus_number,
-        route_name: bus?.route_name ?? assignment.route_name,
+        amount: stop.amount,
+        fare_period: (stop.fare_period as FarePeriod) || 'Monthly',
+        stop_name: stop.stop_name,
+        bus_number: vehicle.bus_number,
+        route_name: vehicle.route_name,
+        vehicle_type: vt(vehicle.vehicle_type),
       };
 
-      // Create fee record
+      // A change request replaces the current live assignment.
+      const current = assignments.find((x) => x.student_id === a.student_id && isLive(x.status) && x.id !== a.id);
+      if (current?.id) await updateAssignmentStatus(current.id, { status: 'stopped', end_date: today() });
+
       let feeId: string | undefined;
       try {
         const fee = await createFee({
           school_id: profile.school_id,
-          student_id: assignment.student_id,
-          fee_type: `Transport Fee (${fareSnapshot.bus_number || 'Bus'} - ${fareSnapshot.stop_name})`,
-          amount: fareSnapshot.amount,
-          due_date: new Date().toISOString().split('T')[0],
+          student_id: a.student_id,
+          fee_type: `Transport Fee (${meta.label} ${vehicle.bus_number} - ${stop.stop_name})`,
+          amount: stop.amount,
+          due_date: today(),
         });
         feeId = fee?.id;
       } catch { /* non-fatal */ }
 
-      await updateAssignmentStatus(assignment.id, {
+      await updateAssignmentStatus(a.id, {
         status: 'approved',
         approved_by: profile.id,
         approved_at: new Date().toISOString(),
@@ -381,287 +587,263 @@ export default function AdminTransport() {
         ...(feeId ? { fee_id: feeId } : {}),
       });
 
-      // Notify parent
-      try {
-        await createNotification({
-          school_id: profile.school_id,
-          title: 'Transport Application Approved',
-          message: `Your transport application for ${fareSnapshot.stop_name} (${formatCurrency(fareSnapshot.amount)}/${fareSnapshot.fare_period.toLowerCase()}) has been approved.`,
-          type: 'success',
-        });
-      } catch { /* non-fatal */ }
+      notifyParent(a.student_id, 'Transport application approved',
+        `Approved: ${meta.label} ${vehicle.bus_number} from ${stop.stop_name}${stop.pickup_time ? ` (pickup ${stop.pickup_time})` : ''}. `
+        + `Fare ${formatCurrency(stop.amount)}/${periodWord(stop.fare_period)}.`, 'success');
 
       await loadData();
-      toast(`Approved transport for ${fareSnapshot.stop_name}`, 'success');
+      toast(`Approved · ${vehicle.bus_number} · ${stop.stop_name}`, 'success');
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to approve', 'error');
+      toast(friendlyError(err, 'Failed to approve'), 'error');
     } finally {
-      setSaving(false);
+      setBusyId(null);
     }
   }
 
-  // ── Reject ─────────────────────────────────────────────────
   async function handleConfirmReject() {
-    if (!profile?.school_id || !rejectAssignmentId) return;
-    if (!rejectReason.trim()) { toast('Please enter a rejection reason', 'error'); return; }
-    const assignment = assignments.find((a) => a.id === rejectAssignmentId);
+    if (!rejectAssignmentId) return;
+    if (!rejectReason.trim()) { toast('Please enter a reason', 'error'); return; }
+    const a = assignments.find((x) => x.id === rejectAssignmentId);
     setSaving(true);
     try {
-      await updateAssignmentStatus(rejectAssignmentId, {
-        status: 'rejected',
-        reject_reason: rejectReason.trim(),
-      });
-
-      try {
-        await createNotification({
-          school_id: profile.school_id,
-          title: 'Transport Application Not Approved',
-          message: `Your transport application for ${assignment?.stop_name || 'stop'} could not be approved. Reason: ${rejectReason.trim()}`,
-          type: 'warning',
-        });
-      } catch { /* non-fatal */ }
-
+      await updateAssignmentStatus(rejectAssignmentId, { status: 'rejected', reject_reason: rejectReason.trim() });
+      if (a) {
+        notifyParent(a.student_id, 'Transport application not approved',
+          `Your application for ${a.stop_name || 'the selected stop'} could not be approved. Reason: ${rejectReason.trim()}`, 'warning');
+      }
       await loadData();
       setRejectAssignmentId(null);
       setRejectReason('');
-      toast('Application rejected and parent notified', 'success');
+      toast('Application rejected — parent notified', 'success');
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to reject', 'error');
+      toast(friendlyError(err, 'Failed to reject'), 'error');
     } finally {
       setSaving(false);
     }
   }
 
-  // ── Stop transport ─────────────────────────────────────────
   async function handleConfirmStopTransport() {
     if (!stopAssignmentId) return;
+    const a = assignments.find((x) => x.id === stopAssignmentId);
     setSaving(true);
     try {
-      await updateAssignmentStatus(stopAssignmentId, {
-        status: 'stopped',
-        end_date: new Date().toISOString().split('T')[0],
-      });
+      await updateAssignmentStatus(stopAssignmentId, { status: 'stopped', end_date: today() });
+      if (a) notifyParent(a.student_id, 'Transport stopped', `School transport from ${a.stop_name} has been stopped from ${formatDate(today())}.`, 'info');
       await loadData();
       setStopAssignmentId(null);
-      toast('Transport stopped for student', 'success');
+      toast('Transport stopped', 'success');
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to stop transport', 'error');
+      toast(friendlyError(err, 'Failed to stop transport'), 'error');
     } finally {
       setSaving(false);
     }
   }
 
-  // ── Delete assignment ──────────────────────────────────────
-  async function handleDeleteAssignment(assignmentId: string) {
-    setSaving(true);
+  async function handleDeleteAssignment(id: string) {
+    setBusyId(id);
     try {
-      await deleteAssignment(assignmentId);
+      await deleteAssignment(id);
       await loadData();
-      toast('Assignment removed', 'success');
+      toast('Record removed', 'success');
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to remove assignment', 'error');
+      toast(friendlyError(err, 'Failed to remove record'), 'error');
     } finally {
-      setSaving(false);
+      setBusyId(null);
     }
   }
 
-  // ── Derived / memoised state ──────────────────────────────
-  const studentMap = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
-
-  const enrolledEntries = useMemo(() =>
-    assignments
-      .map((a) => ({ assignment: a, student: studentMap.get(a.student_id) }))
-      .filter((e): e is { assignment: StudentTransportAssignment; student: Student } => Boolean(e.student)),
-    [assignments, studentMap]
-  );
-
-  const filteredEnrolled = useMemo(() => {
-    return enrolledEntries.filter(({ assignment, student }) => {
-      if (busFilter && assignment.bus_id !== busFilter) return false;
-      if (statusFilter && assignment.status !== statusFilter) return false;
-      if (search.trim()) {
-        const q = search.toLowerCase();
-        return (
-          student.full_name.toLowerCase().includes(q) ||
-          student.admission_number.toLowerCase().includes(q) ||
-          (assignment.stop_name || '').toLowerCase().includes(q) ||
-          (assignment.bus_number || '').toLowerCase().includes(q)
-        );
-      }
-      return true;
-    });
-  }, [enrolledEntries, busFilter, statusFilter, search]);
-
-  const stopStudentCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    assignments
-      .filter((a) => a.status === 'active' || a.status === 'approved')
-      .forEach((a) => { counts[a.stop_id] = (counts[a.stop_id] || 0) + 1; });
-    return counts;
-  }, [assignments]);
-
-  const activeCount  = useMemo(() => assignments.filter((a) => a.status === 'active' || a.status === 'approved').length, [assignments]);
-  const pendingCount = useMemo(() => assignments.filter((a) => a.status === 'pending').length, [assignments]);
-  const totalBilling = useMemo(() =>
-    assignments
-      .filter((a) => a.status === 'active' || a.status === 'approved')
-      .reduce((sum, a) => sum + Number(a.fare_snapshot?.amount ?? a.amount ?? 0), 0),
-    [assignments]
-  );
-
-  const assignableStudents = useMemo(() =>
-    assignClassFilter ? students.filter((s) => s.class_id === assignClassFilter) : students,
-    [students, assignClassFilter]
-  );
-
-  const selectedBusForAssign = buses.find((b) => b.id === assignBusId) || buses[0];
-  const stopsForAssignBus    = selectedBusForAssign?.stops ?? [];
-  const selectedAssignStop   = stops.find((s) => s.id === assignStopId);
-
   // ─────────────────────────────────────────────────────────
-  // Render helpers
+  // Small render pieces
   // ─────────────────────────────────────────────────────────
-  function StatusPill({ status }: { status?: string }) {
-    const map: Record<string, { label: string; cls: string }> = {
-      pending:  { label: 'Pending',  cls: 'bg-amber-100 text-amber-800' },
-      active:   { label: 'Active',   cls: 'bg-emerald-100 text-emerald-800' },
-      approved: { label: 'Approved', cls: 'bg-emerald-100 text-emerald-800' },
-      rejected: { label: 'Rejected', cls: 'bg-red-100 text-red-700' },
-      stopped:  { label: 'Stopped',  cls: 'bg-slate-100 text-slate-600' },
-    };
-    const s = map[status || 'active'] ?? map['active'];
+  function TypeChip({ type }: { type?: string }) {
+    const m = VEHICLE[vt(type)];
     return (
-      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${s.cls}`}>
-        {s.label}
+      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${m.chip}`}>
+        <m.Icon className="h-3 w-3" /> {m.label}
       </span>
     );
   }
 
-  const renderStopFormFields = () => (
-    <div className="space-y-5">
-      {/* Bus info */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-12 rounded-xl border border-brand-100 bg-brand-50/40 p-4">
-        <div className="sm:col-span-4">
-          <Input label="Bus Number *" placeholder="e.g. UP50BS353"
-            value={busNumber} onChange={(e) => setBusNumber(e.target.value.toUpperCase())} required />
-        </div>
-        <div className="sm:col-span-5">
-          <Input label="Route Name *" placeholder="e.g. Sector 14 → School"
-            value={routeName} onChange={(e) => setRouteName(e.target.value)} required />
-        </div>
-        <div className="sm:col-span-3">
-          <Input label="Seat Capacity *" type="number" min="1" max="80"
-            value={busCapacity} onChange={(e) => setBusCapacity(e.target.value)} required />
-        </div>
-        <div className="sm:col-span-6">
-          <Input label="Driver Name" placeholder="e.g. Rajesh Kumar"
-            value={driverName} onChange={(e) => setDriverName(e.target.value)} />
-        </div>
-        <div className="sm:col-span-6">
-          <Input label="Driver Mobile" placeholder="e.g. 9876543210"
-            value={driverPhone} onChange={(e) => setDriverPhone(e.target.value)} />
-        </div>
-        <div className="sm:col-span-6">
-          <Input label="Conductor Name (optional)" placeholder="e.g. Meena Devi"
-            value={conductorName} onChange={(e) => setConductorName(e.target.value)} />
-        </div>
-        <div className="sm:col-span-3">
-          <Input label="Conductor Mobile" placeholder="optional"
-            value={conductorPhone} onChange={(e) => setConductorPhone(e.target.value)} />
-        </div>
-        <div className="sm:col-span-3">
-          <Select label="Bus Status" value={busStatus} onChange={(e) => setBusStatus(e.target.value)}>
-            {BUS_STATUSES.map((s) => <option key={s} value={s}>{busStatusLabel[s]}</option>)}
-          </Select>
-        </div>
-      </div>
+  function StatusPill({ status }: { status?: string }) {
+    const map: Record<string, { label: string; cls: string }> = {
+      pending:  { label: 'Pending',  cls: 'bg-amber-100 text-amber-800' },
+      active:   { label: 'Active',   cls: 'bg-emerald-100 text-emerald-800' },
+      approved: { label: 'Active',   cls: 'bg-emerald-100 text-emerald-800' },
+      rejected: { label: 'Rejected', cls: 'bg-red-100 text-red-700' },
+      stopped:  { label: 'Stopped',  cls: 'bg-slate-100 text-slate-600' },
+    };
+    const s = map[status || 'active'] ?? map.active;
+    return <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ${s.cls}`}>{s.label}</span>;
+  }
 
-      {/* Stops */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div>
-            <h4 className="text-sm font-bold text-slate-900">
-              Stops &amp; Fares ({stopsDraft.length})
-            </h4>
-            <p className="text-xs text-slate-500">Each stop has its own fare and billing period.</p>
-          </div>
-          <Button type="button" size="sm" variant="outline" icon={<Plus className="h-3.5 w-3.5" />}
-            onClick={() => setStopsDraft((p) => [...p, emptyStop()])}>
-            Add Stop
-          </Button>
-        </div>
+  function SegButton({ value, label, count }: { value: TypeFilter; label: string; count: number }) {
+    const active = typeFilter === value;
+    const Icon = value === 'all' ? null : VEHICLE[value].Icon;
+    return (
+      <button type="button" onClick={() => setTypeFilter(value)}
+        className={`inline-flex items-center gap-1.5 rounded-[9px] px-3 py-1.5 text-sm font-semibold transition-colors ${
+          active ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}>
+        {Icon && <Icon className="h-4 w-4" />}
+        {label}
+        <span className={`rounded-full px-1.5 text-[11px] ${active ? 'bg-slate-100 text-slate-700' : 'bg-slate-200/70 text-slate-500'}`}>{count}</span>
+      </button>
+    );
+  }
 
-        {stopsDraft.map((row, idx) => (
-          <div key={idx} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-bold text-brand-800">
-                <MapPin className="h-3 w-3" /> Stop #{idx + 1}
-              </span>
-              {stopsDraft.length > 1 && (
-                <button type="button"
-                  onClick={() => setStopsDraft((p) => p.filter((_, i) => i !== idx))}
-                  className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-red-600 hover:bg-red-50">
-                  <Trash2 className="h-3.5 w-3.5" /> Remove
+  const renderVehicleForm = () => {
+    const meta = VEHICLE[vehicleType];
+    return (
+      <div className="space-y-5">
+        {/* Type picker */}
+        <div>
+          <p className="mb-2 text-sm font-semibold text-slate-800">Vehicle type *</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {(['bus', 'van'] as const).map((t) => {
+              const m = VEHICLE[t];
+              const active = vehicleType === t;
+              return (
+                <button key={t} type="button" onClick={() => chooseType(t)} aria-pressed={active}
+                  className={`relative flex items-center gap-3 rounded-xl border-2 p-3.5 text-left transition-all ${
+                    active ? `${m.accent} ring-4` : 'border-slate-200 bg-white hover:border-slate-300'}`}>
+                  <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[10px] ${m.tile}`}>
+                    <m.Icon className="h-6 w-6" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-900">{m.label}</p>
+                    <p className="text-xs text-slate-500">{m.hint}</p>
+                  </div>
+                  {active && (
+                    <span className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-white">
+                      <Check className="h-3 w-3" />
+                    </span>
+                  )}
                 </button>
-              )}
-            </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-12">
-              <div className="sm:col-span-3">
-                <Input label="Stop Name *" placeholder="e.g. Sector 14 Gate"
-                  value={row.stop_name}
-                  onChange={(e) => setStopsDraft((p) => p.map((r, i) => i === idx ? { ...r, stop_name: e.target.value } : r))}
-                  required={idx === 0} />
-              </div>
-              <div className="sm:col-span-3">
-                <Input label="Area / Landmark" placeholder="e.g. Near Huda Market"
-                  value={row.area_landmark}
-                  onChange={(e) => setStopsDraft((p) => p.map((r, i) => i === idx ? { ...r, area_landmark: e.target.value } : r))} />
-              </div>
-              <div className="sm:col-span-2">
-                <Input label="Fare (₹) *" type="number" min="1" placeholder="1500"
-                  value={row.amount}
-                  onChange={(e) => setStopsDraft((p) => p.map((r, i) => i === idx ? { ...r, amount: e.target.value } : r))}
-                  required={idx === 0} />
-              </div>
-              <div className="sm:col-span-2">
-                <Select label="Period"
-                  value={row.fare_period}
-                  onChange={(e) => setStopsDraft((p) => p.map((r, i) => i === idx ? { ...r, fare_period: e.target.value as FarePeriod } : r))}>
-                  {FARE_PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
-                </Select>
-              </div>
-              <div className="sm:col-span-1">
-                <Input label="Pickup" placeholder="07:30"
-                  value={row.pickup_time}
-                  onChange={(e) => setStopsDraft((p) => p.map((r, i) => i === idx ? { ...r, pickup_time: e.target.value } : r))} />
-              </div>
-              <div className="sm:col-span-1">
-                <Input label="Drop" placeholder="14:30"
-                  value={row.drop_time}
-                  onChange={(e) => setStopsDraft((p) => p.map((r, i) => i === idx ? { ...r, drop_time: e.target.value } : r))} />
-              </div>
-            </div>
+              );
+            })}
           </div>
-        ))}
+        </div>
+
+        {/* Basic info */}
+        <div className="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4 sm:grid-cols-12">
+          <div className="sm:col-span-4">
+            <Input label={`${meta.label} number *`} placeholder={vehicleType === 'van' ? 'e.g. UP50AT1234' : 'e.g. UP50BS353'}
+              value={regNumber} onChange={(e) => setRegNumber(e.target.value.toUpperCase())} required />
+          </div>
+          <div className="sm:col-span-5">
+            <Input label="Route name *" placeholder="e.g. Civil Lines → School"
+              value={routeName} onChange={(e) => setRouteName(e.target.value)} required />
+          </div>
+          <div className="sm:col-span-3">
+            <Input label="Seats *" type="number" min="1" max={meta.maxCapacity}
+              value={capacity} onChange={(e) => { setCapacity(e.target.value); setCapacityTouched(true); }} required />
+          </div>
+          <div className="sm:col-span-6">
+            <Input label="Driver name" placeholder="e.g. Rajesh Kumar" value={driverName} onChange={(e) => setDriverName(e.target.value)} />
+          </div>
+          <div className="sm:col-span-6">
+            <Input label="Driver mobile" type="tel" inputMode="numeric" placeholder="10-digit number"
+              value={driverPhone} onChange={(e) => setDriverPhone(e.target.value.replace(/[^\d+ ]/g, ''))} />
+          </div>
+          <div className="sm:col-span-6">
+            <Input label={`${meta.helperLabel} name`} placeholder="optional" value={helperName} onChange={(e) => setHelperName(e.target.value)} />
+          </div>
+          <div className="sm:col-span-6">
+            <Input label={`${meta.helperLabel} mobile`} type="tel" inputMode="numeric" placeholder="optional"
+              value={helperPhone} onChange={(e) => setHelperPhone(e.target.value.replace(/[^\d+ ]/g, ''))} />
+          </div>
+        </div>
+
+        {/* Status + papers */}
+        <div className="grid grid-cols-1 gap-4 rounded-xl border border-slate-200 p-4 sm:grid-cols-4">
+          <div className="sm:col-span-4 flex items-center gap-2">
+            <ShieldCheck className="h-4 w-4 text-emerald-600" />
+            <p className="text-sm font-semibold text-slate-800">Status &amp; papers</p>
+            <p className="text-xs text-slate-500">— we'll warn you 30 days before anything expires.</p>
+          </div>
+          <Select label="Status" value={vehicleStatus} onChange={(e) => setVehicleStatus(e.target.value)}>
+            {STATUSES.map((s) => <option key={s} value={s}>{statusLabel[s]}</option>)}
+          </Select>
+          <Input label="Insurance valid till" type="date" value={insuranceExpiry} onChange={(e) => setInsuranceExpiry(e.target.value)} />
+          <Input label="Fitness valid till" type="date" value={fitnessExpiry} onChange={(e) => setFitnessExpiry(e.target.value)} />
+          <Input label="Permit valid till" type="date" value={permitExpiry} onChange={(e) => setPermitExpiry(e.target.value)} />
+        </div>
+
+        {/* Stops */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h4 className="text-sm font-bold text-slate-900">Stops &amp; fares ({stopsDraft.length})</h4>
+              <p className="text-xs text-slate-500">In pickup order. Each stop has its own fare.</p>
+            </div>
+            <Button type="button" size="sm" variant="outline" icon={<Plus className="h-3.5 w-3.5" />}
+              onClick={() => setStopsDraft((p) => [...p, emptyStop()])}>
+              Add stop
+            </Button>
+          </div>
+
+          {stopsDraft.map((row, idx) => (
+            <div key={row.id ?? `new-${idx}`} className="rounded-xl border border-slate-200 bg-white p-3.5">
+              <div className="mb-2.5 flex items-center justify-between">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-700">
+                  <MapPin className="h-3 w-3" /> Stop {idx + 1}
+                </span>
+                {stopsDraft.length > 1 && (
+                  <button type="button" onClick={() => setStopsDraft((p) => p.filter((_, i) => i !== idx))}
+                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-red-600 hover:bg-red-50">
+                    <Trash2 className="h-3.5 w-3.5" /> Remove
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-12">
+                <div className="col-span-2 sm:col-span-4">
+                  <Input label="Stop name *" placeholder="e.g. Sector 14 Gate" value={row.stop_name}
+                    onChange={(e) => updateStop(idx, { stop_name: e.target.value })} required={idx === 0} />
+                </div>
+                <div className="col-span-2 sm:col-span-4">
+                  <Input label="Landmark" placeholder="e.g. Near Huda Market" value={row.area_landmark}
+                    onChange={(e) => updateStop(idx, { area_landmark: e.target.value })} />
+                </div>
+                <div className="sm:col-span-2">
+                  <Input label="Fare (₹) *" type="number" min="1" placeholder="1500" value={row.amount}
+                    onChange={(e) => updateStop(idx, { amount: e.target.value })} required={idx === 0} />
+                </div>
+                <div className="sm:col-span-2">
+                  <Select label="Per" value={row.fare_period}
+                    onChange={(e) => updateStop(idx, { fare_period: e.target.value as FarePeriod })}>
+                    {FARE_PERIODS.map((p) => <option key={p} value={p}>{p.replace('ly', '')}</option>)}
+                  </Select>
+                </div>
+                <div className="sm:col-span-3">
+                  <Input label="Pickup time" type="time" value={row.pickup_time}
+                    onChange={(e) => updateStop(idx, { pickup_time: e.target.value })} />
+                </div>
+                <div className="sm:col-span-3">
+                  <Input label="Drop time" type="time" value={row.drop_time}
+                    onChange={(e) => updateStop(idx, { drop_time: e.target.value })} />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   if (loading) return <DashboardLayout title="Transport"><LoadingSpinner /></DashboardLayout>;
 
   // ─────────────────────────────────────────────────────────
-  // JSX
+  // Page
   // ─────────────────────────────────────────────────────────
   return (
     <DashboardLayout title="Transport">
       <div className="space-y-6">
         <PageHeader
-          title="School Transport Management"
-          description="Manage buses, routes, stop-wise fares and student assignments. All data is stored in the database."
-          action={buses.length > 0 ? (
+          title="Transport"
+          description="Buses and vans, their routes, stop-wise fares, and which students ride them."
+          action={vehicles.length > 0 ? (
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" icon={<Plus className="h-4 w-4" />} onClick={openAddBus}>
-                Add Bus & Route
+              <Button variant="outline" icon={<Plus className="h-4 w-4" />} onClick={() => openAddVehicle()}>
+                Add Vehicle
               </Button>
               <Button icon={<UserPlus className="h-4 w-4" />} onClick={() => openAssignModal()}>
                 Assign Student
@@ -670,434 +852,556 @@ export default function AdminTransport() {
           ) : undefined}
         />
 
-        {/* ── Onboarding ── */}
-        {buses.length === 0 ? (
+        {vehicles.length === 0 ? (
+          /* ── Onboarding ── */
           <Card className="overflow-hidden border border-slate-200 p-0">
             <div className="border-b border-slate-100 px-6 py-5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-[10px] bg-[#EEF0FD]">
-                  <Bus className="h-5 w-5 text-[#5B6EE8]" />
-                </div>
-                <div>
-                  <span className="text-[11px] font-semibold uppercase tracking-wider text-[#5B6EE8]">Step 1 · Setup</span>
-                  <h2 className="text-[15px] font-semibold text-slate-900">Add your first Bus, Route & Stops</h2>
-                </div>
-              </div>
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-[#5B6EE8]">Get started</span>
+              <h2 className="text-[15px] font-semibold text-slate-900">Add your first school bus or van</h2>
+              <p className="mt-0.5 text-xs text-slate-500">Choose the vehicle type, add its route and stops. You can add more any time.</p>
             </div>
-            <form onSubmit={handleSaveBus} className="p-6 space-y-5">
-              {renderStopFormFields()}
-              <div className="flex justify-end pt-2 border-t border-slate-100">
+            <form onSubmit={handleSaveVehicle} className="space-y-5 p-6">
+              {renderVehicleForm()}
+              <div className="flex justify-end border-t border-slate-100 pt-4">
                 <Button type="submit" loading={saving} icon={<ArrowRight className="h-4 w-4" />}>
-                  Save & Activate Transport
+                  Save {VEHICLE[vehicleType].label}
                 </Button>
               </div>
             </form>
           </Card>
         ) : (
           <>
-            {/* ── Stat Cards ── */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard label="Active Buses & Routes" value={buses.length}
-                icon={<Bus className="h-5 w-5" />} color="blue" />
-              <StatCard label="Total Route Stops" value={stops.length}
-                icon={<MapPin className="h-5 w-5" />} color="amber" />
-              <StatCard label="Students on Transport" value={activeCount}
+            {/* ── Stats ── */}
+            <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+              <StatCard label="Fleet" value={`${busCount} ${busCount === 1 ? 'Bus' : 'Buses'} · ${vanCount} ${vanCount === 1 ? 'Van' : 'Vans'}`}
+                icon={<Bus className="h-5 w-5" />} color="blue"
+                trend={vehicles.length !== runningVehicles.length ? `${vehicles.length - runningVehicles.length} not running` : `${stops.length} stops`} />
+              <StatCard label="Students on transport" value={liveAssignments.length}
                 icon={<Users className="h-5 w-5" />} color="emerald"
-                trend={pendingCount > 0 ? `${pendingCount} pending approval` : undefined} />
-              <StatCard label="Total Transport Billing" value={formatCurrency(totalBilling)}
+                trend={pending.length > 0 ? `${pending.length} waiting for approval` : undefined} />
+              <StatCard label="Seats filled" value={totalSeats ? `${filledSeats} / ${totalSeats}` : '—'}
+                icon={<Armchair className="h-5 w-5" />} color="amber"
+                trend={totalSeats ? `${Math.round((filledSeats / totalSeats) * 100)}% occupancy` : undefined} />
+              <StatCard label="Transport fees / month" value={formatCurrency(Math.round(monthlyRevenue))}
                 icon={<IndianRupee className="h-5 w-5" />} color="violet" />
             </div>
 
-            {/* ── Buses & Stops ── */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Bus className="h-5 w-5 text-brand-600" /> Buses, Routes & Stops
-                </h3>
-                <Button size="sm" variant="outline" icon={<Plus className="h-3.5 w-3.5" />} onClick={openAddBus}>
-                  Add Bus
-                </Button>
-              </div>
-
-              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                {buses.map((bus) => {
-                  const busStudents = stops
-                    .filter((s) => s.bus_id === bus.id)
-                    .reduce((acc, s) => acc + (stopStudentCounts[s.id] || 0), 0);
-                  const capacity = bus.capacity ?? 40;
-
-                  return (
-                    <Card key={bus.id} className="overflow-hidden border border-slate-200 p-0">
-                      {/* Header */}
-                      <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-[#F8F9FF] px-5 py-4">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-[10px] bg-[#EEF0FD]">
-                            <Bus className="h-4 w-4 text-[#5B6EE8]" />
+            {/* ── Pending applications ── */}
+            {pending.length > 0 && (
+              <Card className="border border-amber-200 bg-amber-50/40 p-0">
+                <div className="flex items-center gap-2 border-b border-amber-100 px-5 py-3">
+                  <Inbox className="h-4 w-4 text-amber-600" />
+                  <h3 className="text-sm font-bold text-slate-900">Parent applications</h3>
+                  <span className="rounded-full bg-amber-100 px-2 text-xs font-bold text-amber-800">{pending.length}</span>
+                </div>
+                <div className="divide-y divide-amber-100">
+                  {pending.map((a) => {
+                    const st = studentMap.get(a.student_id);
+                    const v = a.bus_id ? vehicleMap.get(a.bus_id) : undefined;
+                    const current = assignments.find((x) => x.student_id === a.student_id && isLive(x.status));
+                    const left = v ? seatsLeft(v, a.student_id) : 0;
+                    return (
+                      <div key={a.id} className="flex flex-col gap-3 px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-white text-xs font-bold text-slate-700 ring-1 ring-amber-200">
+                            {getInitials(st?.full_name || '?')}
                           </div>
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h4 className="font-semibold text-sm text-slate-900">{bus.bus_number}</h4>
-                              <span className="rounded-full bg-[#EEF0FD] px-2.5 py-0.5 text-[11px] font-semibold text-[#5B6EE8]">
-                                {bus.stops.length} stops
-                              </span>
-                              {bus.status && bus.status !== 'active' && (
-                                <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-700 capitalize">
-                                  {bus.status}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-slate-500 truncate mt-0.5">{bus.route_name}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          <button onClick={() => openEditBus(bus)}
-                            className="rounded-[10px] p-1.5 text-slate-400 hover:bg-[#EEF0FD] hover:text-[#5B6EE8] transition-colors" title="Edit">
-                            <Pencil className="h-4 w-4" />
-                          </button>
-                          <button onClick={() => setDeleteBusId(bus.id)}
-                            className="rounded-[10px] p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors" title="Delete">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Driver bar */}
-                      <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50 px-5 py-2.5 text-xs text-slate-600 border-b border-slate-100">
-                        <div className="flex items-center gap-3">
-                          <span>Driver: <strong>{bus.driver_name || 'Not assigned'}</strong></span>
-                          {bus.driver_phone && (
-                            <span className="inline-flex items-center gap-1 text-brand-600 font-medium">
-                              <Phone className="h-3 w-3" />{bus.driver_phone}
-                            </span>
-                          )}
-                        </div>
-                        <Badge color={busStudents >= capacity ? 'red' : busStudents > 0 ? 'blue' : 'gray'}>
-                          {busStudents} / {capacity} seats
-                        </Badge>
-                      </div>
-
-                      {/* Stops */}
-                      <div className="p-5 space-y-2.5">
-                        {bus.stops.map((stop, sIdx) => (
-                          <div key={stop.id}
-                            className="flex items-center justify-between gap-3 rounded-xl border border-slate-100 bg-white px-3.5 py-2.5 hover:border-brand-200 transition-colors">
-                            <div className="flex items-start gap-3 min-w-0">
-                              <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-brand-50 text-xs font-bold text-brand-700 border border-brand-200 mt-0.5">
-                                {sIdx + 1}
-                              </div>
-                              <div className="min-w-0">
-                                <p className="text-sm font-bold text-slate-900 truncate">{stop.stop_name}</p>
-                                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500 mt-0.5">
-                                  {stop.area_landmark && (
-                                    <span className="inline-flex items-center gap-1">
-                                      <Navigation className="h-3 w-3 text-brand-500" />{stop.area_landmark}
-                                    </span>
-                                  )}
-                                  {stop.pickup_time && (
-                                    <span className="inline-flex items-center gap-1">
-                                      <Clock className="h-3 w-3 text-slate-400" />↑ {stop.pickup_time}
-                                    </span>
-                                  )}
-                                  {stop.drop_time && (
-                                    <span className="inline-flex items-center gap-1">
-                                      <Clock className="h-3 w-3 text-slate-400" />↓ {stop.drop_time}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              {stopStudentCounts[stop.id] > 0 && (
-                                <span className="text-[11px] font-medium text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full">
-                                  {stopStudentCounts[stop.id]} stu
-                                </span>
-                              )}
-                              <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 border border-emerald-200">
-                                {formatCurrency(stop.amount)} / {(stop.fare_period || 'month').toLowerCase()}
-                              </span>
+                            <p className="truncate text-sm font-semibold text-slate-900">
+                              {st?.full_name || 'Student'}{' '}
+                              <span className="font-normal text-slate-500">· {st?.class?.name || ''}{st?.section?.name ? `-${st.section.name}` : ''}</span>
+                            </p>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+                              <TypeChip type={a.vehicle_type} />
+                              <span className="font-medium">{a.bus_number}</span>
+                              <span>· {a.stop_name}</span>
+                              <span className="font-semibold text-emerald-700">· {formatCurrency(a.fare_snapshot?.amount ?? a.amount)}/{periodWord(a.fare_snapshot?.fare_period ?? a.fare_period)}</span>
+                              {current && <span className="text-amber-700">· change from {current.bus_number} / {current.stop_name}</span>}
+                              {v && <span className={left > 0 ? 'text-slate-400' : 'font-semibold text-red-600'}>· {left > 0 ? `${left} seats left` : 'full'}</span>}
                             </div>
                           </div>
-                        ))}
+                        </div>
+                        <div className="flex flex-shrink-0 gap-2">
+                          <Button size="sm" icon={<Check className="h-3.5 w-3.5" />} loading={busyId === a.id}
+                            disabled={Boolean(busyId)} onClick={() => handleApprove(a)}>
+                            Approve
+                          </Button>
+                          <Button size="sm" variant="outline" icon={<X className="h-3.5 w-3.5" />}
+                            className="border-red-200 text-red-600 hover:bg-red-50"
+                            onClick={() => { setRejectAssignmentId(a.id!); setRejectReason(''); }}>
+                            Reject
+                          </Button>
+                        </div>
                       </div>
-                    </Card>
-                  );
-                })}
+                    );
+                  })}
+                </div>
+              </Card>
+            )}
+
+            {/* ── Paperwork alerts ── */}
+            {paperAlerts.length > 0 && (
+              <div className="rounded-xl border border-red-200 bg-red-50/60 px-5 py-3">
+                <div className="mb-1.5 flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4 text-red-500" />
+                  <p className="text-sm font-bold text-red-800">Papers need renewal</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {paperAlerts.map(({ vehicle, doc, days }) => (
+                    <button key={vehicle.id + doc} type="button" onClick={() => openEditVehicle(vehicle)}
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1 text-xs ring-1 ring-red-200 hover:ring-red-300">
+                      <span className="font-semibold text-slate-800">{vehicle.bus_number}</span>
+                      <span className="text-slate-500">{doc}</span>
+                      <span className={days < 0 ? 'font-bold text-red-600' : 'font-semibold text-amber-700'}>
+                        {days < 0 ? `expired ${-days}d ago` : days === 0 ? 'expires today' : `in ${days}d`}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* ── Toolbar: tabs + type filter ── */}
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex gap-1 border-b border-slate-200">
+                {([['vehicles', 'Vehicles & Routes', vehicles.length], ['students', 'Students', liveAssignments.length]] as const).map(([key, label, n]) => (
+                  <button key={key} type="button" onClick={() => setTab(key)}
+                    className={`-mb-px border-b-2 px-3 py-2 text-sm font-semibold transition-colors ${
+                      tab === key ? 'border-[#5B6EE8] text-[#4A5BD4]' : 'border-transparent text-slate-500 hover:text-slate-800'}`}>
+                    {label} <span className="ml-1 text-xs text-slate-400">{n}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="inline-flex self-start rounded-xl bg-slate-100 p-1">
+                <SegButton value="all" label="All" count={vehicles.length} />
+                <SegButton value="bus" label="Buses" count={busCount} />
+                <SegButton value="van" label="Vans" count={vanCount} />
               </div>
             </div>
 
-            {/* ── Assignments Table ── */}
-            <Card className="p-5">
-              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                    <Users className="h-4 w-4 text-brand-600" /> Parent Applications &amp; Assigned Students
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    All assignments are stored in the database. Approve or reject pending ones.
-                  </p>
-                </div>
-                <Button size="sm" icon={<UserPlus className="h-4 w-4" />} onClick={() => openAssignModal()}>
-                  Assign Student
-                </Button>
-              </div>
+            {tab === 'vehicles' ? (
+              <div className="space-y-4">
+                <SearchInput value={vehicleSearch} onChange={setVehicleSearch} placeholder="Search number, route, driver or stop..." />
 
-              <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-                <div className="flex-1 min-w-0">
-                  <SearchInput value={search} onChange={setSearch} placeholder="Search student, bus, stop..." />
-                </div>
-                <div className="w-full sm:w-52">
-                  <Select value={busFilter} onChange={(e) => setBusFilter(e.target.value)}>
-                    <option value="">All Buses</option>
-                    {buses.map((b) => <option key={b.id} value={b.id}>{b.bus_number} — {b.route_name}</option>)}
-                  </Select>
-                </div>
-                <div className="w-full sm:w-36">
-                  <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                    <option value="">All Status</option>
-                    <option value="pending">Pending</option>
-                    <option value="approved">Approved</option>
-                    <option value="active">Active</option>
-                    <option value="rejected">Rejected</option>
-                    <option value="stopped">Stopped</option>
-                  </Select>
-                </div>
-              </div>
-
-              {filteredEnrolled.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center">
-                  <Bus className="mx-auto h-8 w-8 text-slate-300" />
-                  <p className="mt-2 text-sm font-medium text-slate-600">No transport records found</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-slate-200 bg-slate-50/70 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                        <th className="px-4 py-3">Student</th>
-                        <th className="px-4 py-3">Class</th>
-                        <th className="px-4 py-3">Bus & Route</th>
-                        <th className="px-4 py-3">Stop</th>
-                        <th className="px-4 py-3">Fare</th>
-                        <th className="px-4 py-3">Status</th>
-                        <th className="px-4 py-3">Date</th>
-                        <th className="px-4 py-3 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {filteredEnrolled.map(({ student, assignment }) => (
-                        <tr key={assignment.id || assignment.student_id} className="hover:bg-slate-50/60">
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">
-                                {getInitials(student.full_name)}
+                {visibleVehicles.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center">
+                    {typeFilter === 'van' ? <VanIcon className="mx-auto h-8 w-8 text-slate-300" /> : <Bus className="mx-auto h-8 w-8 text-slate-300" />}
+                    <p className="mt-2 text-sm font-medium text-slate-600">
+                      {vehicleSearch ? 'No vehicles match your search' : `No ${typeFilter === 'all' ? 'vehicles' : VEHICLE[typeFilter].plural.toLowerCase()} yet`}
+                    </p>
+                    {!vehicleSearch && typeFilter !== 'all' && (
+                      <Button size="sm" variant="outline" className="mt-3" icon={<Plus className="h-3.5 w-3.5" />}
+                        onClick={() => openAddVehicle(typeFilter)}>
+                        Add {VEHICLE[typeFilter].label}
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+                    {visibleVehicles.map((v) => {
+                      const meta = VEHICLE[vt(v.vehicle_type)];
+                      const used = seatsUsed[v.id] || 0;
+                      const cap = v.capacity ?? meta.defaultCapacity;
+                      const pct = Math.min(100, Math.round((used / cap) * 100));
+                      const status = v.status || 'active';
+                      return (
+                        <Card key={v.id} className={`overflow-hidden border border-slate-200 p-0 ${status === 'inactive' ? 'opacity-70' : ''}`}>
+                          <div className="flex items-start justify-between gap-3 px-5 pt-4">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-[12px] ${meta.tile}`}>
+                                <meta.Icon className="h-5 w-5" />
                               </div>
-                              <div>
-                                <p className="font-semibold text-slate-900">{student.full_name}</p>
-                                <p className="text-xs text-slate-400">{student.admission_number}</p>
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <h4 className="text-[15px] font-bold tracking-wide text-slate-900">{v.bus_number}</h4>
+                                  <TypeChip type={v.vehicle_type} />
+                                  {status === 'maintenance' && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                                      <Wrench className="h-3 w-3" /> Maintenance
+                                    </span>
+                                  )}
+                                  {status === 'inactive' && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                                      <Ban className="h-3 w-3" /> Inactive
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="mt-0.5 truncate text-xs text-slate-500">{v.route_name}</p>
                               </div>
                             </div>
-                          </td>
-                          <td className="px-4 py-3 text-slate-600 text-sm">
-                            {student.class?.name || '—'}{student.section?.name ? ` (${student.section.name})` : ''}
-                          </td>
-                          <td className="px-4 py-3">
-                            <p className="font-semibold text-slate-900 text-xs">{assignment.bus_number || 'Bus'}</p>
-                            <p className="text-[11px] text-slate-400">{assignment.route_name || '—'}</p>
-                          </td>
-                          <td className="px-4 py-3">
-                            <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
-                              <MapPin className="h-3 w-3" />{assignment.stop_name}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3 font-bold text-emerald-700 text-sm">
-                            {formatCurrency(assignment.fare_snapshot?.amount ?? assignment.amount)}
-                            <span className="block text-[10px] font-normal text-slate-400">
-                              / {(assignment.fare_snapshot?.fare_period || assignment.fare_period || 'month').toLowerCase()}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3"><StatusPill status={assignment.status} /></td>
-                          <td className="px-4 py-3 text-xs text-slate-400">{formatDate(assignment.assigned_at)}</td>
-                          <td className="px-4 py-3 text-right">
-                            <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                              {assignment.status === 'pending' && (
-                                <>
-                                  <Button size="sm" onClick={() => handleApprove(assignment)} loading={saving}>
-                                    Approve
-                                  </Button>
-                                  <Button size="sm" variant="outline"
-                                    className="border-red-200 text-red-600 hover:bg-red-50"
-                                    onClick={() => { setRejectAssignmentId(assignment.id!); setRejectReason(''); }}>
-                                    Reject
-                                  </Button>
-                                </>
-                              )}
-                              {(assignment.status === 'active' || assignment.status === 'approved') && (
-                                <>
-                                  <button onClick={() => openAssignModal(assignment)}
-                                    className="rounded-lg p-1.5 text-slate-400 hover:bg-brand-50 hover:text-brand-600" title="Edit stop">
-                                    <Pencil className="h-4 w-4" />
-                                  </button>
-                                  <button onClick={() => setStopAssignmentId(assignment.id!)}
-                                    className="rounded-lg p-1.5 text-slate-400 hover:bg-amber-50 hover:text-amber-600" title="Stop transport">
-                                    <Clock className="h-4 w-4" />
-                                  </button>
-                                </>
-                              )}
-                              {(assignment.status === 'rejected' || assignment.status === 'stopped') && (
-                                <button onClick={() => handleDeleteAssignment(assignment.id!)}
-                                  className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600" title="Delete record">
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
-                              )}
+                            <div className="flex flex-shrink-0 items-center gap-0.5">
+                              <button onClick={() => openAssignModal(undefined, v.id)} title="Assign student"
+                                className="rounded-[10px] p-1.5 text-slate-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600">
+                                <UserPlus className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => openEditVehicle(v)} title="Edit"
+                                className="rounded-[10px] p-1.5 text-slate-400 transition-colors hover:bg-[#EEF0FD] hover:text-[#5B6EE8]">
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => setDeleteVehicleId(v.id)} title="Delete"
+                                className="rounded-[10px] p-1.5 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600">
+                                <Trash2 className="h-4 w-4" />
+                              </button>
                             </div>
-                          </td>
+                          </div>
+
+                          {/* Seats bar */}
+                          <div className="px-5 pt-3">
+                            <div className="mb-1 flex items-center justify-between text-xs">
+                              <span className="text-slate-500">Seats</span>
+                              <span className={`font-semibold ${used >= cap ? 'text-red-600' : 'text-slate-700'}`}>
+                                {used} / {cap} {used >= cap && '· Full'}
+                              </span>
+                            </div>
+                            <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
+                              <div className={`h-full rounded-full ${pct >= 100 ? 'bg-red-500' : pct >= 85 ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                                style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+
+                          {/* Crew */}
+                          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 border-y border-slate-100 bg-slate-50/70 px-5 py-2 text-xs text-slate-600">
+                            <span>Driver: <strong className="text-slate-800">{v.driver_name || 'Not set'}</strong>
+                              {v.driver_phone && (
+                                <a href={`tel:${v.driver_phone}`} className="ml-1.5 inline-flex items-center gap-1 font-medium text-[#5B6EE8] hover:underline">
+                                  <Phone className="h-3 w-3" />{v.driver_phone}
+                                </a>
+                              )}
+                            </span>
+                            {v.conductor_name && (
+                              <span>{meta.helperLabel}: <strong className="text-slate-800">{v.conductor_name}</strong>
+                                {v.conductor_phone && <span className="ml-1.5 text-slate-500">{v.conductor_phone}</span>}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Stops */}
+                          <ol className="space-y-0 px-5 py-3">
+                            {v.stops.map((stop, i) => (
+                              <li key={stop.id} className="relative flex items-center justify-between gap-3 py-1.5 pl-6">
+                                <span className={`absolute left-[7px] top-0 w-px bg-slate-200 ${i === 0 ? 'top-1/2' : ''} ${i === v.stops.length - 1 ? 'h-1/2' : 'h-full'}`} />
+                                <span className="absolute left-[3px] top-1/2 h-[9px] w-[9px] -translate-y-1/2 rounded-full border-2 border-white bg-slate-400 ring-1 ring-slate-300" />
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm font-semibold text-slate-800">{stop.stop_name}</p>
+                                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                                    {stop.area_landmark && <span className="inline-flex items-center gap-1"><Navigation className="h-3 w-3" />{stop.area_landmark}</span>}
+                                    {stop.pickup_time && <span className="inline-flex items-center gap-1"><Clock className="h-3 w-3" />↑ {stop.pickup_time}</span>}
+                                    {stop.drop_time && <span>↓ {stop.drop_time}</span>}
+                                  </div>
+                                </div>
+                                <div className="flex flex-shrink-0 items-center gap-2">
+                                  {stopStudentCounts[stop.id] > 0 && (
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500">
+                                      <Users className="h-3 w-3" />{stopStudentCounts[stop.id]}
+                                    </span>
+                                  )}
+                                  <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                                    {formatCurrency(stop.amount)}<span className="font-normal text-emerald-600">/{periodWord(stop.fare_period)}</span>
+                                  </span>
+                                </div>
+                              </li>
+                            ))}
+                          </ol>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* ── Students tab ── */
+              <Card className="p-5">
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="min-w-0 flex-1">
+                    <SearchInput value={search} onChange={setSearch} placeholder="Search student, vehicle or stop..." />
+                  </div>
+                  <div className="w-full sm:w-56">
+                    <Select value={vehicleFilter} onChange={(e) => setVehicleFilter(e.target.value)}>
+                      <option value="">All vehicles</option>
+                      {(['bus', 'van'] as const).map((t) => {
+                        const list = vehicles.filter((v) => vt(v.vehicle_type) === t);
+                        if (!list.length || (typeFilter !== 'all' && typeFilter !== t)) return null;
+                        return (
+                          <optgroup key={t} label={VEHICLE[t].plural}>
+                            {list.map((v) => <option key={v.id} value={v.id}>{v.bus_number} — {v.route_name}</option>)}
+                          </optgroup>
+                        );
+                      })}
+                    </Select>
+                  </div>
+                  <div className="w-full sm:w-36">
+                    <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                      <option value="">All status</option>
+                      <option value="approved">Active</option>
+                      <option value="pending">Pending</option>
+                      <option value="rejected">Rejected</option>
+                      <option value="stopped">Stopped</option>
+                    </Select>
+                  </div>
+                </div>
+
+                {filteredEnrolled.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center">
+                    <Users className="mx-auto h-8 w-8 text-slate-300" />
+                    <p className="mt-2 text-sm font-medium text-slate-600">No transport records found</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[760px] text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50/70 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                          <th className="px-4 py-3">Student</th>
+                          <th className="px-4 py-3">Vehicle</th>
+                          <th className="px-4 py-3">Stop</th>
+                          <th className="px-4 py-3">Fare</th>
+                          <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3">Since</th>
+                          <th className="px-4 py-3 text-right">Actions</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </Card>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {filteredEnrolled.map(({ student, assignment: a }) => (
+                          <tr key={a.id || a.student_id} className="hover:bg-slate-50/60">
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-700">
+                                  {getInitials(student.full_name)}
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-slate-900">{student.full_name}</p>
+                                  <p className="text-xs text-slate-400">
+                                    {student.admission_number} · {student.class?.name || '—'}{student.section?.name ? `-${student.section.name}` : ''}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-1.5">
+                                <TypeChip type={a.vehicle_type} />
+                                <span className="text-xs font-semibold text-slate-900">{a.bus_number || '—'}</span>
+                              </div>
+                              <p className="mt-0.5 text-[11px] text-slate-400">{a.route_name || ''}</p>
+                            </td>
+                            <td className="px-4 py-3">
+                              <p className="text-xs font-semibold text-slate-800">{a.stop_name}</p>
+                              {a.pickup_time && <p className="text-[11px] text-slate-400">↑ {a.pickup_time}</p>}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-bold text-emerald-700">
+                              {formatCurrency(a.fare_snapshot?.amount ?? a.amount)}
+                              <span className="block text-[10px] font-normal text-slate-400">/ {periodWord(a.fare_snapshot?.fare_period ?? a.fare_period)}</span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <StatusPill status={a.status} />
+                              {a.status === 'rejected' && a.reject_reason && (
+                                <p className="mt-1 max-w-[180px] truncate text-[11px] text-slate-400" title={a.reject_reason}>{a.reject_reason}</p>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-xs text-slate-400">{formatDate(a.start_date || a.assigned_at)}</td>
+                            <td className="px-4 py-3 text-right">
+                              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                                {a.status === 'pending' && (
+                                  <>
+                                    <Button size="sm" loading={busyId === a.id} disabled={Boolean(busyId)} onClick={() => handleApprove(a)}>Approve</Button>
+                                    <Button size="sm" variant="outline" className="border-red-200 text-red-600 hover:bg-red-50"
+                                      onClick={() => { setRejectAssignmentId(a.id!); setRejectReason(''); }}>
+                                      Reject
+                                    </Button>
+                                  </>
+                                )}
+                                {isLive(a.status) && (
+                                  <>
+                                    <button onClick={() => openAssignModal(a)} title="Change vehicle / stop"
+                                      className="rounded-lg p-1.5 text-slate-400 hover:bg-[#EEF0FD] hover:text-[#5B6EE8]">
+                                      <Pencil className="h-4 w-4" />
+                                    </button>
+                                    <button onClick={() => setStopAssignmentId(a.id!)} title="Stop transport"
+                                      className="rounded-lg p-1.5 text-slate-400 hover:bg-amber-50 hover:text-amber-600">
+                                      <Ban className="h-4 w-4" />
+                                    </button>
+                                  </>
+                                )}
+                                {(a.status === 'rejected' || a.status === 'stopped') && (
+                                  <button onClick={() => handleDeleteAssignment(a.id!)} disabled={busyId === a.id} title="Delete record"
+                                    className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600">
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </Card>
+            )}
           </>
         )}
       </div>
 
-      {/* ── Add / Edit Bus Modal ── */}
-      <Modal open={busModalOpen} onClose={() => setBusModalOpen(false)}
-        title={editingBus ? `Edit ${editingBus.bus_number}` : 'Add Bus, Route & Stops'} size="xl">
-        <form onSubmit={handleSaveBus} className="space-y-4">
-          {renderStopFormFields()}
-          <div className="flex justify-end gap-2 pt-3 border-t border-slate-100">
-            <Button type="button" variant="outline" onClick={() => setBusModalOpen(false)}>Cancel</Button>
-            <Button type="submit" loading={saving}>{editingBus ? 'Update' : 'Save'}</Button>
+      {/* ── Add / Edit Vehicle ── */}
+      <Modal open={vehicleModalOpen} onClose={() => setVehicleModalOpen(false)} size="xl"
+        title={editingVehicle ? `Edit ${VEHICLE[vehicleType].label} ${editingVehicle.bus_number}` : 'Add Vehicle'}>
+        <form onSubmit={handleSaveVehicle} className="space-y-4">
+          {renderVehicleForm()}
+          <div className="flex justify-end gap-2 border-t border-slate-100 pt-3">
+            <Button type="button" variant="outline" onClick={() => setVehicleModalOpen(false)}>Cancel</Button>
+            <Button type="submit" loading={saving}>
+              {editingVehicle ? 'Save changes' : `Add ${VEHICLE[vehicleType].label}`}
+            </Button>
           </div>
         </form>
       </Modal>
 
-      {/* ── Assign Student Modal ── */}
-      <Modal open={assignModalOpen} onClose={() => setAssignModalOpen(false)}
-        title={editingAssignment ? 'Change Stop' : 'Assign Student to Transport'} size="md">
+      {/* ── Assign Student ── */}
+      <Modal open={assignModalOpen} onClose={() => setAssignModalOpen(false)} size="md"
+        title={editingAssignment ? 'Change Vehicle / Stop' : 'Assign Student'}>
         <form onSubmit={handleAssignStudent} className="space-y-4">
-          <Select label="Filter by Class" value={assignClassFilter}
-            onChange={(e) => { setAssignClassFilter(e.target.value); setAssignStudentId(''); }}>
-            <option value="">All Classes</option>
-            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {!editingAssignment && (
+            <>
+              <Select label="Class" value={assignClassFilter}
+                onChange={(e) => { setAssignClassFilter(e.target.value); setAssignStudentId(''); }}>
+                <option value="">All classes</option>
+                {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </Select>
+              <Select label="Student *" value={assignStudentId} onChange={(e) => setAssignStudentId(e.target.value)} required>
+                <option value="">Choose student...</option>
+                {assignableStudents.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.full_name} ({s.admission_number}) — {s.class?.name || ''} {s.section?.name || ''}
+                  </option>
+                ))}
+              </Select>
+              {existingLive && (
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  Already on {existingLive.bus_number} · {existingLive.stop_name}. Saving will move them to the new stop.
+                </p>
+              )}
+            </>
+          )}
+          {editingAssignment && (
+            <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
+              {studentMap.get(editingAssignment.student_id)?.full_name}
+            </p>
+          )}
+
+          <Select label="Vehicle *" value={assignVehicleId} required
+            onChange={(e) => { setAssignVehicleId(e.target.value); setAssignStopId(firstStopOf(e.target.value)); }}>
+            {(['bus', 'van'] as const).map((t) => {
+              const list = vehicles.filter((v) => vt(v.vehicle_type) === t);
+              if (!list.length) return null;
+              return (
+                <optgroup key={t} label={VEHICLE[t].plural}>
+                  {list.map((v) => {
+                    const left = seatsLeft(v, assignStudentId);
+                    const off = (v.status || 'active') !== 'active';
+                    return (
+                      <option key={v.id} value={v.id} disabled={off}>
+                        {v.bus_number} — {v.route_name} · {off ? statusLabel[v.status!] : left > 0 ? `${left} seats left` : 'Full'}
+                      </option>
+                    );
+                  })}
+                </optgroup>
+              );
+            })}
           </Select>
-          <Select label="Student *" value={assignStudentId}
-            onChange={(e) => setAssignStudentId(e.target.value)} required>
-            <option value="">Choose student...</option>
-            {assignableStudents.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.full_name} ({s.admission_number}) — {s.class?.name || ''} {s.section?.name || ''}
-              </option>
-            ))}
-          </Select>
-          <Select label="Bus & Route *" value={assignBusId}
-            onChange={(e) => { setAssignBusId(e.target.value); setAssignStopId(buses.find((b) => b.id === e.target.value)?.stops[0]?.id || ''); }} required>
-            {buses.map((b) => <option key={b.id} value={b.id}>{b.bus_number} — {b.route_name}</option>)}
-          </Select>
-          <Select label="Stop *" value={assignStopId}
-            onChange={(e) => setAssignStopId(e.target.value)} required>
+
+          <Select label="Stop *" value={assignStopId} onChange={(e) => setAssignStopId(e.target.value)} required>
             <option value="">Choose stop...</option>
-            {stopsForAssignBus.map((st, idx) => (
+            {(assignVehicle?.stops ?? []).map((st, i) => (
               <option key={st.id} value={st.id}>
-                #{idx + 1} {st.stop_name} — {formatCurrency(st.amount)}/{(st.fare_period || 'month').toLowerCase()}
+                {i + 1}. {st.stop_name} — {formatCurrency(st.amount)}/{periodWord(st.fare_period)}
               </option>
             ))}
           </Select>
 
-          {selectedAssignStop && (
-            <div className="rounded-xl border border-brand-200 bg-brand-50/70 p-3.5 flex items-center justify-between">
-              <div>
-                <p className="text-xs font-semibold text-brand-900">{selectedAssignStop.stop_name}</p>
-                <p className="text-[11px] text-brand-600">
-                  {selectedAssignStop.area_landmark}
-                  {selectedAssignStop.pickup_time ? ` · ↑ ${selectedAssignStop.pickup_time}` : ''}
-                  {selectedAssignStop.drop_time   ? ` · ↓ ${selectedAssignStop.drop_time}`   : ''}
-                </p>
+          {assignStop && assignVehicle && (
+            <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+              <div className="flex items-center gap-3">
+                <div className={`flex h-9 w-9 items-center justify-center rounded-[10px] ${VEHICLE[vt(assignVehicle.vehicle_type)].tile}`}>
+                  {(() => { const I = VEHICLE[vt(assignVehicle.vehicle_type)].Icon; return <I className="h-4 w-4" />; })()}
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">{assignStop.stop_name}</p>
+                  <p className="text-[11px] text-slate-500">
+                    {[assignStop.area_landmark, assignStop.pickup_time && `↑ ${assignStop.pickup_time}`, assignStop.drop_time && `↓ ${assignStop.drop_time}`].filter(Boolean).join(' · ') || assignVehicle.route_name}
+                  </p>
+                </div>
               </div>
               <div className="text-right">
-                <p className="font-semibold text-brand-900">{formatCurrency(selectedAssignStop.amount)}</p>
-                <p className="text-[10px] text-brand-500">/ {(selectedAssignStop.fare_period || 'month').toLowerCase()}</p>
+                <p className="font-bold text-slate-900">{formatCurrency(assignStop.amount)}</p>
+                <p className="text-[10px] text-slate-500">/ {periodWord(assignStop.fare_period)}</p>
               </div>
             </div>
           )}
 
-          <Input label="Start Date" type="date" value={assignStartDate}
-            onChange={(e) => setAssignStartDate(e.target.value)} />
+          <Input label="Start date" type="date" value={assignStartDate} onChange={(e) => setAssignStartDate(e.target.value)} />
 
           {!editingAssignment && (
-            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-3">
-              <label className="flex items-start gap-2.5 cursor-pointer">
-                <input type="checkbox" checked={autoCreateFee}
-                  onChange={(e) => setAutoCreateFee(e.target.checked)}
+            <div className="space-y-3 rounded-xl border border-slate-200 p-3.5">
+              <label className="flex cursor-pointer items-start gap-2.5">
+                <input type="checkbox" checked={autoCreateFee} onChange={(e) => setAutoCreateFee(e.target.checked)}
                   className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600" />
                 <div>
                   <p className="text-xs font-semibold text-slate-800">
-                    Create Transport Fee record ({selectedAssignStop ? `${formatCurrency(selectedAssignStop.amount)}/${(selectedAssignStop.fare_period || 'month').toLowerCase()}` : '—'})
+                    Create transport fee {assignStop ? `(${formatCurrency(assignStop.amount)})` : ''}
                   </p>
-                  <p className="text-[11px] text-slate-500">Creates an invoice in the Fees module.</p>
+                  <p className="text-[11px] text-slate-500">Adds an invoice in Fees so the parent can pay it.</p>
                 </div>
               </label>
               {autoCreateFee && (
-                <Input label="Fee Due Date" type="date" value={assignDueDate}
-                  onChange={(e) => setAssignDueDate(e.target.value)} />
+                <Input label="Fee due date" type="date" value={assignDueDate} onChange={(e) => setAssignDueDate(e.target.value)} />
               )}
             </div>
           )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setAssignModalOpen(false)}>Cancel</Button>
-            <Button type="submit" loading={saving}>{editingAssignment ? 'Update' : 'Assign'}</Button>
+            <Button type="submit" loading={saving}>{editingAssignment || existingLive ? 'Save' : 'Assign'}</Button>
           </div>
         </form>
       </Modal>
 
-      {/* ── Reject Modal ── */}
-      <Modal open={Boolean(rejectAssignmentId)} onClose={() => setRejectAssignmentId(null)}
-        title="Reject Transport Application" size="sm">
+      {/* ── Reject ── */}
+      <Modal open={Boolean(rejectAssignmentId)} onClose={() => setRejectAssignmentId(null)} title="Reject Application" size="sm">
         <div className="space-y-4">
-          <div className="flex items-start gap-3 rounded-xl bg-amber-50 border border-amber-200 p-3">
-            <AlertTriangle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-amber-800">
-              The parent will be notified with the reason via Notifications.
-            </p>
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+            <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-amber-500" />
+            <p className="text-sm text-amber-800">The parent gets this reason as a notification.</p>
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">Rejection Reason *</label>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">Reason *</label>
             <textarea value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} rows={3}
-              placeholder="e.g. Bus is full for this route. Please select another stop."
+              placeholder="e.g. This van is full. Please choose the bus on the same route."
               className="w-full rounded-[10px] border border-slate-200 px-3.5 py-2.5 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25" />
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setRejectAssignmentId(null)}>Cancel</Button>
-            <Button loading={saving} onClick={handleConfirmReject}
-              className="bg-red-600 hover:bg-red-700 text-white border-0">
-              Confirm Reject
+            <Button loading={saving} onClick={handleConfirmReject} className="border-0 bg-red-600 text-white hover:bg-red-700">
+              Reject
             </Button>
           </div>
         </div>
       </Modal>
 
-      {/* ── Stop Transport Confirm ── */}
       <ConfirmDialog
         open={Boolean(stopAssignmentId)}
         onClose={() => setStopAssignmentId(null)}
         onConfirm={handleConfirmStopTransport}
-        title="Stop Student Transport"
-        message="Mark this transport assignment as stopped? Existing fee records will not be deleted."
+        title="Stop Transport"
+        message="Stop transport for this student from today? Fee records already created are kept."
         confirmText="Stop Transport"
         variant="danger"
         loading={saving}
       />
 
-      {/* ── Delete Bus Confirm ── */}
       <ConfirmDialog
-        open={Boolean(deleteBusId)}
-        onClose={() => setDeleteBusId(null)}
-        onConfirm={handleConfirmDeleteBus}
-        title="Delete Bus & Route"
-        message="Delete this bus and all its stops? Students must have no active assignments on this bus."
+        open={Boolean(deleteVehicleId)}
+        onClose={() => setDeleteVehicleId(null)}
+        onConfirm={handleConfirmDeleteVehicle}
+        title="Delete Vehicle"
+        message="Delete this vehicle and all its stops? Vehicles with student history can't be deleted — mark them Inactive instead."
         confirmText="Delete"
         variant="danger"
         loading={saving}

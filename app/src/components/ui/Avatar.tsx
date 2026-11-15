@@ -12,8 +12,8 @@ interface AvatarProps {
 export function Avatar({ name, uri, size = 40, color }: AvatarProps) {
   const initials = getInitials(name);
   // Website style: light brand background, dark brand initials.
-  const bgColor = color ?? '#DFE3FC';
-  const textColor = color ? '#FFFFFF' : '#3B4DC8';
+  const bgColor = color ?? '#DCE8FD';
+  const textColor = color ? '#FFFFFF' : '#1544AE';
   const fontSize = Math.round(size * 0.36);
 
   if (uri) {

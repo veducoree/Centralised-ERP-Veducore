@@ -3,7 +3,6 @@ import {
   View,
   Text,
   ScrollView,
-  RefreshControl,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
@@ -33,6 +32,7 @@ import {
   toISODate,
   weekdayOf,
 } from '@/lib/timetable';
+import { RefreshScrollView } from '@/components/ui/RefreshScrollView';
 
 interface ScheduleSlot extends TeacherSchedule {
   className: string;
@@ -195,18 +195,10 @@ export default function TeacherScheduleModal() {
           </ScrollView>
         </View>
 
-        <ScrollView
+        <RefreshScrollView refreshing={refreshing} onRefresh={onRefresh}
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={COLORS.primary}
-              colors={[COLORS.primary]}
-            />
-          }>
+          showsVerticalScrollIndicator={false}>
 
           {displayedDuties.length > 0 && (
             <View style={styles.dayGroup}>
@@ -348,7 +340,7 @@ export default function TeacherScheduleModal() {
           )}
 
           <View style={{ height: SPACING.xxl }} />
-        </ScrollView>
+        </RefreshScrollView>
       </SafeAreaView>
     </View>
   );
@@ -396,8 +388,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   filterChipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: '#0B1736',
+    borderColor: '#0B1736',
   },
   filterChipToday: {
     backgroundColor: '#ECFDF5',
@@ -524,13 +516,13 @@ const styles = StyleSheet.create({
   timeBadge: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#EEF0FD',
+    backgroundColor: '#EBF2FE',
     borderRadius: RADIUS.md,
     paddingVertical: 8,
     paddingHorizontal: 10,
     minWidth: 84,
     borderWidth: 1,
-    borderColor: '#DFE3FC',
+    borderColor: '#DCE8FD',
   },
   timeStart: {
     fontSize: 12,
@@ -580,7 +572,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: RADIUS.sm,
@@ -597,7 +589,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: RADIUS.sm,

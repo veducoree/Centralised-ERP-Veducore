@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   Dimensions,
   ActivityIndicator,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -25,6 +24,7 @@ import { GlassCard } from '@/components/ui/GlassCard';
 import { MobileInlineSkeleton } from '@/components/ui/Skeleton';
 import type { Student, Attendance, StudentRecord, Fee, Remark, Class, Section } from '@/types';
 import { StudentPhotoPickerModal } from '@/components/ui/StudentPhotoPickerModal';
+import { appAlert } from '@/components/ui/AppDialog';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -43,7 +43,7 @@ export function StudentDetailModal({
   visible,
   onClose,
   onStudentUpdated,
-  isClassIncharge = true,
+  isClassIncharge = false,
 }: StudentDetailModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [loading, setLoading] = useState(false);
@@ -106,7 +106,7 @@ export function StudentDetailModal({
 
   const handleAvatarPress = () => {
     if (!isClassIncharge) {
-      Alert.alert(
+      appAlert(
         'Permission Restricted',
         'Only the assigned Class Incharge can upload or capture student photos for this section.',
       );
@@ -571,7 +571,7 @@ const styles = StyleSheet.create({
   bodyContent: {
     padding: SPACING.md,
     paddingBottom: SPACING.xxl,
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
   },
   loaderWrap: {
     paddingVertical: 60,
@@ -606,7 +606,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: '#EEF0FD',
+    backgroundColor: '#EBF2FE',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -679,7 +679,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: '#EEF0FD',
+    backgroundColor: '#EBF2FE',
   },
   gradeText: {
     fontSize: 14,

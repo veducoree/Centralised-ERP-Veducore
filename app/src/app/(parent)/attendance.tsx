@@ -3,7 +3,6 @@ import {
   View,
   Text,
   ScrollView,
-  RefreshControl,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
@@ -29,6 +28,7 @@ import { useAuth } from '@/context/AuthContext';
 import type {
   Parent, ParentStudent, Student, Class, Section, Attendance, AttendanceStatus, Notification,
 } from '@/types';
+import { RefreshScrollView } from '@/components/ui/RefreshScrollView';
 
 interface ChildInfo {
   student: Student;
@@ -180,18 +180,10 @@ export default function ParentAttendance() {
           onNotificationPress={() => router.push('/parent-modal/notifications' as never)}
         />
 
-        <ScrollView
+        <RefreshScrollView refreshing={refreshing} onRefresh={onRefresh}
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#5B6EE8"
-              colors={['#5B6EE8']}
-            />
-          }>
+          showsVerticalScrollIndicator={false}>
 
           {/* Child selector if multiple children */}
           {children.length > 1 && (
@@ -309,7 +301,7 @@ export default function ParentAttendance() {
                     <View style={styles.recHeaderRow}>
                       <View style={styles.recDateWrap}>
                         <View style={styles.calendarIconCircle}>
-                          <Ionicons name="calendar-outline" size={16} color="#5B6EE8" />
+                          <Ionicons name="calendar-outline" size={16} color="#1E5BD8" />
                         </View>
                         <Text style={styles.recDateText}>{formatDate(rec.attendance_date)}</Text>
                       </View>
@@ -335,15 +327,15 @@ export default function ParentAttendance() {
           )}
 
           <View style={{ height: SPACING.xxl }} />
-        </ScrollView>
+        </RefreshScrollView>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F4F5FB' },
-  centerContainer: { flex: 1, backgroundColor: '#F4F5FB', alignItems: 'center', justifyContent: 'center' },
+  container: { flex: 1, backgroundColor: '#F5F7FA' },
+  centerContainer: { flex: 1, backgroundColor: '#F5F7FA', alignItems: 'center', justifyContent: 'center' },
   loadingArea: { paddingVertical: 40, alignItems: 'center', gap: 8 },
   loadingText: { color: '#64748B', fontSize: 13 },
   content: { flex: 1, backgroundColor: 'transparent' },
@@ -367,27 +359,27 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   childChipActive: {
-    backgroundColor: '#EEF0FD',
-    borderColor: '#5B6EE8',
+    backgroundColor: '#EBF2FE',
+    borderColor: '#1E5BD8',
   },
   childChipName: { fontSize: 13, fontWeight: '700', color: '#64748B' },
-  childChipNameActive: { color: '#5B6EE8' },
+  childChipNameActive: { color: '#1E5BD8' },
   childChipSub: { fontSize: 11, color: '#94A3B8', marginTop: 1 },
-  childChipSubActive: { color: '#4B5DD8' },
+  childChipSubActive: { color: '#1A4FC4' },
 
   singleChildBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF0FD',
+    backgroundColor: '#EBF2FE',
     borderRadius: RADIUS.md,
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginBottom: SPACING.sm,
     borderWidth: 1,
-    borderColor: '#DFE3FC',
+    borderColor: '#DCE8FD',
   },
-  singleChildDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#5B6EE8', marginRight: 8 },
-  singleChildText: { fontSize: 12, fontWeight: '600', color: '#3B4DC8' },
+  singleChildDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#1E5BD8', marginRight: 8 },
+  singleChildText: { fontSize: 12, fontWeight: '600', color: '#1544AE' },
 
   statsCard: {
     backgroundColor: '#FFFFFF',
@@ -423,8 +415,8 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   filterPillActive: {
-    backgroundColor: '#5B6EE8',
-    borderColor: '#5B6EE8',
+    backgroundColor: '#0B1736',
+    borderColor: '#0B1736',
   },
   filterPillText: { fontSize: 12, fontWeight: '600', color: '#64748B' },
   filterPillTextActive: { color: '#FFFFFF', fontWeight: '700' },
@@ -449,7 +441,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: '#EEF0FD',
+    backgroundColor: '#EBF2FE',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,

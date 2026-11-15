@@ -151,12 +151,12 @@ export function Header({
 }
 
 const styles = StyleSheet.create({
-  // Mirrors the website navbar: white bar, hairline #E8EAF3 divider.
+  // Mirrors the website navbar: white bar, hairline #E5E9F0 divider.
   container: {
     paddingHorizontal: SPACING.md,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#E8EAF3',
+    borderBottomColor: '#E5E9F0',
     backgroundColor: '#FFFFFF',
   },
   row: {
@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
-    shadowColor: '#5B6EE8',
+    shadowColor: '#1E5BD8',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
@@ -183,7 +183,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#E8EAF3',
+    borderColor: '#E5E9F0',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
@@ -233,7 +233,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    shadowColor: '#5B6EE8',
+    shadowColor: '#1E5BD8',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     gap: 3,
     borderRadius: 14,
     backgroundColor: '#FFFFFF',
-    shadowColor: '#5B6EE8',
+    shadowColor: '#1E5BD8',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 10,

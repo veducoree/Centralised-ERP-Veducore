@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, RefreshControl, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -27,6 +27,7 @@ import {
   weekdayOf,
 } from '@/lib/timetable';
 import type { Student, TeacherSchedule, TimetablePeriod, TimetableSubstitution } from '@/types';
+import { RefreshScrollView } from '@/components/ui/RefreshScrollView';
 
 type Child = Student & { class?: { name: string } | null; section?: { name: string } | null };
 
@@ -161,13 +162,10 @@ export default function ParentTimetableModal() {
               </ScrollView>
             </View>
 
-            <ScrollView
+            <RefreshScrollView refreshing={refreshing} onRefresh={onRefresh}
               style={styles.scroll}
               contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />
-              }>
+              showsVerticalScrollIndicator={false}>
               {child && (
                 <Text style={styles.childLine}>
                   {child.full_name} · {child.class?.name ?? ''}{child.section?.name ? ` - ${child.section.name}` : ''}
@@ -226,7 +224,7 @@ export default function ParentTimetableModal() {
                 </View>
               )}
               <View style={{ height: SPACING.xxl }} />
-            </ScrollView>
+            </RefreshScrollView>
           </>
         )}
       </SafeAreaView>
@@ -262,7 +260,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  chipActive: { backgroundColor: '#0B1736', borderColor: '#0B1736' },
   chipToday: { backgroundColor: '#ECFDF5', borderColor: '#A7F3D0' },
   chipText: { fontSize: 13, fontWeight: '600', color: COLORS.textMuted },
   chipTextActive: { color: '#FFFFFF', fontWeight: '700' },
@@ -290,13 +288,13 @@ const styles = StyleSheet.create({
   timeBadge: {
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#EEF0FD',
+    backgroundColor: '#EBF2FE',
     borderRadius: RADIUS.md,
     paddingVertical: 8,
     paddingHorizontal: 10,
     minWidth: 78,
     borderWidth: 1,
-    borderColor: '#DFE3FC',
+    borderColor: '#DCE8FD',
   },
   timeStart: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
   timeEnd: { fontSize: 11, fontWeight: '600', color: COLORS.textMuted },

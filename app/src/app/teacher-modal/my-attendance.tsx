@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput, Alert, ActivityIndicator, RefreshControl,
+  View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +15,10 @@ import {
   fetchTeacherByUserId, markMyAttendance, fetchMyStaffAttendance, applyLeave, fetchMyLeaves, cancelMyLeave,
   fetchHolidays, type StaffAttendanceRow, type StaffLeave,
 } from '@/services/api';
+import { appAlert } from '@/components/ui/AppDialog';
+import { RefreshScrollView } from '@/components/ui/RefreshScrollView';
+import { Button } from '@/components/ui/Button';
+import { weeklyOffDays } from '@/lib/holidays';
 
 const localISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 const addDays = (iso: string, n: number) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return localISO(d); };
@@ -42,7 +46,7 @@ const LEAVE: Record<StaffLeave['status'], { label: string; color: string; bg: st
 
 export default function MyAttendanceScreen() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, school } = useAuth();
   const today = localISO();
   const tomorrow = addDays(today, 1);
 
@@ -95,11 +99,14 @@ export default function MyAttendanceScreen() {
 
   const refresh = async () => { setRefreshing(true); await Promise.all([loadBase().catch(() => {}), loadMonth()]); setRefreshing(false); };
 
+  // Weekly off follows Settings → Weekly Working Days (5 = Sat + Sun off).
+  const weeklyOff = useMemo(() => weeklyOffDays(school), [school]);
   const offDay = useCallback((iso: string) => {
     if (holidays.has(iso)) return holidays.get(iso)!;
     if (working.has(iso)) return null;
-    return new Date(iso + 'T00:00:00').getDay() === 0 ? 'Sunday' : null;
-  }, [holidays, working]);
+    const dow = new Date(iso + 'T00:00:00').getDay();
+    return weeklyOff.includes(dow) ? (dow === 6 ? 'Saturday' : 'Sunday') : null;
+  }, [holidays, working, weeklyOff]);
 
   const byDate = useMemo(() => Object.fromEntries(rows.map(r => [r.attendance_date, r])), [rows]);
   const counts = useMemo(() => rows.reduce((m, r) => ({ ...m, [r.status]: (m[r.status] ?? 0) + 1 }), {} as Record<string, number>), [rows]);
@@ -119,36 +126,36 @@ export default function MyAttendanceScreen() {
       setTodayRow(r);
       loadMonth();
     } catch (e) {
-      Alert.alert('Could not mark', e instanceof Error ? e.message : 'Please try again.');
+      appAlert('Could not mark', e instanceof Error ? e.message : 'Please try again.');
     } finally {
       setMarking(false);
     }
   };
 
   const submit = async () => {
-    if (!from) { Alert.alert('Pick a date', 'Tap the date box to choose your leave days.'); return; }
+    if (!from) { appAlert('Pick a date', 'Tap the date box to choose your leave days.'); return; }
     const end = type === 'half_day' ? from : (to ?? from);
-    if (from < tomorrow) { Alert.alert('Too late', 'Leave must be applied at least one day in advance.'); return; }
-    if (workingDaysInRange === 0) { Alert.alert('No working days', 'The selected days are all Sundays or holidays.'); return; }
-    if (!reason.trim()) { Alert.alert('Reason needed', 'Please add a short reason.'); return; }
+    if (from < tomorrow) { appAlert('Too late', 'Leave must be applied at least one day in advance.'); return; }
+    if (workingDaysInRange === 0) { appAlert('No working days', 'The selected days are all weekly offs or holidays.'); return; }
+    if (!reason.trim()) { appAlert('Reason needed', 'Please add a short reason.'); return; }
     setApplying(true);
     try {
       await applyLeave(type, from, end, reason.trim());
-      Alert.alert('Request sent', 'The office will review your leave.');
+      appAlert('Request sent', 'The office will review your leave.');
       setReason(''); setFrom(null); setTo(null); setType('full_day');
       loadBase().catch(() => {});
     } catch (e) {
-      Alert.alert('Could not apply', e instanceof Error ? e.message : 'Please try again.');
+      appAlert('Could not apply', e instanceof Error ? e.message : 'Please try again.');
     } finally {
       setApplying(false);
     }
   };
 
   const confirmCancel = (l: StaffLeave) => {
-    Alert.alert('Cancel leave?', 'If it was approved, those days go back to unmarked.', [
+    appAlert('Cancel leave?', 'If it was approved, those days go back to unmarked.', [
       { text: 'Keep', style: 'cancel' },
       { text: 'Cancel leave', style: 'destructive', onPress: async () => {
-        try { await cancelMyLeave(l.id); refresh(); } catch (e) { Alert.alert('Could not cancel', e instanceof Error ? e.message : ''); }
+        try { await cancelMyLeave(l.id); refresh(); } catch (e) { appAlert('Could not cancel', e instanceof Error ? e.message : ''); }
       } },
     ]);
   };
@@ -165,8 +172,7 @@ export default function MyAttendanceScreen() {
       <StatusBar style="dark" />
       <Header title="My Attendance" showBack onBackPress={() => router.back()} />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={COLORS.primary} />}>
+        <RefreshScrollView refreshing={refreshing} onRefresh={refresh} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {loading ? <ActivityIndicator color={COLORS.primary} style={{ marginTop: 40 }} /> : !teacherId ? (
             <Text style={styles.muted}>Teacher profile not found.</Text>
           ) : (
@@ -186,14 +192,10 @@ export default function MyAttendanceScreen() {
                     ) : null}
                   </View>
                   {!todayRow && !todayOff && (
-                    <TouchableOpacity style={styles.primaryBtn} onPress={() => mark(false)} disabled={marking} activeOpacity={0.85}>
-                      {marking ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnText}>Mark present</Text>}
-                    </TouchableOpacity>
+                    <Button label="Mark present" icon="checkmark-circle-outline" loading={marking} loadingLabel="Marking…" onPress={() => mark(false)} />
                   )}
                   {todayRow && todayRow.status !== 'leave' && todayRow.check_in && !todayRow.check_out && (
-                    <TouchableOpacity style={styles.outlineBtn} onPress={() => mark(true)} disabled={marking} activeOpacity={0.85}>
-                      <Text style={styles.outlineBtnText}>Check out</Text>
-                    </TouchableOpacity>
+                    <Button label="Check out" variant="outline" icon="log-out-outline" loading={marking} onPress={() => mark(true)} />
                   )}
                 </View>
               </GlassCard>
@@ -254,14 +256,14 @@ export default function MyAttendanceScreen() {
 
                 <Text style={styles.label}>{type === 'half_day' ? 'Date' : 'Dates'}</Text>
                 <TouchableOpacity style={styles.dateBox} onPress={() => setPickerOpen(true)} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Choose leave dates">
-                  <Ionicons name="calendar-outline" size={18} color={from ? '#5B6EE8' : COLORS.textLight} />
+                  <Ionicons name="calendar-outline" size={18} color={from ? '#1E5BD8' : COLORS.textLight} />
                   <Text style={[styles.dateText, !from && { color: COLORS.textLight }]} numberOfLines={1}>{dateLabel}</Text>
                   <Ionicons name="chevron-down" size={16} color={COLORS.textLight} />
                 </TouchableOpacity>
                 {from && (
                   <Text style={styles.hint}>
                     {type === 'half_day' ? 'Half day' : `${workingDaysInRange} working day${workingDaysInRange === 1 ? '' : 's'}`}
-                    {type === 'full_day' && workingDaysInRange > 0 ? ' (Sundays & holidays not counted)' : ''}
+                    {type === 'full_day' && workingDaysInRange > 0 ? ' (weekly offs & holidays not counted)' : ''}
                   </Text>
                 )}
 
@@ -269,9 +271,7 @@ export default function MyAttendanceScreen() {
                 <TextInput style={styles.input} value={reason} onChangeText={setReason}
                   placeholder="e.g. Family function" placeholderTextColor={COLORS.textLight} multiline maxLength={300} />
 
-                <TouchableOpacity style={[styles.primaryBtn, styles.fullBtn]} onPress={submit} disabled={applying} activeOpacity={0.85}>
-                  {applying ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.primaryBtnText}>Send request</Text>}
-                </TouchableOpacity>
+                <Button label="Send request" icon="paper-plane-outline" size="lg" fullWidth loading={applying} loadingLabel="Sending…" onPress={submit} style={styles.fullBtn} />
               </GlassCard>
 
               {/* My requests */}
@@ -304,7 +304,7 @@ export default function MyAttendanceScreen() {
             </>
           )}
           <View style={{ height: 32 }} />
-        </ScrollView>
+        </RefreshScrollView>
       </KeyboardAvoidingView>
 
       <CalendarPicker
@@ -334,38 +334,34 @@ const styles = StyleSheet.create({
   todayRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4 },
   todayStatus: { fontSize: 18, fontWeight: '700', color: COLORS.text },
   todayTime: { fontSize: 12, color: COLORS.textMuted, marginTop: 2 },
-  primaryBtn: { backgroundColor: '#5B6EE8', borderRadius: 12, height: 40, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
-  primaryBtnText: { color: '#FFFFFF', fontWeight: '600', fontSize: 14 },
-  outlineBtn: { borderWidth: 1, borderColor: '#5B6EE8', borderRadius: 12, height: 40, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' },
-  outlineBtnText: { color: '#5B6EE8', fontWeight: '600', fontSize: 14 },
   fullBtn: { marginTop: SPACING.md },
 
   monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  navBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#F4F5FB', alignItems: 'center', justifyContent: 'center' },
+  navBtn: { width: 34, height: 34, borderRadius: 10, backgroundColor: '#F5F7FA', alignItems: 'center', justifyContent: 'center' },
   monthText: { fontSize: 15, fontWeight: '600', color: COLORS.text },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   weekday: { width: `${100 / 7}%`, textAlign: 'center', fontSize: 11, fontWeight: '600', color: COLORS.textLight, paddingVertical: 6 },
   cell: { width: `${100 / 7}%`, aspectRatio: 1, padding: 3 },
   day: { flex: 1, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   dayText: { fontSize: 13, color: COLORS.text },
-  dayOff: { backgroundColor: '#F4F5FB' },
+  dayOff: { backgroundColor: '#F5F7FA' },
   dayOffText: { color: '#CBD5E1' },
   dayFuture: { color: '#CBD5E1' },
-  dayToday: { borderWidth: 2, borderColor: '#5B6EE8' },
-  legend: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, borderTopWidth: 1, borderTopColor: '#F1F2F8', paddingTop: 10, rowGap: 6 },
+  dayToday: { borderWidth: 2, borderColor: '#1E5BD8' },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, borderTopWidth: 1, borderTopColor: '#F1F4F8', paddingTop: 10, rowGap: 6 },
   legendItem: { width: '33.33%', flexDirection: 'row', alignItems: 'center', gap: 6 },
   legendDot: { width: 10, height: 10, borderRadius: 3 },
   legendText: { fontSize: 12, color: COLORS.textMuted, flexShrink: 1 },
 
-  segment: { flexDirection: 'row', backgroundColor: '#F4F5FB', borderRadius: 12, padding: 3, marginTop: SPACING.md },
+  segment: { flexDirection: 'row', backgroundColor: '#F5F7FA', borderRadius: 12, padding: 3, marginTop: SPACING.md },
   segmentItem: { flex: 1, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
-  segmentActive: { backgroundColor: '#FFFFFF', shadowColor: '#5B6EE8', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 1 },
+  segmentActive: { backgroundColor: '#FFFFFF', shadowColor: '#1E5BD8', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 6, elevation: 1 },
   segmentText: { fontSize: 13, color: COLORS.textMuted, fontWeight: '500' },
   segmentTextActive: { color: COLORS.text, fontWeight: '600' },
   label: { fontSize: 12, color: COLORS.textMuted, marginTop: SPACING.md, marginBottom: 6, fontWeight: '500' },
-  dateBox: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 44, borderRadius: 12, borderWidth: 1, borderColor: '#E8EAF3', paddingHorizontal: 12, backgroundColor: '#FFFFFF' },
+  dateBox: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 44, borderRadius: 12, borderWidth: 1, borderColor: '#E5E9F0', paddingHorizontal: 12, backgroundColor: '#FFFFFF' },
   dateText: { flex: 1, fontSize: 14, color: COLORS.text, fontWeight: '500' },
-  input: { borderWidth: 1, borderColor: '#E8EAF3', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: COLORS.text, backgroundColor: '#FFFFFF', minHeight: 64, textAlignVertical: 'top' },
+  input: { borderWidth: 1, borderColor: '#E5E9F0', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 10, fontSize: 14, color: COLORS.text, backgroundColor: '#FFFFFF', minHeight: 64, textAlignVertical: 'top' },
 
   reqCard: { marginBottom: SPACING.sm },
   reqRow: { flexDirection: 'row', gap: 12 },

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { appLink } from '../../../lib/appUrl';
 import { Building2, CheckCircle2, Copy, Eye, EyeOff, Plus, Sparkles, UserRound, Wallet } from 'lucide-react';
 import { callManageSchools, errMsg, generatePassword, rupees, type Plan } from '../api';
 import { Button, Card, ErrorBanner, Field, cx, inputCls, toast } from '../ui';
@@ -60,7 +61,7 @@ export default function AddSchoolSection({ onCreated }: { onCreated: (schoolId: 
   }
 
   if (done) {
-    const loginUrl = `${window.location.origin}/login`;
+    const loginUrl = appLink('/login');
     const text = `Welcome to Veducore!\n\nSchool: ${done.name}\nLogin: ${loginUrl}\nEmail: ${done.email}\nPassword: ${done.password}\n\nPlease change the password after your first sign-in.`;
     return (
       <div className="mx-auto max-w-xl">

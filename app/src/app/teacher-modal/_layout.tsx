@@ -8,7 +8,7 @@ export default function TeacherModalLayout() {
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: '#F4F5FB' },
+          contentStyle: { backgroundColor: '#F5F7FA' },
           animation: 'slide_from_right',
         }}
       />

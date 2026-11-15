@@ -2,8 +2,6 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
-  ScrollView,
-  RefreshControl,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
@@ -30,6 +28,7 @@ import { MobileListSkeleton } from '@/components/ui/Skeleton';
 import { StudentDetailModal } from '@/components/ui/StudentDetailModal';
 import { useAuth } from '@/context/AuthContext';
 import type { ClassAssignment, Student } from '@/types';
+import { RefreshScrollView } from '@/components/ui/RefreshScrollView';
 
 interface SubjectInfo {
   id: string;
@@ -177,18 +176,10 @@ export default function TeacherClasses() {
       <View style={styles.content}>
         <Header title="My Classes & Roster" />
 
-        <ScrollView
+        <RefreshScrollView refreshing={refreshing} onRefresh={onRefresh}
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={COLORS.primary}
-              colors={[COLORS.primary]}
-            />
-          }>
+          showsVerticalScrollIndicator={false}>
 
           {/* Search Bar */}
           <View style={styles.searchContainer}>
@@ -368,7 +359,7 @@ export default function TeacherClasses() {
           )}
 
           <View style={{ height: SPACING.xxl }} />
-        </ScrollView>
+        </RefreshScrollView>
 
         <StudentDetailModal
           student={selectedStudent}
@@ -423,7 +414,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: RADIUS.md,
-    backgroundColor: '#EEF0FD',
+    backgroundColor: '#EBF2FE',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -478,9 +469,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
-    backgroundColor: '#EEF0FD',
+    backgroundColor: '#EBF2FE',
     borderWidth: 1,
-    borderColor: '#C7CDFB',
+    borderColor: '#BFD6FB',
     borderRadius: RADIUS.sm,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -495,7 +486,7 @@ const styles = StyleSheet.create({
   subjectChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderWidth: 1,
     borderColor: COLORS.borderLight,
     borderRadius: RADIUS.sm,
@@ -505,7 +496,7 @@ const styles = StyleSheet.create({
   },
   subjectChipName: { flexShrink: 1, fontSize: 12, fontWeight: '600', color: COLORS.text },
   subjectCodePill: {
-    backgroundColor: '#EEF0FD',
+    backgroundColor: '#EBF2FE',
     borderRadius: 4,
     paddingHorizontal: 5,
     paddingVertical: 1,

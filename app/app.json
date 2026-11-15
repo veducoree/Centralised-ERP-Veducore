@@ -7,16 +7,11 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "backgroundColor": "#F4F5FB",
+    "backgroundColor": "#F5F7FA",
     "androidStatusBar": {
       "backgroundColor": "#FFFFFF",
       "translucent": false,
       "barStyle": "dark-content"
-    },
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
     },
     "ios": {
       "supportsTablet": true,
@@ -27,7 +22,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#FFFFFF"
       },
-      "backgroundColor": "#F4F5FB",
+      "backgroundColor": "#F5F7FA",
       "package": "com.veducore.app"
     },
     "web": {
@@ -37,7 +32,15 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-splash-screen",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF",
+          "imageWidth": 220
+        }
+      ],
       "expo-status-bar",
       "expo-sharing"
     ],

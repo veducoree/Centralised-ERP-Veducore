@@ -1,35 +1,53 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-} from 'react-native';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
 import { fetchTeacherByUserId, fetchTeacherAssignments } from '@/services/api';
-import { COLORS, SPACING, RADIUS, SHADOW, formatDate, getInitials } from '@/lib/utils';
-import { GlassCard } from '@/components/ui/GlassCard';
+import { COLORS, SPACING, formatDate } from '@/lib/utils';
 import { Header } from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import type { Teacher } from '@/types';
+import { appAlert } from '@/components/ui/AppDialog';
+import { Button } from '@/components/ui/Button';
+import { MobileInlineSkeleton } from '@/components/ui/Skeleton';
+import {
+  FadeUp, ProfileHero, StatStrip, Section, InfoRow, NavRow, ProfileFooter,
+} from '@/components/profile/ProfileKit';
 
 interface AssignmentInfo {
+  key: string;
   className: string;
   sectionName: string;
+  subjectName: string | null;
   isClassTeacher: boolean;
 }
 
+type AssignmentRow = {
+  class?: { name?: string } | null;
+  section?: { name?: string } | null;
+  subject?: { name?: string } | null;
+  class_id?: string;
+  section_id?: string;
+  is_class_teacher?: boolean;
+};
+
+function yearsSince(date?: string | null) {
+  if (!date) return '—';
+  const ms = Date.now() - new Date(date).getTime();
+  if (isNaN(ms) || ms < 0) return '—';
+  const y = ms / (365.25 * 86400000);
+  return y < 1 ? '<1' : String(Math.floor(y));
+}
+
 export default function TeacherProfileModal() {
-  const { user, logout } = useAuth();
+  const { user, profile, school, logout } = useAuth();
   const router = useRouter();
   const [teacher, setTeacher] = useState<Teacher | null>(null);
   const [assignments, setAssignments] = useState<AssignmentInfo[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
@@ -37,20 +55,20 @@ export default function TeacherProfileModal() {
       try {
         const found = await fetchTeacherByUserId(user.id);
         setTeacher(found);
-
         if (found) {
-          const allAssign = await fetchTeacherAssignments(found.id);
-
-          const assignedList = allAssign.map(a => ({
-            className: (a as any).class?.name ?? 'Class',
-            sectionName: (a as any).section?.name ?? 'A',
+          const rows = (await fetchTeacherAssignments(found.id)) as unknown as AssignmentRow[];
+          setAssignments(rows.map((a, i) => ({
+            key: `${a.class_id ?? ''}-${a.section_id ?? ''}-${i}`,
+            className: a.class?.name ?? 'Class',
+            sectionName: a.section?.name ?? '',
+            subjectName: a.subject?.name ?? null,
             isClassTeacher: !!a.is_class_teacher,
-          }));
-
-          setAssignments(assignedList);
+          })));
         }
       } catch (err) {
         console.error('Error loading teacher profile:', err);
+      } finally {
+        setLoading(false);
       }
     }
     load();
@@ -58,132 +76,106 @@ export default function TeacherProfileModal() {
 
   const performLogout = async () => {
     await logout();
-    if (router.canDismiss()) {
-      router.dismissAll();
-    }
+    if (router.canDismiss()) router.dismissAll();
     router.replace('/login');
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to log out of your account?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: performLogout,
-        },
-      ],
-    );
+    appAlert('Log out?', 'You will need to sign in again to mark attendance and marks.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log Out', style: 'destructive', onPress: performLogout },
+    ]);
   };
 
-  const initials = teacher ? getInitials(teacher.full_name) : 'T';
-
-  const infoRows: { icon: keyof typeof Ionicons.glyphMap; label: string; value: string | null }[] = teacher
-    ? [
-        { icon: 'card-outline',     label: 'Employee ID',    value: teacher.employee_id },
-        { icon: 'school-outline',   label: 'Qualification',  value: teacher.qualification },
-        { icon: 'book-outline',     label: 'Primary Subject', value: teacher.subject },
-        { icon: 'calendar-outline', label: 'Date of Joining', value: formatDate(teacher.date_of_joining) },
-        { icon: 'mail-outline',     label: 'Email',          value: teacher.email },
-        { icon: 'call-outline',     label: 'Phone',          value: teacher.phone ?? 'Not provided' },
-      ]
-    : [];
+  const phone = teacher?.phone || profile?.phone || null;
+  const classCount = new Set(assignments.map(a => `${a.className}-${a.sectionName}`)).size;
+  const inchargeOf = assignments.filter(a => a.isClassTeacher);
 
   return (
     <View style={styles.container}>
       <StatusBar style="dark" />
-      <SafeAreaView edges={['bottom']} style={styles.safeArea}>
+      <SafeAreaView edges={['bottom']} style={{ flex: 1 }}>
         <Header title="My Profile" showBack />
 
-        <ScrollView
-          contentContainerStyle={styles.content}
-          showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {loading ? (
+            <MobileInlineSkeleton rows={6} />
+          ) : (
+            <>
+              <FadeUp>
+                <ProfileHero
+                  name={teacher?.full_name ?? 'Teacher'}
+                  photo={teacher?.avatar_url}
+                  role="Teacher"
+                  schoolName={school?.name}
+                  badges={[
+                    ...(teacher?.subject ? [{ icon: 'book-outline' as const, label: teacher.subject }] : []),
+                    ...(inchargeOf.length ? [{ icon: 'shield-checkmark' as const, label: 'Class Incharge', tone: 'green' as const }] : []),
+                  ]}
+                />
+                <StatStrip items={[
+                  { value: classCount, label: classCount === 1 ? 'Class' : 'Classes' },
+                  { value: inchargeOf.length, label: 'Incharge of' },
+                  { value: yearsSince(teacher?.date_of_joining), label: 'Years here' },
+                ]} />
+              </FadeUp>
 
-          {/* Teacher Profile Card */}
-          <GlassCard style={styles.profileCard} padding={SPACING.lg}>
-            <View style={styles.avatarSection}>
-              <View style={styles.avatarCircle}>
-                <Text style={styles.avatarInitials}>{initials}</Text>
-              </View>
-              <Text style={styles.name}>{teacher?.full_name ?? 'Faculty Member'}</Text>
-              <View style={styles.roleBadgeRow}>
-                <View style={styles.roleBadge}>
-                  <Ionicons name="school" size={13} color={COLORS.primary} />
-                  <Text style={styles.roleText}>Faculty Teacher</Text>
-                </View>
-                {assignments.some(a => a.isClassTeacher) && (
-                  <View style={styles.inchargeBadge}>
-                    <Ionicons name="shield-checkmark" size={13} color="#059669" />
-                    <Text style={styles.inchargeText}>Class Incharge</Text>
-                  </View>
-                )}
-              </View>
-            </View>
-          </GlassCard>
-
-          {/* Assigned Classes */}
-          {assignments.length > 0 && (
-            <GlassCard style={styles.cardSection} padding={SPACING.md}>
-              <Text style={styles.sectionHeading}>Teaching Assignments</Text>
-              <View style={styles.assignmentChips}>
-                {assignments.map((item, idx) => (
-                  <View key={idx} style={styles.assignChip}>
-                    <Ionicons name="people" size={14} color={COLORS.primary} />
-                    <Text style={styles.assignChipText}>
-                      {item.className} - {item.sectionName}
-                    </Text>
-                    {item.isClassTeacher && (
-                      <View style={styles.inchargeMiniTag}>
-                        <Text style={styles.inchargeMiniText}>Incharge</Text>
+              {assignments.length > 0 && (
+                <FadeUp delay={70}>
+                  <Section title="Teaching">
+                    {assignments.map((a, i) => (
+                      <View key={a.key} style={styles.classRow}>
+                        {i > 0 && <View style={styles.classDivider} />}
+                        <View style={[styles.classIcon, a.isClassTeacher && styles.classIconIncharge]}>
+                          <Ionicons name={a.isClassTeacher ? 'shield-checkmark-outline' : 'people-outline'} size={17} color={a.isClassTeacher ? '#0E8F6E' : COLORS.primary} />
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={styles.className} numberOfLines={1}>
+                            {a.className}{a.sectionName ? ` - ${a.sectionName}` : ''}
+                          </Text>
+                          <Text style={styles.classMeta} numberOfLines={1}>
+                            {a.isClassTeacher ? 'Class teacher' : a.subjectName ?? 'Subject teacher'}
+                          </Text>
+                        </View>
+                        {a.isClassTeacher && (
+                          <View style={styles.inchargeTag}><Text style={styles.inchargeText}>Incharge</Text></View>
+                        )}
                       </View>
-                    )}
-                  </View>
-                ))}
-              </View>
-            </GlassCard>
+                    ))}
+                  </Section>
+                </FadeUp>
+              )}
+
+              <FadeUp delay={120}>
+                <Section title="Professional">
+                  <InfoRow first icon="id-card-outline" label="Employee ID" value={teacher?.employee_id} />
+                  <InfoRow icon="ribbon-outline" label="Qualification" value={teacher?.qualification} tint="#B7791F" />
+                  <InfoRow icon="book-outline" label="Primary subject" value={teacher?.subject} tint="#0B7CB8" />
+                  <InfoRow icon="calendar-outline" label="Joined on" value={teacher?.date_of_joining ? formatDate(teacher.date_of_joining) : null} tint="#0F8A7E" />
+                </Section>
+              </FadeUp>
+
+              <FadeUp delay={170}>
+                <Section title="Contact details" footer="Profile details are managed by the school administrator.">
+                  <InfoRow first icon="call-outline" label="Mobile number" value={phone} tint="#0E8F6E" />
+                  <InfoRow icon="location-outline" label="Address" value={teacher?.address} tint="#C2611A" />
+                </Section>
+              </FadeUp>
+
+              <FadeUp delay={220}>
+                <Section title="Quick links">
+                  <NavRow first icon="finger-print-outline" label="My attendance & leave" tint="#0E8F6E" onPress={() => router.push('/teacher-modal/my-attendance' as never)} />
+                  <NavRow icon="time-outline" label="My schedule" tint="#0E7490" onPress={() => router.push('/teacher-modal/schedule' as never)} />
+                  <NavRow icon="notifications-outline" label="Notifications" tint={COLORS.primary} onPress={() => router.push('/teacher-modal/notifications' as never)} />
+                </Section>
+              </FadeUp>
+
+              <FadeUp delay={260}>
+                <Button label="Log Out" variant="danger" icon="log-out-outline" size="lg" fullWidth onPress={handleLogout} style={{ marginTop: 24 }} />
+                <ProfileFooter />
+              </FadeUp>
+            </>
           )}
-
-          {/* Info Details Card */}
-          <GlassCard padding={0} style={styles.cardSection}>
-            <View style={styles.detailsHeader}>
-              <Text style={styles.sectionHeading}>Personal & Professional Details</Text>
-            </View>
-            {infoRows.map((row, index) => (
-              <View
-                key={row.label}
-                style={[styles.infoRow, index < infoRows.length - 1 && styles.divider]}>
-                <View style={styles.infoIconCircle}>
-                  <Ionicons name={row.icon} size={18} color={COLORS.primary} />
-                </View>
-                <View style={styles.infoText}>
-                  <Text style={styles.infoLabel}>{row.label}</Text>
-                  <Text style={styles.infoValue}>{row.value ?? '—'}</Text>
-                </View>
-              </View>
-            ))}
-          </GlassCard>
-
-          {/* Edit Profile Button */}
-          <TouchableOpacity
-            style={styles.editBtn}
-            onPress={() => Alert.alert('Edit Profile', 'Profile updates are managed by the school administrator.')}
-            activeOpacity={0.8}>
-            <Ionicons name="pencil-outline" size={17} color={COLORS.primary} />
-            <Text style={styles.editBtnText}>Edit Profile</Text>
-          </TouchableOpacity>
-
-          {/* Sign Out Button */}
-          <TouchableOpacity
-            style={styles.logoutBtn}
-            onPress={handleLogout}
-            activeOpacity={0.8}>
-            <Ionicons name="log-out-outline" size={18} color="#EF4444" />
-            <Text style={styles.logoutBtnText}>Sign Out</Text>
-          </TouchableOpacity>
-
           <View style={{ height: SPACING.xxl }} />
         </ScrollView>
       </SafeAreaView>
@@ -192,202 +184,14 @@ export default function TeacherProfileModal() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  content: {
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.md,
-    gap: SPACING.md,
-  },
-  profileCard: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-    ...SHADOW.sm,
-  },
-  avatarSection: {
-    alignItems: 'center',
-  },
-  avatarCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#DFE3FC',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.sm,
-  },
-  avatarInitials: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#3B4DC8',
-  },
-  name: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: 6,
-  },
-  roleBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  roleBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: RADIUS.full,
-    backgroundColor: '#EEF0FD',
-    borderWidth: 1,
-    borderColor: '#C7CDFB',
-  },
-  roleText: {
-    flexShrink: 1,
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  inchargeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: RADIUS.full,
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-  },
-  inchargeText: {
-    flexShrink: 1,
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#059669',
-  },
-  cardSection: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#E2E8F0',
-    ...SHADOW.sm,
-  },
-  sectionHeading: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.text,
-    marginBottom: SPACING.sm,
-  },
-  detailsHeader: {
-    paddingHorizontal: SPACING.md,
-    paddingTop: SPACING.md,
-    paddingBottom: 2,
-  },
-  assignmentChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  assignChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: RADIUS.sm,
-    backgroundColor: '#F4F5FB',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  assignChipText: {
-    flexShrink: 1,
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.text,
-  },
-  inchargeMiniTag: {
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  inchargeMiniText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#059669',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.md,
-    gap: SPACING.sm,
-  },
-  infoIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: RADIUS.sm,
-    backgroundColor: '#EEF0FD',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  infoText: {
-    flex: 1,
-  },
-  infoLabel: {
-    fontSize: 11,
-    color: COLORS.textDim,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  infoValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.text,
-    marginTop: 2,
-  },
-  divider: {
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  editBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 11,
-    borderRadius: RADIUS.md,
-    borderWidth: 1.5,
-    borderColor: COLORS.primary,
-    backgroundColor: '#FFFFFF',
-    ...SHADOW.sm,
-  },
-  editBtnText: {
-    flexShrink: 1,
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  logoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 11,
-    borderRadius: RADIUS.md,
-    borderWidth: 1.5,
-    borderColor: '#FCA5A5',
-    backgroundColor: '#FEF2F2',
-  },
-  logoutBtnText: {
-    flexShrink: 1,
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#EF4444',
-  },
+  container: { flex: 1, backgroundColor: COLORS.canvas },
+  content: { paddingHorizontal: SPACING.md, paddingTop: SPACING.md },
+  classRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
+  classDivider: { position: 'absolute', top: 0, left: 62, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: '#E3E7EE' },
+  classIcon: { width: 36, height: 36, borderRadius: 11, backgroundColor: '#EEF4FE', alignItems: 'center', justifyContent: 'center' },
+  classIconIncharge: { backgroundColor: '#E7F5EF' },
+  className: { fontSize: 15, fontWeight: '700', color: '#0B1736' },
+  classMeta: { fontSize: 12.5, color: COLORS.textMuted, marginTop: 1 },
+  inchargeTag: { backgroundColor: '#E7F5EF', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 3 },
+  inchargeText: { fontSize: 10.5, fontWeight: '800', color: '#0E8F6E' },
 });

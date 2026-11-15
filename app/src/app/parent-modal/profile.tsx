@@ -1,24 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Alert,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
 import { fetchParentByUserId, fetchParentStudents } from '@/services/api';
-import { COLORS, SPACING, RADIUS, SHADOW, getInitials } from '@/lib/utils';
-import { GlassCard } from '@/components/ui/GlassCard';
+import { COLORS, SPACING } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
 import { Header } from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
-import type { Parent, ParentStudent, Student, Class, Section } from '@/types';
+import type { Parent, Student } from '@/types';
+import { appAlert } from '@/components/ui/AppDialog';
+import { Button } from '@/components/ui/Button';
+import { MobileInlineSkeleton } from '@/components/ui/Skeleton';
+import {
+  FadeUp, ProfileHero, StatStrip, Section, InfoRow, NavRow, ProfileFooter,
+} from '@/components/profile/ProfileKit';
+import { call, mail } from '@/lib/contact';
 
 interface ChildInfo {
   student: Student;
@@ -27,10 +25,11 @@ interface ChildInfo {
 }
 
 export default function ParentProfile() {
-  const { user, logout } = useAuth();
+  const { user, profile, school, logout } = useAuth();
   const router = useRouter();
   const [parent, setParent] = useState<Parent | null>(null);
   const [children, setChildren] = useState<ChildInfo[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
@@ -47,6 +46,8 @@ export default function ParentProfile() {
         })));
       } catch (err) {
         console.error('Parent profile load error', err);
+      } finally {
+        setLoading(false);
       }
     }
     load();
@@ -54,36 +55,25 @@ export default function ParentProfile() {
 
   const performLogout = async () => {
     await logout();
-    if (router.canDismiss()) {
-      router.dismissAll();
-    }
+    if (router.canDismiss()) router.dismissAll();
     router.replace('/login');
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: performLogout,
-        },
-      ],
-    );
+    appAlert('Log out?', 'You will need to sign in again to see your child’s updates.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log Out', style: 'destructive', onPress: performLogout },
+    ]);
   };
 
-  const initials = parent ? getInitials(parent.full_name) : '?';
+  // The parent record can be blank when details were only entered at the
+  // child's admission, so fall back to the account and the child's record.
+  const kid = (pick: (s: Student) => string | null | undefined) =>
+    children.map(c => pick(c.student)).find(v => !!v && String(v).trim()) || null;
+  const phone = parent?.phone || profile?.phone || kid(s => s.parent_phone) || kid(s => s.emergency_contact);
+  const address = parent?.address || kid(s => s.address);
 
-  const infoRows: { icon: string; label: string; value: string | null }[] = parent
-    ? [
-        { icon: 'mail-outline',      label: 'Email',   value: parent.email },
-        { icon: 'call-outline',      label: 'Phone',   value: parent.phone ?? 'Not provided' },
-        { icon: 'location-outline',  label: 'Address', value: parent.address },
-      ]
-    : [];
+  const memberSince = parent?.created_at ? new Date(parent.created_at).getFullYear() : '—';
 
   return (
     <View style={styles.container}>
@@ -92,78 +82,75 @@ export default function ParentProfile() {
         <Header title="My Profile" showBack onBackPress={() => router.back()} />
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-
-          {/* Avatar & Hero */}
-          <View style={styles.avatarSection}>
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarInitials}>{initials}</Text>
-            </View>
-            <Text style={styles.name}>{parent?.full_name ?? '—'}</Text>
-            <View style={styles.roleBadge}>
-              <Text style={styles.roleText}>Verified Parent</Text>
-            </View>
-          </View>
-
-          {/* Info Card */}
-          <GlassCard padding={0} style={styles.cardContainer}>
-            {infoRows.map((row, index) => (
-              <View
-                key={row.label}
-                style={[styles.infoRow, index < infoRows.length - 1 && styles.divider]}>
-                <View style={styles.infoIconCircle}>
-                  <Ionicons name={row.icon as any} size={18} color={COLORS.primary} />
-                </View>
-                <View style={styles.infoText}>
-                  <Text style={styles.infoLabel}>{row.label}</Text>
-                  <Text style={styles.infoValue}>{row.value ?? '—'}</Text>
-                </View>
-              </View>
-            ))}
-          </GlassCard>
-
-          {/* Children List */}
-          {children.length > 0 && (
+          {loading ? (
+            <MobileInlineSkeleton rows={6} />
+          ) : (
             <>
-              <Text style={styles.sectionTitle}>Enrolled Children</Text>
-              <GlassCard padding={0} style={styles.cardContainer}>
-                {children.map((child, index) => (
-                  <View
-                    key={child.student.id}
-                    style={[styles.childRow, index < children.length - 1 && styles.divider]}>
-                    <Avatar
-                      name={child.student.full_name}
-                      uri={child.student.avatar_url}
-                      size={44}
-                      color={child.student.gender === 'female' ? '#EC4899' : COLORS.primary}
-                    />
-                    <View style={{ flex: 1, marginLeft: SPACING.sm }}>
-                      <Text style={styles.childName}>{child.student.full_name}</Text>
-                      <Text style={styles.childClass}>{child.className} – Section {child.sectionName}</Text>
-                      <Text style={styles.childAdm}>Adm No: {child.student.admission_number}</Text>
-                    </View>
-                  </View>
-                ))}
-              </GlassCard>
+              <FadeUp>
+                <ProfileHero
+                  name={parent?.full_name ?? user?.email ?? 'Parent'}
+                  photo={parent?.avatar_url}
+                  role="Parent"
+                  schoolName={school?.name}
+                  badges={[{ icon: 'shield-checkmark', label: 'Verified', tone: 'green' }]}
+                />
+                <StatStrip items={[
+                  { value: children.length, label: children.length === 1 ? 'Child' : 'Children' },
+                  { value: school?.academic_year || '—', label: 'Session' },
+                  { value: memberSince, label: 'Member since' },
+                ]} />
+              </FadeUp>
+
+              {children.length > 0 && (
+                <FadeUp delay={70}>
+                  <Section title={children.length === 1 ? 'My child' : 'My children'}>
+                    {children.map((child, i) => (
+                      <View key={child.student.id} style={styles.childRow}>
+                        {i > 0 && <View style={styles.childDivider} />}
+                        <Avatar name={child.student.full_name} uri={child.student.avatar_url} size={46} />
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={styles.childName} numberOfLines={1}>{child.student.full_name}</Text>
+                          <Text style={styles.childMeta} numberOfLines={1}>
+                            {child.className}{child.sectionName ? ` · Section ${child.sectionName}` : ''}
+                          </Text>
+                        </View>
+                        <View style={styles.admPill}>
+                          <Text style={styles.admLabel}>ADM</Text>
+                          <Text style={styles.admValue}>{child.student.admission_number || '—'}</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </Section>
+                </FadeUp>
+              )}
+
+              <FadeUp delay={130}>
+                <Section title="Contact details" footer="To change these details, please contact the school office.">
+                  <InfoRow first icon="call-outline" label="Mobile number" value={phone} tint="#0E8F6E" />
+                  <InfoRow icon="location-outline" label="Address" value={address} tint="#C2611A" />
+                  {!!parent?.occupation && <InfoRow icon="briefcase-outline" label="Occupation" value={parent.occupation} tint="#B7791F" />}
+                </Section>
+              </FadeUp>
+
+              <FadeUp delay={190}>
+                <Section title="Quick links">
+                  <NavRow first icon="notifications-outline" label="Notifications" tint={COLORS.primary} onPress={() => router.push('/parent-modal/notifications' as never)} />
+                  <NavRow icon="time-outline" label="Class timetable" tint="#0E7490" onPress={() => router.push('/parent-modal/timetable' as never)} />
+                  {!!school?.contact_number && (
+                    <NavRow icon="call-outline" label="Call school office" tint="#0E8F6E" trailing={school.contact_number} onPress={() => call(school.contact_number)} />
+                  )}
+                  {!!school?.email && (
+                    <NavRow icon="mail-outline" label="Email school" tint="#475569" onPress={() => mail(school.email)} />
+                  )}
+                </Section>
+              </FadeUp>
+
+              <FadeUp delay={240}>
+                <Button label="Log Out" variant="danger" icon="log-out-outline" size="lg" fullWidth onPress={handleLogout} style={{ marginTop: 24 }} />
+                <ProfileFooter />
+              </FadeUp>
             </>
           )}
-
-          {/* Action Buttons */}
-          <TouchableOpacity
-            style={styles.editBtn}
-            onPress={() => Alert.alert('Coming Soon', 'Profile editing will be available soon.')}
-            activeOpacity={0.8}>
-            <Ionicons name="pencil-outline" size={16} color={COLORS.primary} />
-            <Text style={styles.editBtnText}>Edit Contact Details</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.logoutBtn}
-            onPress={handleLogout}
-            activeOpacity={0.8}>
-            <Ionicons name="log-out-outline" size={18} color="#DC2626" />
-            <Text style={styles.logoutBtnText}>Log Out Account</Text>
-          </TouchableOpacity>
-
           <View style={{ height: SPACING.xxl }} />
         </ScrollView>
       </SafeAreaView>
@@ -173,83 +160,12 @@ export default function ParentProfile() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.canvas },
-  content: { paddingHorizontal: SPACING.md, paddingTop: SPACING.lg },
-  avatarSection: { alignItems: 'center', marginBottom: SPACING.lg },
-  avatarCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: '#DFE3FC',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.sm,
-    ...SHADOW.sm,
-  },
-  avatarInitials: { fontSize: 26, fontWeight: '700', color: '#3B4DC8' },
-  name: { fontSize: 18, fontWeight: '700', color: COLORS.text, marginBottom: SPACING.xs },
-  roleBadge: {
-    paddingHorizontal: 14,
-    paddingVertical: 4,
-    borderRadius: RADIUS.full,
-    backgroundColor: '#EEF0FD',
-    borderWidth: 1,
-    borderColor: '#C7CDFB',
-  },
-  roleText: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: SPACING.sm,
-    marginTop: SPACING.xs,
-  },
-  cardContainer: {
-    marginBottom: SPACING.md,
-    borderRadius: RADIUS.lg,
-  },
-  infoRow: { flexDirection: 'row', alignItems: 'center', padding: SPACING.md, gap: SPACING.sm },
-  infoIconCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: RADIUS.md,
-    backgroundColor: '#F1F5F9',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  infoText: { flex: 1 },
-  infoLabel: { fontSize: 11, color: COLORS.textMuted, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
-  infoValue: { fontSize: 15, fontWeight: '600', color: COLORS.text, marginTop: 2 },
-  divider: { borderBottomWidth: 1, borderBottomColor: COLORS.borderLight },
-  childRow: { flexDirection: 'row', alignItems: 'center', padding: SPACING.md },
-  childName: { fontSize: 15, fontWeight: '700', color: COLORS.text },
-  childClass: { fontSize: 13, color: COLORS.textMuted, marginTop: 2 },
-  childAdm: { fontSize: 11, color: COLORS.textLight, marginTop: 2 },
-  editBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 11,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    backgroundColor: COLORS.surface,
-    marginBottom: SPACING.sm,
-    ...SHADOW.sm,
-  },
-  editBtnText: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: COLORS.primary },
-  logoutBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 11,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: '#FECACA',
-    backgroundColor: '#FEF2F2',
-  },
-  logoutBtnText: { flexShrink: 1, fontSize: 14, fontWeight: '700', color: '#DC2626' },
+  content: { paddingHorizontal: SPACING.md, paddingTop: SPACING.md },
+  childRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 14, paddingVertical: 12 },
+  childDivider: { position: 'absolute', top: 0, left: 72, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: '#E3E7EE' },
+  childName: { fontSize: 15.5, fontWeight: '700', color: '#0B1736' },
+  childMeta: { fontSize: 12.5, color: COLORS.textMuted, marginTop: 2 },
+  admPill: { alignItems: 'flex-end' },
+  admLabel: { fontSize: 9.5, fontWeight: '800', color: COLORS.textDim, letterSpacing: 0.8 },
+  admValue: { fontSize: 12.5, fontWeight: '700', color: '#334155', marginTop: 1 },
 });

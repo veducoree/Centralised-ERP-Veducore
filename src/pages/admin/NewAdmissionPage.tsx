@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  CheckCircle, Upload, Copy, X, Lock, FileText, ImageIcon,
+  CheckCircle, Copy, X, Lock,
   ArrowLeft, AlertTriangle, IndianRupee, Pencil, Printer,
   MessageCircle, PlusCircle,
 } from 'lucide-react';
@@ -31,7 +31,7 @@ import { INDIAN_STATES, formatCurrency } from '@/lib/utils';
 import { generateParentCredentials } from '@/lib/parentUtils';
 
 // ─── Wizard persistence key ───────────────────────────────────────────────────
-const WIZARD_KEY = 'veducore_admission_wizard_v2';
+const WIZARD_KEY = 'veducore_admission_wizard_v3';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,12 +64,7 @@ interface FormData {
   tc_number: string;
   tc_date: string;
   transport_selected: boolean;
-  // Step 4 — Documents
-  prev_tc_file: File | null;
-  student_aadhar: File | null;
-  parent_aadhar: File | null;
-  residence_proof: File | null;
-  // Step 5 — Fees
+  // Step 4 — Fees
   fees: AdmissionFeesData;
 }
 
@@ -96,20 +91,13 @@ const INITIAL_FORM: FormData = {
   admission_number: '', prev_school_name: '', prev_school_board: '',
   tc_number: '', tc_date: '',
   transport_selected: false,
-  prev_tc_file: null, student_aadhar: null,
-  parent_aadhar: null, residence_proof: null,
   fees: DEFAULT_FEES,
 };
 
-const STEP_LABELS = ['Personal', 'Address', 'Class & School', 'Documents', 'Fees', 'Review'];
+const STEP_LABELS = ['Personal', 'Address', 'Class & School', 'Fees', 'Review'];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function formatFileSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 /** Compute fee summary from current fees state */
 function computeFeeSummary(fees: AdmissionFeesData) {
@@ -256,73 +244,6 @@ function sendWhatsAppReceipt(params: {
     (params.balanceDue > 0 ? `Balance Due: ₹${params.balanceDue.toFixed(2)}\n` : '') +
     `\nThank you for your payment.`;
   window.open(`https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`, '_blank');
-}
-
-// ─── UploadField ──────────────────────────────────────────────────────────────
-
-interface UploadFieldProps {
-  label: string; required?: boolean; file: File | null;
-  onChange: (file: File | null) => void; accept?: string;
-  error?: string; note?: string; showPreview?: boolean;
-}
-
-function UploadField({ label, required, file, onChange, accept, error, note, showPreview }: UploadFieldProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [dragOver, setDragOver] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (file && showPreview && file.type.startsWith('image/')) {
-      const url = URL.createObjectURL(file);
-      setPreviewUrl(url);
-      return () => URL.revokeObjectURL(url);
-    }
-    setPreviewUrl(null);
-  }, [file, showPreview]);
-
-  return (
-    <div className="w-full">
-      <label className="mb-1.5 block text-sm font-medium text-slate-700">
-        {label} {required && <span className="text-red-500">*</span>}
-        {note && <span className="ml-1 font-normal text-slate-400">{note}</span>}
-      </label>
-      {file ? (
-        <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-          {showPreview && previewUrl
-            ? <img src={previewUrl} alt="preview" className="h-20 w-20 rounded-lg object-cover border border-emerald-200 flex-shrink-0" />
-            : <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-emerald-100">
-                <FileText className="h-5 w-5 text-emerald-600" />
-              </div>}
-          <div className="flex flex-1 flex-col min-w-0">
-            <span className="truncate text-sm font-medium text-emerald-700">{file.name}</span>
-            <span className="text-xs text-emerald-500">{formatFileSize(file.size)}</span>
-          </div>
-          <button type="button" onClick={() => onChange(null)}
-            className="rounded-lg p-1 text-emerald-500 hover:bg-emerald-100 hover:text-emerald-700 transition-colors">
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      ) : (
-        <div role="button" tabIndex={0}
-          className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-5 transition-colors ${
-            dragOver ? 'border-brand-400 bg-brand-50'
-            : error ? 'border-red-300 bg-red-50'
-            : 'border-slate-200 bg-slate-50 hover:border-brand-300 hover:bg-brand-50'}`}
-          onClick={() => inputRef.current?.click()}
-          onKeyDown={(e) => e.key === 'Enter' && inputRef.current?.click()}
-          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) onChange(f); }}>
-          {showPreview ? <ImageIcon className="mb-2 h-8 w-8 text-slate-300" /> : <Upload className="mb-2 h-8 w-8 text-slate-300" />}
-          <span className="text-sm font-medium text-slate-500">Click to upload or drag & drop</span>
-          {accept && <span className="mt-1 text-xs text-slate-400">{accept.replace(/\./g, '').replace(/,/g, ', ').toUpperCase()}</span>}
-        </div>
-      )}
-      <input ref={inputRef} type="file" accept={accept} className="hidden"
-        onChange={(e) => { const f = e.target.files?.[0] ?? null; onChange(f); e.target.value = ''; }} />
-      {error && <p className="mt-1 text-xs text-red-600">{error}</p>}
-    </div>
-  );
 }
 
 // ─── CopyButton ───────────────────────────────────────────────────────────────
@@ -526,22 +447,6 @@ function Step3({ formData, errors, update, classes }: Step3Props) {
           </label>
           <p className="mt-1 text-xs text-slate-400">Transport Fee will be included in the fee structure if checked.</p>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Step 4: Documents ────────────────────────────────────────────────────────
-
-function Step4({ formData, errors, update }: StepProps) {
-  return (
-    <div className="space-y-4">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Document Uploads</h3>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <UploadField label="Previous School TC" file={formData.prev_tc_file} onChange={(f) => update({ prev_tc_file: f })} accept=".pdf,image/*" note="(if applicable, optional)" />
-        <UploadField label="Student Aadhar Card" required file={formData.student_aadhar} onChange={(f) => update({ student_aadhar: f })} accept=".pdf,image/*" error={errors.student_aadhar} />
-        <UploadField label="Parent Aadhar Card" required file={formData.parent_aadhar} onChange={(f) => update({ parent_aadhar: f })} accept=".pdf,image/*" error={errors.parent_aadhar} />
-        <UploadField label="Residence Proof" required file={formData.residence_proof} onChange={(f) => update({ residence_proof: f })} accept=".pdf,image/*" error={errors.residence_proof} />
       </div>
     </div>
   );
@@ -903,7 +808,7 @@ function Step5Fees({ formData, errors, update, schoolId, academicYear, canCollec
   );
 }
 
-// ─── Step 6: Review ───────────────────────────────────────────────────────────
+// ─── Step 5: Review ───────────────────────────────────────────────────────────
 
 interface Step6Props {
   formData: FormData;
@@ -918,13 +823,6 @@ function Step6({ formData, credentials, onEditStep }: Step6Props) {
     formData.address_line1, formData.address_line2 || null, formData.city,
     `${formData.state} - ${formData.pin_code}`, formData.country,
   ].filter(Boolean).join(', ');
-
-  const docs = [
-    { label: 'Previous School TC', file: formData.prev_tc_file },
-    { label: 'Student Aadhar Card', file: formData.student_aadhar },
-    { label: 'Parent Aadhar Card', file: formData.parent_aadhar },
-    { label: 'Residence Proof', file: formData.residence_proof },
-  ];
 
   const PAYMENT_LABELS: Record<string, string> = { full: 'Pay Now (Full)', partial: 'Pay Partial', later: 'Pay Later' };
 
@@ -955,19 +853,8 @@ function Step6({ formData, credentials, onEditStep }: Step6Props) {
         <ReviewRow label="Transport" value={formData.transport_selected ? 'Yes' : 'No'} />
       </ReviewCard>
 
-      <ReviewCard title="Documents" onEdit={() => onEditStep(4)}>
-        <div className="grid grid-cols-2 gap-2">
-          {docs.map(({ label, file }) => (
-            <div key={label} className="flex items-center gap-2">
-              {file ? <CheckCircle className="h-4 w-4 flex-shrink-0 text-emerald-500" /> : <span className="text-slate-400">—</span>}
-              <span className={`text-sm ${file ? 'text-slate-700' : 'text-slate-400'}`}>{label}</span>
-            </div>
-          ))}
-        </div>
-      </ReviewCard>
-
       {/* Fees & Payment summary */}
-      <ReviewCard title="Fees & Payment" onEdit={() => onEditStep(5)}>
+      <ReviewCard title="Fees & Payment" onEdit={() => onEditStep(4)}>
         {formData.fees.line_items.filter((l) => l.include).length === 0 ? (
           <p className="text-sm text-slate-400">No fee items selected — student will be enrolled with Pay Later.</p>
         ) : (
@@ -1047,13 +934,8 @@ export default function NewAdmissionPage() {
     try {
       const raw = sessionStorage.getItem(WIZARD_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw) as Omit<FormData, 'prev_tc_file' | 'student_aadhar' | 'parent_aadhar' | 'residence_proof'>;
-        return {
-          ...INITIAL_FORM,
-          ...parsed,
-          prev_tc_file: null, student_aadhar: null,
-          parent_aadhar: null, residence_proof: null,
-        };
+        const parsed = JSON.parse(raw) as Partial<FormData>;
+        return { ...INITIAL_FORM, ...parsed };
       }
     } catch { /* ignore */ }
     return INITIAL_FORM;
@@ -1062,8 +944,7 @@ export default function NewAdmissionPage() {
   // Persist on every change (skip File fields)
   useEffect(() => {
     try {
-      const { prev_tc_file, student_aadhar, parent_aadhar, residence_proof, ...rest } = formData; // eslint-disable-line @typescript-eslint/no-unused-vars
-      sessionStorage.setItem(WIZARD_KEY, JSON.stringify(rest));
+      sessionStorage.setItem(WIZARD_KEY, JSON.stringify(formData));
     } catch { /* ignore quota errors */ }
   }, [formData]);
 
@@ -1140,12 +1021,6 @@ export default function NewAdmissionPage() {
     }
 
     if (step === 4) {
-      if (!formData.student_aadhar) e.student_aadhar = 'Student Aadhar card is required';
-      if (!formData.parent_aadhar) e.parent_aadhar = 'Parent Aadhar card is required';
-      if (!formData.residence_proof) e.residence_proof = 'Residence proof is required';
-    }
-
-    if (step === 5) {
       const fees = formData.fees;
       const includedLines = fees.line_items.filter((l) => l.include);
 
@@ -1235,6 +1110,12 @@ export default function NewAdmissionPage() {
         class_id: formData.class_id,
         section_id: formData.section_id,
         address,
+        parent_phone: formData.phone || null,
+        whatsapp_number: (formData.same_as_phone ? formData.phone : formData.whatsapp) || null,
+        previous_school: formData.prev_school_name || null,
+        previous_board: formData.prev_school_board || null,
+        tc_number: formData.tc_number || null,
+        tc_date: formData.tc_date || null,
         admission_date: new Date().toISOString().split('T')[0],
         academic_year: academicYear,
         fee_lines: formData.fees.line_items,
@@ -1487,15 +1368,14 @@ export default function NewAdmissionPage() {
                   {currentStep === 1 && <Step1 formData={formData} errors={errors} update={update} />}
                   {currentStep === 2 && <Step2 formData={formData} errors={errors} update={update} />}
                   {currentStep === 3 && <Step3 formData={formData} errors={errors} update={update} classes={classes} />}
-                  {currentStep === 4 && <Step4 formData={formData} errors={errors} update={update} />}
-                  {currentStep === 5 && (
+                  {currentStep === 4 && (
                     <Step5Fees
                       formData={formData} errors={errors} update={update}
                       schoolId={schoolId} academicYear={academicYear}
                       canCollectPayment={canCollectPayment}
                     />
                   )}
-                  {currentStep === 6 && (
+                  {currentStep === 5 && (
                     <Step6 formData={formData} credentials={credentials} onEditStep={handleEditStep} />
                   )}
                 </div>
@@ -1509,16 +1389,16 @@ export default function NewAdmissionPage() {
                   </div>
                   <div className="flex items-center gap-3">
                     {/* Step 5 shortcut — pay later skip */}
-                    {currentStep === 5 && formData.fees.no_structure_warning && formData.fees.payment_option !== 'later' && (
+                    {currentStep === 4 && formData.fees.no_structure_warning && formData.fees.payment_option !== 'later' && (
                       <button type="button"
-                        onClick={() => { update({ fees: { ...formData.fees, payment_option: 'later' } }); setErrors({}); setCurrentStep(6); }}
+                        onClick={() => { update({ fees: { ...formData.fees, payment_option: 'later' } }); setErrors({}); setCurrentStep(5); }}
                         className="text-xs text-slate-500 hover:text-slate-700 underline">
                         Skip — Pay Later
                       </button>
                     )}
-                    {currentStep < 6 ? (
+                    {currentStep < 5 ? (
                       <Button onClick={handleNext}>
-                        {currentStep === 5 ? 'Review →' : 'Next →'}
+                        {currentStep === 4 ? 'Review →' : 'Next →'}
                       </Button>
                     ) : (
                       <Button loading={saving} onClick={handleSubmit} disabled={saving}>

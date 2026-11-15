@@ -5,11 +5,12 @@ import {
   Modal,
   StyleSheet,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { COLORS, SPACING, RADIUS, SHADOW } from '@/lib/utils';
+import { appAlert } from '@/components/ui/AppDialog';
+import { Button } from '@/components/ui/Button';
 
 interface StudentPhotoPickerModalProps {
   visible: boolean;
@@ -30,7 +31,7 @@ export function StudentPhotoPickerModal({
     try {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Camera permission is required to capture student photos.');
+        appAlert('Permission Denied', 'Camera permission is required to capture student photos.');
         return;
       }
 
@@ -46,7 +47,7 @@ export function StudentPhotoPickerModal({
       }
     } catch (err) {
       console.error('Camera capture error', err);
-      Alert.alert('Camera Error', 'Could not access camera on this device.');
+      appAlert('Camera Error', 'Could not access camera on this device.');
     }
   };
 
@@ -54,7 +55,7 @@ export function StudentPhotoPickerModal({
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Photo library permission is required to select photos.');
+        appAlert('Permission Denied', 'Photo library permission is required to select photos.');
         return;
       }
 
@@ -70,7 +71,7 @@ export function StudentPhotoPickerModal({
       }
     } catch (err) {
       console.error('Gallery pick error', err);
-      Alert.alert('Gallery Error', 'Could not open photo gallery.');
+      appAlert('Gallery Error', 'Could not open photo gallery.');
     }
   };
 
@@ -92,7 +93,7 @@ export function StudentPhotoPickerModal({
 
           <View style={styles.actionsWrap}>
             <TouchableOpacity style={styles.actionRow} onPress={handleTakePhoto} activeOpacity={0.7}>
-              <View style={[styles.iconWrap, { backgroundColor: '#EEF0FD' }]}>
+              <View style={[styles.iconWrap, { backgroundColor: '#EBF2FE' }]}>
                 <Ionicons name="camera" size={20} color={COLORS.primary} />
               </View>
               <View style={styles.actionTextWrap}>
@@ -127,9 +128,7 @@ export function StudentPhotoPickerModal({
             )}
           </View>
 
-          <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.8}>
-            <Text style={styles.cancelBtnText}>Cancel</Text>
-          </TouchableOpacity>
+          <Button label="Cancel" variant="glass" size="lg" fullWidth onPress={onClose} style={{ marginTop: SPACING.md }} />
         </View>
       </View>
     </Modal>
@@ -176,7 +175,7 @@ const styles = StyleSheet.create({
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: RADIUS.md,
@@ -202,17 +201,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textMuted,
     marginTop: 2,
-  },
-  cancelBtn: {
-    marginTop: SPACING.md,
-    backgroundColor: '#F1F5F9',
-    borderRadius: RADIUS.md,
-    paddingVertical: 11,
-    alignItems: 'center',
-  },
-  cancelBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.textMuted,
   },
 });

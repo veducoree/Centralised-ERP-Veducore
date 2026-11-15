@@ -13,6 +13,8 @@ import {
   fetchTeacherByUserId, markMyAttendance, fetchMyStaffAttendance, applyLeave, cancelMyLeave, fetchMyLeaves, fetchHolidays,
 } from '@/services/api';
 import type { Teacher, StaffAttendanceRow, StaffLeave, StaffAttendanceStatus, Holiday } from '@/types';
+import { useSchool } from '@/lib/useSchool';
+import { weeklyOffDays, makeOffDay } from '@/lib/holidays';
 
 const localISO = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 const addDays = (iso: string, n: number) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return localISO(d); };
@@ -90,15 +92,9 @@ export default function TeacherMyAttendance() {
   }, [teacher, month, today]);
   const mine = todayRow ?? todayFetched ?? null;
 
-  const holidayOn = useMemo(() => {
-    const m = new Map(holidays.map((h) => [h.date, h]));
-    return (d: string) => {
-      const h = m.get(d);
-      if (h?.type === 'working') return null;
-      if (h) return h.label ?? 'Holiday';
-      return new Date(d + 'T00:00:00').getDay() === 0 ? 'Sunday' : null;
-    };
-  }, [holidays]);
+  const school = useSchool();
+  const offKey = weeklyOffDays(school).join(',');
+  const holidayOn = useMemo(() => makeOffDay(holidays, weeklyOffDays(school)), [holidays, offKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const todayOff = holidayOn(today);
 
   async function mark(checkOut: boolean) {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { appLink } from '../../../lib/appUrl';
 import {
   Activity, AlertTriangle, Bell, Building2, CalendarDays, Check, ClipboardCheck, Copy, CreditCard, ExternalLink,
   Eye, EyeOff, GraduationCap, IndianRupee, KeyRound, LifeBuoy, LogIn, Mail, MapPin, Phone, Power,
@@ -499,7 +500,7 @@ function AccessTab({ d, canManage, onSaved }: { d: Detail; canManage: boolean; o
   const [saving, setSaving] = useState(false);
   const [impersonating, setImpersonating] = useState(false);
   const [link, setLink] = useState<string | null>(null);
-  const loginUrl = `${window.location.origin}/login`;
+  const loginUrl = appLink('/login');
 
   async function resetPassword() {
     setSaving(true);
@@ -520,7 +521,7 @@ function AccessTab({ d, canManage, onSaved }: { d: Detail; canManage: boolean; o
     setImpersonating(true);
     try {
       const r = await callManageSchools<{ link: string }>({
-        action: 'impersonate', school_id: s.id, redirect_to: `${window.location.origin}/admin/dashboard`,
+        action: 'impersonate', school_id: s.id, redirect_to: appLink('/admin/dashboard'),
       });
       setLink(r.link);
     } catch (e) {

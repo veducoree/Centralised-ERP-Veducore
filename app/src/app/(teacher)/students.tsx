@@ -3,12 +3,10 @@ import {
   View,
   Text,
   ScrollView,
-  RefreshControl,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
   TextInput,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,19 +17,15 @@ import {
   fetchTeacherByUserId,
   fetchTeacherAssignments,
   fetchStudentsBySection,
-  fetchClasses,
 } from '@/services/api';
-import { supabase } from '@/lib/supabase';
 import { COLORS, SPACING, RADIUS, SHADOW } from '@/lib/utils';
 import { GlassCard } from '@/components/ui/GlassCard';
 import { Avatar } from '@/components/ui/Avatar';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { MobileListSkeleton, MobileInlineSkeleton } from '@/components/ui/Skeleton';
 import { StudentDetailModal } from '@/components/ui/StudentDetailModal';
-import { AddStudentModal } from '@/components/ui/AddStudentModal';
-import { NewAdmissionModal } from '@/components/ui/NewAdmissionModal';
-import { BulkStudentEntryModal } from '@/components/ui/BulkStudentEntryModal';
 import type { ClassAssignment, Section, Student } from '@/types';
+import { RefreshScrollView } from '@/components/ui/RefreshScrollView';
 
 interface SectionChip {
   section_id: string;
@@ -55,9 +49,6 @@ export default function TeacherStudents() {
 
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
-  const [addModalVisible, setAddModalVisible] = useState(false);
-  const [newAdmissionModalVisible, setNewAdmissionModalVisible] = useState(false);
-  const [bulkModalVisible, setBulkModalVisible] = useState(false);
 
   const loadSections = useCallback(async () => {
     if (!user?.id) return;
@@ -81,15 +72,8 @@ export default function TeacherStudents() {
         const clsName = cls?.name || '';
         const secName = sec?.name || 'A';
 
-        // An assignment designates Class Incharge if is_class_teacher is true, or subject_id is null / undefined
-        const isAssignmentIncharge = Boolean(
-          ca.is_class_teacher === true ||
-          (ca as any).is_class_teacher === 'true' ||
-          ca.subject_id === null ||
-          ca.subject_id === undefined ||
-          ca.subject_id === '' ||
-          !(ca as any).subject
-        );
+        // Class teacher = the assignment row without a subject (same rule the database enforces).
+        const isAssignmentIncharge = ca.subject_id === null || ca.subject_id === undefined || ca.subject_id === '';
 
         if (isAssignmentIncharge && !inchargeIds.includes(secId)) {
           inchargeIds.push(secId);
@@ -112,60 +96,6 @@ export default function TeacherStudents() {
             existing.chipLabel = `${clsName} - ${existing.sectionName}`;
           }
         }
-      }
-
-      // Check if sections table directly designates class_teacher_id
-      try {
-        const { data: ctSections } = await supabase
-          .from('sections')
-          .select('*, class:classes(*)')
-          .eq('class_teacher_id', teacher.id);
-
-        if (ctSections && ctSections.length > 0) {
-          for (const s of ctSections) {
-            if (!inchargeIds.includes(s.id)) inchargeIds.push(s.id);
-            const cls = (s as any).class;
-            const clsName = cls?.name || '';
-            const secName = s.name || 'A';
-            if (!sectionMap.has(s.id)) {
-              sectionMap.set(s.id, {
-                section_id: s.id,
-                class_id: s.class_id,
-                className: clsName,
-                sectionName: secName,
-                chipLabel: clsName ? `${clsName} - ${secName}` : `Sec ${secName}`,
-                isClassIncharge: true,
-              });
-            } else {
-              const existing = sectionMap.get(s.id)!;
-              existing.isClassIncharge = true;
-            }
-          }
-        }
-      } catch {}
-
-      // Fallback: If no assignments exist yet, load school classes so teacher can manage students
-      if (sectionMap.size === 0 && teacher.school_id) {
-        try {
-          const allClasses = await fetchClasses(teacher.school_id);
-          for (const c of allClasses) {
-            if (c.sections) {
-              for (const s of c.sections) {
-                const clsName = c.name || '';
-                const secName = s.name || 'A';
-                inchargeIds.push(s.id);
-                sectionMap.set(s.id, {
-                  section_id: s.id,
-                  class_id: c.id,
-                  className: clsName,
-                  sectionName: secName,
-                  chipLabel: `${clsName} - ${secName}`,
-                  isClassIncharge: true,
-                });
-              }
-            }
-          }
-        } catch {}
       }
 
       const chips = Array.from(sectionMap.values());
@@ -219,60 +149,8 @@ export default function TeacherStudents() {
     setRefreshing(false);
   }, [loadSections, loadStudents, selectedSectionId]);
 
-  const isTeacherAnyIncharge = inchargeSectionIds.length > 0;
   const isCurrentSectionIncharge = inchargeSectionIds.includes(selectedSectionId);
   const currentSectionChip = sectionChips.find(s => s.section_id === selectedSectionId);
-  const inchargeSections = sectionChips.filter(s => inchargeSectionIds.includes(s.section_id));
-
-  // Determine active section for modal operations (prefer current if incharge, else first incharge section)
-  const activeInchargeSectionId = isCurrentSectionIncharge
-    ? selectedSectionId
-    : (inchargeSectionIds[0] || selectedSectionId);
-
-  const canPerformInchargeActions = isCurrentSectionIncharge || isTeacherAnyIncharge;
-
-  const handleOpenAddStudent = () => {
-    if (!canPerformInchargeActions) {
-      Alert.alert(
-        'Permission Restricted',
-        `Only designated Class Incharges can add new students.\n\nYou are currently assigned as a Subject Teacher.`
-      );
-      return;
-    }
-    if (!isCurrentSectionIncharge && inchargeSectionIds.length > 0) {
-      setSelectedSectionId(inchargeSectionIds[0]);
-    }
-    setAddModalVisible(true);
-  };
-
-  const handleOpenAdmission = () => {
-    if (!canPerformInchargeActions) {
-      Alert.alert(
-        'Permission Restricted',
-        `Only designated Class Incharges can perform student admissions.\n\nYou are currently assigned as a Subject Teacher.`
-      );
-      return;
-    }
-    if (!isCurrentSectionIncharge && inchargeSectionIds.length > 0) {
-      setSelectedSectionId(inchargeSectionIds[0]);
-    }
-    setNewAdmissionModalVisible(true);
-  };
-
-  const handleOpenBulk = () => {
-    if (!canPerformInchargeActions) {
-      Alert.alert(
-        'Permission Restricted',
-        `Only designated Class Incharges can perform bulk CSV student entry.\n\nYou are currently assigned as a Subject Teacher.`
-      );
-      return;
-    }
-    if (!isCurrentSectionIncharge && inchargeSectionIds.length > 0) {
-      setSelectedSectionId(inchargeSectionIds[0]);
-    }
-    setBulkModalVisible(true);
-  };
-
   const filteredStudents = allStudents.filter(s => {
     if (!searchQuery.trim()) return true;
     const q = searchQuery.trim().toLowerCase();
@@ -300,89 +178,16 @@ export default function TeacherStudents() {
       <View style={styles.content}>
         <Header title="Enrolled Students" />
 
-        <ScrollView
+        <RefreshScrollView refreshing={refreshing} onRefresh={onRefresh}
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={COLORS.primary}
-              colors={[COLORS.primary]}
-            />
-          }>
+          showsVerticalScrollIndicator={false}>
 
-          {/* Action Cards: Add Student, New Admission, Bulk Entry */}
-          <View style={styles.actionGrid}>
-            <TouchableOpacity
-              style={[
-                styles.actionCard,
-                styles.actionCardPrimary,
-                !canPerformInchargeActions && styles.actionCardDisabled,
-              ]}
-              onPress={handleOpenAddStudent}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.actionIconCircle, { backgroundColor: '#EEF0FD' }]}>
-                <Ionicons name="person-add" size={16} color={COLORS.primary} />
-              </View>
-              <Text style={[styles.actionCardTitle, { color: canPerformInchargeActions ? COLORS.primary : COLORS.textMuted }]} numberOfLines={1}>Add Student</Text>
-              <Text style={styles.actionCardSub}>
-                {canPerformInchargeActions ? 'Quick Enrol' : 'Incharge Only'}
-              </Text>
-              {!canPerformInchargeActions && (
-                <View style={styles.actionLockBadge}>
-                  <Ionicons name="lock-closed" size={10} color="#94A3B8" />
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.actionCard,
-                styles.actionCardSecondary,
-                !canPerformInchargeActions && styles.actionCardDisabled,
-              ]}
-              onPress={handleOpenAdmission}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.actionIconCircle, { backgroundColor: '#F5F3FF' }]}>
-                <Ionicons name="school" size={16} color="#7C3AED" />
-              </View>
-              <Text style={[styles.actionCardTitle, { color: canPerformInchargeActions ? '#7C3AED' : COLORS.textMuted }]} numberOfLines={1}>Admission</Text>
-              <Text style={styles.actionCardSub}>
-                {canPerformInchargeActions ? 'Full Dossier' : 'Incharge Only'}
-              </Text>
-              {!canPerformInchargeActions && (
-                <View style={styles.actionLockBadge}>
-                  <Ionicons name="lock-closed" size={10} color="#94A3B8" />
-                </View>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[
-                styles.actionCard,
-                styles.actionCardTertiary,
-                !canPerformInchargeActions && styles.actionCardDisabled,
-              ]}
-              onPress={handleOpenBulk}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.actionIconCircle, { backgroundColor: '#F0F9FF' }]}>
-                <Ionicons name="cloud-upload" size={16} color="#0284C7" />
-              </View>
-              <Text style={[styles.actionCardTitle, { color: canPerformInchargeActions ? '#0284C7' : COLORS.textMuted }]} numberOfLines={1}>Bulk CSV</Text>
-              <Text style={styles.actionCardSub}>
-                {canPerformInchargeActions ? 'CSV Import' : 'Incharge Only'}
-              </Text>
-              {!canPerformInchargeActions && (
-                <View style={styles.actionLockBadge}>
-                  <Ionicons name="lock-closed" size={10} color="#94A3B8" />
-                </View>
-              )}
-            </TouchableOpacity>
+          <View style={styles.scopeNote}>
+            <Ionicons name="information-circle-outline" size={15} color="#475569" />
+            <Text style={styles.scopeNoteText}>
+              New students are added by the school office.{isCurrentSectionIncharge ? ' As class teacher you can update a student\'s photo from their card.' : ''}
+            </Text>
           </View>
 
           {/* Search bar */}
@@ -534,53 +339,19 @@ export default function TeacherStudents() {
           )}
 
           <View style={{ height: SPACING.xxl }} />
-        </ScrollView>
+        </RefreshScrollView>
 
         {/* Student Detail Modal */}
         <StudentDetailModal
           student={selectedStudent}
           visible={detailModalVisible}
-          isClassIncharge={canPerformInchargeActions}
+          isClassIncharge={isCurrentSectionIncharge}
           onClose={() => setDetailModalVisible(false)}
           onStudentUpdated={() => {
             if (selectedSectionId) loadStudents(selectedSectionId);
           }}
         />
 
-        {/* Add Student Modal */}
-        <AddStudentModal
-          visible={addModalVisible}
-          defaultSectionId={activeInchargeSectionId}
-          inchargeSectionIds={inchargeSectionIds}
-          onClose={() => setAddModalVisible(false)}
-          onSuccess={() => {
-            if (selectedSectionId) loadStudents(selectedSectionId);
-          }}
-        />
-
-        {/* New Admission Modal */}
-        <NewAdmissionModal
-          visible={newAdmissionModalVisible}
-          defaultSectionId={activeInchargeSectionId}
-          inchargeSectionIds={inchargeSectionIds}
-          onClose={() => setNewAdmissionModalVisible(false)}
-          onSuccess={() => {
-            if (selectedSectionId) loadStudents(selectedSectionId);
-          }}
-        />
-
-        {/* Bulk Student Entry Modal */}
-        <BulkStudentEntryModal
-          visible={bulkModalVisible}
-          sections={inchargeSections.length > 0 ? inchargeSections : sectionChips}
-          defaultSectionId={activeInchargeSectionId}
-          isClassIncharge={canPerformInchargeActions}
-          inchargeSectionIds={inchargeSectionIds}
-          onClose={() => setBulkModalVisible(false)}
-          onSuccess={() => {
-            if (selectedSectionId) loadStudents(selectedSectionId);
-          }}
-        />
       </View>
     </View>
   );
@@ -594,52 +365,11 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.md, paddingTop: SPACING.sm },
 
-  actionGrid: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: SPACING.sm + 4,
+  scopeNote: {
+    flexDirection: 'row', alignItems: 'center', gap: 7, marginBottom: SPACING.sm,
+    paddingHorizontal: 12, paddingVertical: 9, borderRadius: 12, backgroundColor: '#F1F4F8', borderWidth: 1, borderColor: '#E2E7EE',
   },
-  actionCard: {
-    flex: 1,
-    borderRadius: RADIUS.lg,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    ...SHADOW.sm,
-  },
-  actionCardPrimary: {
-    backgroundColor: COLORS.surface,
-    borderColor: '#C7CDFB',
-  },
-  actionCardSecondary: {
-    backgroundColor: COLORS.surface,
-    borderColor: '#DDD6FE',
-  },
-  actionCardTertiary: {
-    backgroundColor: COLORS.surface,
-    borderColor: '#BAE6FD',
-  },
-  actionIconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 6,
-  },
-  actionCardTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  actionCardSub: {
-    fontSize: 10,
-    color: COLORS.textMuted,
-    marginTop: 2,
-    textAlign: 'center',
-  },
+  scopeNoteText: { flex: 1, fontSize: 12.5, color: '#475569' },
 
   searchRow: {
     marginBottom: SPACING.sm + 4,
@@ -687,7 +417,7 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     ...SHADOW.sm,
   },
-  chipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  chipActive: { backgroundColor: '#0B1736', borderColor: '#0B1736' },
   chipIncharge: {
     borderColor: '#A7F3D0',
     backgroundColor: '#F0FDF4',
@@ -732,7 +462,7 @@ const styles = StyleSheet.create({
 
   actionCardDisabled: {
     opacity: 0.65,
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderColor: COLORS.borderLight,
   },
   actionLockBadge: {

@@ -8,7 +8,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { COLORS, SPACING, RADIUS } from '@/lib/utils';
+import { appAlert } from '@/components/ui/AppDialog';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -31,18 +31,18 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Required Fields', 'Please enter your email and password to continue.');
+      appAlert('Required Fields', 'Please enter your email and password to continue.');
       return;
     }
     setLoading(true);
     try {
       const { error } = await login(email.trim(), password);
       if (error) {
-        Alert.alert('Login Failed', error);
+        appAlert('Login Failed', error);
       } else {
         const adminEmail = 'iamaryan721@gmail.com';
         if (email.trim().toLowerCase() === adminEmail.toLowerCase()) {
-          Alert.alert(
+          appAlert(
             'Web Portal Required',
             'The Administrator dashboard is optimized for desktop web browsers. Mobile app is tailored for Teachers and Parents.'
           );
@@ -61,7 +61,7 @@ export default function LoginScreen() {
 
       {/* Clean subtle light gradient */}
       <LinearGradient
-        colors={['#FFFFFF', '#F4F5FB', '#F1F5F9']}
+        colors={['#FFFFFF', '#F5F7FA', '#F1F5F9']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
@@ -157,6 +157,7 @@ export default function LoginScreen() {
                 label="Sign In to Portal"
                 onPress={handleLogin}
                 loading={loading}
+                loadingLabel="Signing in…"
                 fullWidth
                 size="lg"
                 icon="log-in-outline"
@@ -177,7 +178,7 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
   },
   safeArea: {
     flex: 1,
@@ -260,7 +261,7 @@ const styles = StyleSheet.create({
   inputField: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
     borderRadius: RADIUS.md,
@@ -269,7 +270,7 @@ const styles = StyleSheet.create({
     height: 48,
   },
   inputFieldFocused: {
-    borderColor: '#5B6EE8',
+    borderColor: '#1E5BD8',
     backgroundColor: '#FFFFFF',
   },
   inputIcon: {

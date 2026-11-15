@@ -3,15 +3,12 @@ import {
   View,
   Text,
   ScrollView,
-  RefreshControl,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
   Modal,
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,12 +29,15 @@ import { Avatar } from '@/components/ui/Avatar';
 import { MobileListSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/context/AuthContext';
 import type { Remark, Student } from '@/types';
+import { appAlert } from '@/components/ui/AppDialog';
+import { RefreshScrollView } from '@/components/ui/RefreshScrollView';
+import { Button } from '@/components/ui/Button';
 
 type RemarkCategory = 'academic' | 'behaviour' | 'attendance' | 'performance' | 'general';
 type RemarkVisibility = 'public' | 'parents_only' | 'staff_only';
 
 const CATEGORIES: { key: RemarkCategory; label: string; bg: string; text: string; border: string }[] = [
-  { key: 'academic', label: 'Academic', bg: '#EEF0FD', text: '#5B6EE8', border: '#C7CDFB' },
+  { key: 'academic', label: 'Academic', bg: '#EBF2FE', text: '#1E5BD8', border: '#BFD6FB' },
   { key: 'behaviour', label: 'Behaviour', bg: '#FEF3C7', text: '#D97706', border: '#FDE68A' },
   { key: 'attendance', label: 'Attendance', bg: '#ECFDF5', text: '#059669', border: '#A7F3D0' },
   { key: 'performance', label: 'Performance', bg: '#F3E8FF', text: '#7C3AED', border: '#DDD6FE' },
@@ -139,11 +139,11 @@ export default function TeacherRemarksModal() {
 
   const handleSave = async () => {
     if (!selectedStudentId) {
-      Alert.alert('Required', 'Please select a student.');
+      appAlert('Required', 'Please select a student.');
       return;
     }
     if (!remarkText.trim()) {
-      Alert.alert('Required', 'Please write your remark.');
+      appAlert('Required', 'Please write your remark.');
       return;
     }
 
@@ -162,14 +162,14 @@ export default function TeacherRemarksModal() {
       await loadData();
     } catch (err) {
       console.error('Save remark error', err);
-      Alert.alert('Error', 'Failed to save remark. Please try again.');
+      appAlert('Error', 'Failed to save remark. Please try again.');
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = (remark: RemarkWithStudent) => {
-    Alert.alert(
+    appAlert(
       'Delete Remark',
       `Delete remark for ${remark.studentName}?`,
       [
@@ -183,7 +183,7 @@ export default function TeacherRemarksModal() {
               setRemarks(prev => prev.filter(r => r.id !== remark.id));
             } catch (err) {
               console.error('Delete remark error', err);
-              Alert.alert('Error', 'Failed to delete remark.');
+              appAlert('Error', 'Failed to delete remark.');
             }
           },
         },
@@ -230,13 +230,7 @@ export default function TeacherRemarksModal() {
           title="Student Remarks"
           showBack
           rightAction={
-            <TouchableOpacity
-              onPress={openAddModal}
-              activeOpacity={0.8}
-              style={styles.headerAddBtn}>
-              <Ionicons name="add" size={18} color="#FFFFFF" />
-              <Text style={styles.headerAddBtnText}>Add Remark</Text>
-            </TouchableOpacity>
+            <Button label="Add Remark" icon="add" size="sm" onPress={openAddModal} />
           }
         />
 
@@ -307,18 +301,10 @@ export default function TeacherRemarksModal() {
           </ScrollView>
         </View>
 
-        <ScrollView
+        <RefreshScrollView refreshing={refreshing} onRefresh={onRefresh}
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={COLORS.primary}
-              colors={[COLORS.primary]}
-            />
-          }>
+          showsVerticalScrollIndicator={false}>
 
           {filteredRemarks.length === 0 ? (
             <View style={styles.emptyWrap}>
@@ -388,7 +374,7 @@ export default function TeacherRemarksModal() {
           )}
 
           <View style={{ height: SPACING.xxl }} />
-        </ScrollView>
+        </RefreshScrollView>
       </SafeAreaView>
 
       {/* Add Remark Modal */}
@@ -558,20 +544,15 @@ export default function TeacherRemarksModal() {
                 </View>
 
                 {/* Save button */}
-                <TouchableOpacity
+                <Button
+                  label="Publish Remark"
+                  loadingLabel="Publishing…"
+                  icon="checkmark-circle-outline"
+                  size="lg"
+                  fullWidth
+                  loading={saving}
                   onPress={handleSave}
-                  activeOpacity={0.85}
-                  disabled={saving}
-                  style={[styles.saveBtn, saving && styles.saveBtnDisabled]}>
-                  {saving ? (
-                    <ActivityIndicator size="small" color="#FFFFFF" />
-                  ) : (
-                    <>
-                      <Ionicons name="checkmark-circle-outline" size={20} color="#FFFFFF" />
-                      <Text style={styles.saveBtnText}>Publish Remark</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
+                />
 
                 <View style={{ height: SPACING.lg }} />
               </ScrollView>
@@ -606,21 +587,6 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontWeight: '500',
   },
-  headerAddBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.full,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-  },
-  headerAddBtnText: {
-    flexShrink: 1,
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
   searchSection: {
     backgroundColor: '#FFFFFF',
     paddingHorizontal: SPACING.md,
@@ -630,7 +596,7 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderRadius: RADIUS.md,
     paddingHorizontal: SPACING.sm,
     paddingVertical: 8,
@@ -662,8 +628,8 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   categoryFilterChipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: '#0B1736',
+    borderColor: '#0B1736',
   },
   categoryFilterChipText: {
     fontSize: 13,
@@ -756,7 +722,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: RADIUS.sm,
@@ -842,7 +808,7 @@ const styles = StyleSheet.create({
   studentSearchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderRadius: RADIUS.md,
     paddingHorizontal: 10,
     paddingVertical: 7,
@@ -861,7 +827,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     padding: 4,
     marginBottom: SPACING.sm,
   },
@@ -878,7 +844,7 @@ const styles = StyleSheet.create({
   },
   studentItemActive: {
     borderColor: COLORS.primary,
-    backgroundColor: '#EEF0FD',
+    backgroundColor: '#EBF2FE',
   },
   studentItemDetails: {
     flex: 1,
@@ -914,7 +880,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: RADIUS.full,
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
@@ -924,7 +890,7 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
   },
   remarkInput: {
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: '#CBD5E1',
@@ -945,13 +911,13 @@ const styles = StyleSheet.create({
     gap: 10,
     padding: 10,
     borderRadius: RADIUS.md,
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   visibilityCardActive: {
     borderColor: COLORS.primary,
-    backgroundColor: '#EEF0FD',
+    backgroundColor: '#EBF2FE',
   },
   visibilityTextWrap: {
     flex: 1,
@@ -968,23 +934,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.textMuted,
     marginTop: 1,
-  },
-  saveBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.md,
-    paddingVertical: 11,
-    ...SHADOW.md,
-  },
-  saveBtnDisabled: {
-    opacity: 0.6,
-  },
-  saveBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
   },
 });

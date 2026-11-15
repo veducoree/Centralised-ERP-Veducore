@@ -1,12 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-} from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, Pressable, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -19,6 +12,7 @@ import { routeForNotification, setBadgeCount } from '@/lib/notifications';
 import { useLiveNotifications } from '@/lib/useLiveNotifications';
 import { COLORS, SPACING, RADIUS } from '@/lib/utils';
 import type { Notification } from '@/types';
+import { RefreshScrollView } from '@/components/ui/RefreshScrollView';
 
 type Role = 'parent' | 'teacher';
 type FilterKey = 'all' | 'new' | 'attendance' | 'fee' | 'academic' | 'notice';
@@ -36,24 +30,24 @@ function groupOf(n: Notification): Exclude<FilterKey, 'all' | 'new'> {
 type Style = { icon: keyof typeof Ionicons.glyphMap; color: string; bg: string; label: string };
 
 const CATEGORY: Record<string, Style> = {
-  attendance: { icon: 'calendar', color: '#D97706', bg: '#FEF3C7', label: 'Attendance' },
-  fee: { icon: 'wallet', color: '#059669', bg: '#D1FAE5', label: 'Fees' },
-  exam: { icon: 'document-text', color: '#7C3AED', bg: '#EDE9FE', label: 'Exam' },
-  homework: { icon: 'book', color: '#0284C7', bg: '#E0F2FE', label: 'Homework' },
-  remark: { icon: 'chatbubble-ellipses', color: '#475569', bg: '#E2E8F0', label: 'Remark' },
-  holiday: { icon: 'sunny', color: '#0D9488', bg: '#CCFBF1', label: 'Holiday' },
-  event: { icon: 'sparkles', color: '#DB2777', bg: '#FCE7F3', label: 'Event' },
-  transport: { icon: 'bus', color: '#EA580C', bg: '#FFEDD5', label: 'Transport' },
-  timetable: { icon: 'time', color: '#0891B2', bg: '#CFFAFE', label: 'Timetable' },
-  emergency: { icon: 'alert-circle', color: '#DC2626', bg: '#FEE2E2', label: 'Urgent' },
-  announcement: { icon: 'megaphone', color: '#5B6EE8', bg: '#E0E4FC', label: 'Notice' },
+  attendance:   { icon: 'calendar-outline',            color: '#B7791F', bg: '#FBF3E4', label: 'Attendance' },
+  fee:          { icon: 'wallet-outline',              color: '#0E8F6E', bg: '#E7F5EF', label: 'Fees' },
+  exam:         { icon: 'document-text-outline',       color: '#2F55C8', bg: '#ECF1FC', label: 'Exam' },
+  homework:     { icon: 'book-outline',                color: '#0B7CB8', bg: '#E7F3FA', label: 'Homework' },
+  remark:       { icon: 'chatbubble-ellipses-outline', color: '#475569', bg: '#EEF1F5', label: 'Remark' },
+  holiday:      { icon: 'sunny-outline',               color: '#0F8A7E', bg: '#E6F4F2', label: 'Holiday' },
+  event:        { icon: 'sparkles-outline',            color: '#B8456B', bg: '#FAEEF2', label: 'Event' },
+  transport:    { icon: 'bus-outline',                 color: '#C2611A', bg: '#FBF0E6', label: 'Transport' },
+  timetable:    { icon: 'time-outline',                color: '#0E7490', bg: '#E6F3F6', label: 'Timetable' },
+  emergency:    { icon: 'alert-circle-outline',        color: '#C53030', bg: '#FDECEC', label: 'Urgent' },
+  announcement: { icon: 'megaphone-outline',           color: '#1E5BD8', bg: '#EBF2FE', label: 'Notice' },
 };
 
 const BY_TYPE: Record<string, Style> = {
-  success: { icon: 'checkmark-circle', color: '#059669', bg: '#D1FAE5', label: 'Update' },
-  error: { icon: 'close-circle', color: '#DC2626', bg: '#FEE2E2', label: 'Alert' },
-  warning: { icon: 'warning', color: '#D97706', bg: '#FEF3C7', label: 'Reminder' },
-  info: { icon: 'information-circle', color: COLORS.primary, bg: '#E0E4FC', label: 'Info' },
+  success: { icon: 'checkmark-circle-outline',   color: '#0E8F6E', bg: '#E7F5EF', label: 'Update' },
+  error:   { icon: 'close-circle-outline',       color: '#C53030', bg: '#FDECEC', label: 'Alert' },
+  warning: { icon: 'warning-outline',            color: '#B7791F', bg: '#FBF3E4', label: 'Reminder' },
+  info:    { icon: 'information-circle-outline', color: '#1E5BD8', bg: '#EBF2FE', label: 'Info' },
 };
 
 function styleFor(n: Notification): Style {
@@ -157,8 +151,7 @@ export function NotificationFeed({ role }: { role: Role }) {
 
   const onPress = (n: Notification) => {
     const route = routeForNotification(role, { link: n.link, category: n.category });
-    const self = `/${role}-modal/notifications`;
-    if (route !== self) {
+    if (route !== `/${role}-modal/notifications`) {
       router.push(route as never);
       return;
     }
@@ -169,9 +162,8 @@ export function NotificationFeed({ role }: { role: Role }) {
     });
   };
 
-  const summary = fresh.size
-    ? `${fresh.size} new notification${fresh.size > 1 ? 's' : ''}`
-    : 'You’re all caught up';
+  const unread = fresh.size;
+  const self = `/${role}-modal/notifications`;
 
   return (
     <View style={styles.container}>
@@ -180,31 +172,29 @@ export function NotificationFeed({ role }: { role: Role }) {
 
       <View style={styles.topBar}>
         <View style={styles.summaryRow}>
-          <View style={[styles.summaryIcon, fresh.size ? styles.summaryIconActive : null]}>
-            <Ionicons
-              name={fresh.size ? 'notifications' : 'checkmark-done'}
-              size={14}
-              color={fresh.size ? '#FFFFFF' : COLORS.primary}
-            />
+          <View>
+            <Text style={styles.summaryTitle}>{unread ? `${unread} unread` : 'All caught up'}</Text>
+            <Text style={styles.summarySub}>
+              {items.length ? `${items.length} update${items.length > 1 ? 's' : ''} from school` : 'Updates from school appear here'}
+            </Text>
           </View>
-          <Text style={styles.summaryText}>{summary}</Text>
+          <View style={styles.livePill}>
+            <LiveDot />
+            <Text style={styles.liveText}>Live</Text>
+          </View>
         </View>
 
         {filters.length > 1 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.chips}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
             {filters.map(f => {
               const active = filter === f.key;
               return (
-                <TouchableOpacity
+                <Pressable
                   key={f.key}
                   onPress={() => setFilter(f.key)}
-                  activeOpacity={0.8}
-                  style={[styles.chip, active && styles.chipActive]}>
+                  style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && !active && styles.chipPressed]}>
                   <Text style={[styles.chipText, active && styles.chipTextActive]}>{f.label}</Text>
-                </TouchableOpacity>
+                </Pressable>
               );
             })}
           </ScrollView>
@@ -216,194 +206,177 @@ export function NotificationFeed({ role }: { role: Role }) {
           <MobileInlineSkeleton rows={5} />
         </View>
       ) : (
-        <ScrollView
-          style={{ flex: 1 }}
+        <RefreshScrollView refreshing={refreshing} onRefresh={onRefresh}
           contentContainerStyle={visible.length ? styles.list : styles.emptyScroll}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={COLORS.primary}
-              colors={[COLORS.primary]}
-            />
-          }>
+          showsVerticalScrollIndicator={false}>
           {visible.length === 0 ? (
             <EmptyState
               icon="notifications-off-outline"
               title={filter === 'all' ? 'No notifications yet' : 'Nothing here'}
-              subtitle={
-                filter === 'all'
-                  ? 'School updates and alerts will show up here.'
-                  : 'No notifications in this category.'
-              }
+              subtitle={filter === 'all' ? 'School updates and alerts will show up here.' : 'No notifications in this category.'}
             />
           ) : (
-            sections.map(section => (
-              <View key={section.title}>
+            sections.map((section, si) => (
+              <FadeIn key={section.title} delay={si * 60}>
                 <Text style={styles.sectionTitle}>{section.title}</Text>
-                <View style={styles.sectionCard}>
+                <View style={styles.group}>
                   {section.data.map((n, i) => {
-                    const cfg = styleFor(n);
-                    const isNew = fresh.has(n.id);
-                    const isOpen = expanded.has(n.id);
-                    const urgent = n.priority === 'urgent';
+                    const route = routeForNotification(role, { link: n.link, category: n.category });
                     return (
-                      <TouchableOpacity
+                      <NotificationRow
                         key={n.id}
-                        activeOpacity={0.7}
+                        n={n}
+                        cfg={styleFor(n)}
+                        first={i === 0}
+                        isNew={fresh.has(n.id)}
+                        isOpen={expanded.has(n.id)}
+                        opensScreen={route !== self}
                         onPress={() => onPress(n)}
-                        style={[
-                          styles.row,
-                          i > 0 && styles.rowDivider,
-                          isNew && styles.rowNew,
-                        ]}>
-                        {urgent && <View style={styles.urgentBar} />}
-                        <View style={[styles.iconTile, { backgroundColor: cfg.bg }]}>
-                          <Ionicons name={cfg.icon} size={19} color={cfg.color} />
-                        </View>
-
-                        <View style={styles.body}>
-                          <View style={styles.titleRow}>
-                            <Text
-                              style={[styles.title, isNew && styles.titleNew]}
-                              numberOfLines={isOpen ? undefined : 1}>
-                              {n.title}
-                            </Text>
-                            {isNew && (
-                              <View style={styles.newPill}>
-                                <Text style={styles.newPillText}>NEW</Text>
-                              </View>
-                            )}
-                          </View>
-
-                          {!!n.message && (
-                            <Text style={styles.message} numberOfLines={isOpen ? undefined : 2}>
-                              {n.message}
-                            </Text>
-                          )}
-
-                          <View style={styles.meta}>
-                            <Text style={[styles.metaLabel, { color: cfg.color }]}>{cfg.label}</Text>
-                            <View style={styles.metaDot} />
-                            <Text style={styles.metaTime}>{timeLabel(n.created_at)}</Text>
-                          </View>
-                        </View>
-                      </TouchableOpacity>
+                      />
                     );
                   })}
                 </View>
-              </View>
+              </FadeIn>
             ))
           )}
           <View style={{ height: 40 }} />
-        </ScrollView>
+        </RefreshScrollView>
       )}
     </View>
   );
 }
 
+function FadeIn({ delay, children }: { delay: number; children: React.ReactNode }) {
+  const v = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(v, { toValue: 1, duration: 300, delay, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+  }, [v, delay]);
+  return (
+    <Animated.View style={{ opacity: v, transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }] }}>
+      {children}
+    </Animated.View>
+  );
+}
+
+function LiveDot() {
+  const v = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const loop = Animated.loop(Animated.timing(v, { toValue: 1, duration: 1800, easing: Easing.out(Easing.quad), useNativeDriver: true }));
+    loop.start();
+    return () => loop.stop();
+  }, [v]);
+  return (
+    <View style={styles.liveDotWrap}>
+      <Animated.View style={[styles.liveHalo, {
+        opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0] }),
+        transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [1, 2.4] }) }],
+      }]} />
+      <View style={styles.liveDot} />
+    </View>
+  );
+}
+
+function NotificationRow({ n, cfg, first, isNew, isOpen, opensScreen, onPress }: {
+  n: Notification; cfg: Style; first: boolean; isNew: boolean; isOpen: boolean; opensScreen: boolean; onPress: () => void;
+}) {
+  const urgent = n.priority === 'urgent';
+  const long = (n.message?.length ?? 0) > 110;
+
+  return (
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}>
+      {!first && <View style={styles.divider} />}
+      <View style={[styles.iconTile, { backgroundColor: cfg.bg }]}>
+        <Ionicons name={cfg.icon} size={19} color={cfg.color} />
+      </View>
+
+      <View style={styles.body}>
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, isNew && styles.titleNew]} numberOfLines={isOpen ? undefined : 2}>{n.title}</Text>
+          <View style={styles.timeWrap}>
+            {isNew && <View style={styles.unreadDot} />}
+            <Text style={[styles.time, isNew && styles.timeNew]}>{timeLabel(n.created_at)}</Text>
+          </View>
+        </View>
+
+        {!!n.message && (
+          <Text style={styles.message} numberOfLines={isOpen ? undefined : 2}>{n.message}</Text>
+        )}
+
+        <View style={styles.meta}>
+          <View style={[styles.metaDot, { backgroundColor: cfg.color }]} />
+          <Text style={styles.metaLabel}>{cfg.label}</Text>
+          {urgent && <Text style={styles.urgent}>  ·  Urgent</Text>}
+          <View style={{ flex: 1 }} />
+          {opensScreen ? (
+            <Ionicons name="chevron-forward" size={15} color={COLORS.textDim} />
+          ) : long ? (
+            <Text style={styles.more}>{isOpen ? 'Show less' : 'Show more'}</Text>
+          ) : null}
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+const INK = '#0B1736';
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.canvas },
 
   topBar: {
-    backgroundColor: '#FFFFFF',
-    paddingTop: 12,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E8EAF3',
-    gap: 10,
+    backgroundColor: '#FFFFFF', paddingTop: 14, paddingBottom: 12, gap: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#D9DEE7',
   },
-  summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    paddingHorizontal: SPACING.md,
+  summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SPACING.md },
+  summaryTitle: { fontSize: 20, fontWeight: '800', color: INK, letterSpacing: -0.4 },
+  summarySub: { fontSize: 12.5, color: COLORS.textMuted, marginTop: 2 },
+  livePill: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, paddingVertical: 5,
+    borderRadius: RADIUS.full, backgroundColor: '#F1F5F4', borderWidth: 1, borderColor: '#DDEBE5',
   },
-  summaryIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: COLORS.primaryBg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  summaryIconActive: { backgroundColor: COLORS.primary },
-  summaryText: { fontSize: 13, fontWeight: '600', color: COLORS.text, flexShrink: 1 },
+  liveText: { fontSize: 11.5, fontWeight: '700', color: '#0E7A5A' },
+  liveDotWrap: { width: 8, height: 8, alignItems: 'center', justifyContent: 'center' },
+  liveHalo: { position: 'absolute', width: 8, height: 8, borderRadius: 4, backgroundColor: '#10B981' },
+  liveDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#10B981' },
 
   chips: { gap: 8, paddingHorizontal: SPACING.md },
   chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: RADIUS.full,
-    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 14, paddingVertical: 7, borderRadius: RADIUS.full,
+    backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#DCE1EA',
   },
-  chipActive: { backgroundColor: COLORS.text },
-  chipText: { fontSize: 12, fontWeight: '600', color: COLORS.textMuted },
+  chipActive: { backgroundColor: INK, borderColor: INK },
+  chipPressed: { backgroundColor: '#F3F5F9' },
+  chipText: { fontSize: 12.5, fontWeight: '600', color: '#475569' },
   chipTextActive: { color: '#FFFFFF' },
 
   emptyScroll: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 60 },
   list: { paddingHorizontal: SPACING.md, paddingTop: 4 },
 
   sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.textDim,
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    marginTop: 18,
-    marginBottom: 8,
-    marginLeft: 4,
+    fontSize: 11.5, fontWeight: '700', color: COLORS.textDim, letterSpacing: 1,
+    textTransform: 'uppercase', marginTop: 20, marginBottom: 8, marginLeft: 4,
   },
-  sectionCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    overflow: 'hidden',
-    shadowColor: '#5B6EE8',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07,
-    shadowRadius: 14,
-    elevation: 2,
+  group: {
+    backgroundColor: '#FFFFFF', borderRadius: 16, overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth, borderColor: '#D9DEE7',
+    shadowColor: INK, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 1,
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-  },
-  rowDivider: { borderTopWidth: 1, borderTopColor: '#F1F5F9' },
-  rowNew: { backgroundColor: '#F7F8FF' },
-  urgentBar: {
-    position: 'absolute',
-    left: 0,
-    top: 10,
-    bottom: 10,
-    width: 3,
-    borderRadius: 2,
-    backgroundColor: '#DC2626',
-  },
-  iconTile: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingHorizontal: 14, paddingVertical: 14 },
+  rowPressed: { backgroundColor: '#F6F8FB' },
+  divider: { position: 'absolute', top: 0, left: 66, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: '#E3E7EE' },
+  iconTile: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   body: { flex: 1, minWidth: 0 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  title: { flex: 1, fontSize: 14, fontWeight: '600', color: '#334155' },
-  titleNew: { fontWeight: '700', color: COLORS.text },
-  newPill: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  newPillText: { fontSize: 9, fontWeight: '800', color: '#FFFFFF', letterSpacing: 0.5 },
-  message: { fontSize: 13, color: COLORS.textMuted, lineHeight: 19, marginTop: 3 },
-  meta: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
-  metaLabel: { fontSize: 11, fontWeight: '700' },
-  metaDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: COLORS.textDim, marginHorizontal: 6 },
-  metaTime: { fontSize: 11, color: COLORS.textDim, flexShrink: 1 },
+  titleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  title: { flex: 1, fontSize: 14.5, fontWeight: '600', color: '#334155', lineHeight: 20 },
+  titleNew: { fontWeight: '700', color: INK },
+  timeWrap: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  unreadDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: COLORS.primary },
+  time: { fontSize: 11.5, color: COLORS.textDim, fontWeight: '500' },
+  timeNew: { color: COLORS.primary, fontWeight: '700' },
+  message: { fontSize: 13.5, color: '#5B6678', lineHeight: 19.5, marginTop: 3 },
+  meta: { flexDirection: 'row', alignItems: 'center', marginTop: 9 },
+  metaDot: { width: 6, height: 6, borderRadius: 3, marginRight: 6 },
+  metaLabel: { fontSize: 11.5, fontWeight: '600', color: '#64748B' },
+  urgent: { fontSize: 11.5, fontWeight: '800', color: '#C53030' },
+  more: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
 });

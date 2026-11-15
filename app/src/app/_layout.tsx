@@ -5,6 +5,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { enableScreens } from 'react-native-screens';
+import { DialogHost } from '@/components/ui/AppDialog';
 import { setupNotifications, registerPushToken, onNotificationTap, routeForNotification } from '@/lib/notifications';
 
 enableScreens(true);
@@ -39,7 +40,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (Platform.OS === 'android') {
       (RNStatusBar as any).setTranslucent?.(true);
-      (RNStatusBar as any).setBackgroundColor?.('#F4F5FB', false);
+      (RNStatusBar as any).setBackgroundColor?.('#F5F7FA', false);
       RNStatusBar.setBarStyle('dark-content', false);
     }
     // Initialize notification channels and request device permissions
@@ -47,14 +48,14 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <SafeAreaProvider style={{ flex: 1, backgroundColor: '#F4F5FB' }}>
+    <SafeAreaProvider style={{ flex: 1, backgroundColor: '#F5F7FA' }}>
       <AuthProvider>
         <PushBridge />
         <StatusBar style="dark" />
         <Stack
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: '#F4F5FB' },
+            contentStyle: { backgroundColor: '#F5F7FA' },
             animation: 'fade',
           }}>
           <Stack.Screen name="index" />
@@ -70,6 +71,7 @@ export default function RootLayout() {
             options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
           />
         </Stack>
+        <DialogHost />
       </AuthProvider>
     </SafeAreaProvider>
   );

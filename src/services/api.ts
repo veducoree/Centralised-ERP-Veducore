@@ -167,6 +167,8 @@ export {
   createHoliday,
   updateHoliday,
   deleteHoliday,
+  upsertHolidays,
+  clearHolidayDates,
   fetchExamDefs,
   createExamDef,
   deleteExamDef,

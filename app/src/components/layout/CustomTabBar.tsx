@@ -47,7 +47,7 @@ function TabButton({ tab, focused, onPress }: { tab: TabItem; focused: boolean; 
         <Ionicons
           name={focused ? tab.iconFocused : tab.icon}
           size={23}
-          color={focused ? '#5B6EE8' : '#94A3B8'}
+          color={focused ? '#1E5BD8' : '#94A3B8'}
         />
       </Animated.View>
       <Text style={[styles.label, focused && styles.labelFocused]} numberOfLines={1} ellipsizeMode="tail">
@@ -78,7 +78,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 6,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    shadowColor: '#5B6EE8',
+    shadowColor: '#1E5BD8',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
@@ -103,7 +103,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   labelFocused: {
-    color: '#5B6EE8',
+    color: '#1E5BD8',
     fontWeight: '700',
   },
 });

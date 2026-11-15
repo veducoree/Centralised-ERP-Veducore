@@ -3,10 +3,8 @@ import {
   View,
   Text,
   ScrollView,
-  RefreshControl,
   StyleSheet,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
@@ -30,6 +28,8 @@ import type {
   TransportStop,
   StudentTransportAssignment,
 } from '@/types';
+import { appAlert } from '@/components/ui/AppDialog';
+import { RefreshScrollView } from '@/components/ui/RefreshScrollView';
 
 interface ChildInfo {
   student: Student;
@@ -117,10 +117,14 @@ export default function ParentTransport() {
     [stops, selectedStopId]
   );
 
+  const vLabel = (t?: string) => (t === 'van' ? 'Van' : 'Bus');
+  const per = (p?: string) => `/${(p || 'Monthly').toLowerCase().replace('ly', '')}`;
+  const isClosed = childAssignment?.status === 'rejected' || childAssignment?.status === 'stopped';
+
   const handleApplyTransport = async () => {
     if (!selectedChild) return;
     if (!selectedStopObj) {
-      Alert.alert('Select Bus Stop', 'Please select a bus stop to apply for transport.');
+      appAlert('Select Stop', 'Please select a stop to apply for transport.');
       return;
     }
 
@@ -153,15 +157,15 @@ export default function ParentTransport() {
       const saved = await applyForTransport(schoolId, payload);
       setAssignments((prev) => ({
         ...prev,
-        [selectedChild.student.id]: saved,
+        [selectedChild.student.id]: { ...saved, vehicle_type: selectedStopObj.vehicle_type, fare_period: selectedStopObj.fare_period },
       }));
 
-      Alert.alert(
+      appAlert(
         'Transport Application Submitted',
         `Your transport application for ${selectedChild.student.full_name} at "${selectedStopObj.stop_name}" (${formatCurrency(selectedStopObj.amount)}) has been sent to the school admin.`
       );
-    } catch {
-      Alert.alert('Error', 'Could not submit transport application. Please try again.');
+    } catch (err) {
+      appAlert('Error', err instanceof Error ? err.message : 'Could not submit transport application. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -182,18 +186,10 @@ export default function ParentTransport() {
       <StatusBar style="dark" />
       <Header title="School Transport" />
 
-      <ScrollView
+      <RefreshScrollView refreshing={refreshing} onRefresh={onRefresh}
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#5B6EE8"
-            colors={['#5B6EE8']}
-          />
-        }
       >
         {/* Child selector if multiple children */}
         {children.length > 1 && (
@@ -247,7 +243,7 @@ export default function ParentTransport() {
                 <View
                   style={[
                     styles.statusBadge,
-                    childAssignment.status === 'pending'
+                    childAssignment.status === 'pending' || isClosed
                       ? styles.pendingBadge
                       : styles.activeBadge,
                   ]}
@@ -272,7 +268,11 @@ export default function ParentTransport() {
                   >
                     {childAssignment.status === 'pending'
                       ? 'Pending Approval'
-                      : 'Active'}
+                      : childAssignment.status === 'rejected'
+                        ? 'Not Approved'
+                        : childAssignment.status === 'stopped'
+                          ? 'Stopped'
+                          : 'Active'}
                   </Text>
                 </View>
               ) : (
@@ -286,7 +286,12 @@ export default function ParentTransport() {
               <View style={styles.assignedBody}>
                 <View style={styles.assignedRow}>
                   <View style={{ flex: 1 }}>
-                    <Text style={styles.assignedLabel}>SELECTED BUS STOP</Text>
+                    {childAssignment.status === 'rejected' && childAssignment.reject_reason ? (
+                      <Text style={[styles.assignedLandmark, { color: '#B91C1C', marginBottom: 6 }]}>
+                        Reason from school: {childAssignment.reject_reason}
+                      </Text>
+                    ) : null}
+                    <Text style={styles.assignedLabel}>STOP</Text>
                     <Text style={styles.assignedStopName}>{childAssignment.stop_name}</Text>
                     {childAssignment.area_landmark ? (
                       <Text style={styles.assignedLandmark}>
@@ -298,15 +303,16 @@ export default function ParentTransport() {
                     <Text style={styles.assignedAmountLabel}>TRANSPORT FEE</Text>
                     <Text style={styles.assignedAmountVal}>
                       {formatCurrency(childAssignment.amount)}
+                      <Text style={{ fontSize: 11, fontWeight: '500' }}>{per(childAssignment.fare_period)}</Text>
                     </Text>
                   </View>
                 </View>
 
                 <View style={styles.assignedMetaGrid}>
                   <View style={styles.assignedMetaItem}>
-                    <Ionicons name="bus-outline" size={15} color="#5B6EE8" />
+                    <Ionicons name={childAssignment.vehicle_type === 'van' ? 'car-outline' : 'bus-outline'} size={15} color="#1E5BD8" />
                     <Text style={styles.assignedMetaText}>
-                      {childAssignment.bus_number || 'School Bus'}
+                      {vLabel(childAssignment.vehicle_type)} {childAssignment.bus_number || ''}
                       {childAssignment.route_name ? ` · Route: ${childAssignment.route_name}` : ''}
                     </Text>
                   </View>
@@ -323,7 +329,7 @@ export default function ParentTransport() {
               </View>
             ) : (
               <Text style={styles.emptySmall}>
-                No bus stop selected yet. Select your preferred bus stop below and apply for transport.
+                No stop selected yet. Pick a bus or van stop below and apply for transport.
               </Text>
             )}
           </View>
@@ -332,7 +338,7 @@ export default function ParentTransport() {
         {/* ── 2. APPLY FOR SCHOOL TRANSPORT (SELECT BUS & BUS STOP) ── */}
         <View style={styles.applyCard}>
           <Text style={styles.applyCardTitle}>
-            {childAssignment ? 'Change / Update Bus Stop Application' : 'Apply for School Transport'}
+            {childAssignment ? 'Change Stop' : 'Apply for School Transport'}
           </Text>
           <Text style={styles.applyCardSub}>
             Select your preferred bus stop below and submit your application. It will be sent directly to the school administration.
@@ -342,14 +348,14 @@ export default function ParentTransport() {
             <EmptyState
               icon="bus-outline"
               title="No transport stops available"
-              subtitle="School bus routes and stops will appear here once added by the school administrator."
+              subtitle="Bus and van routes will appear here once the school adds them."
             />
           ) : (
             <>
               {/* Bus / Route Filter Chips */}
               {buses.length > 1 && (
                 <View style={{ marginBottom: 12 }}>
-                  <Text style={styles.fieldLabel}>Filter by Bus / Route</Text>
+                  <Text style={styles.fieldLabel}>Filter by Bus / Van</Text>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -368,7 +374,7 @@ export default function ParentTransport() {
                           selectedBusFilter === 'all' && styles.busFilterChipTextActive,
                         ]}
                       >
-                        All Buses ({stops.length} Stops)
+                        All ({stops.length} Stops)
                       </Text>
                     </TouchableOpacity>
                     {buses.map((b) => {
@@ -388,7 +394,7 @@ export default function ParentTransport() {
                               active && styles.busFilterChipTextActive,
                             ]}
                           >
-                            {b.bus_number} · {b.route_name}
+                            {vLabel(b.vehicle_type)} {b.bus_number} · {b.route_name}
                           </Text>
                         </TouchableOpacity>
                       );
@@ -397,7 +403,7 @@ export default function ParentTransport() {
                 </View>
               )}
 
-              <Text style={styles.fieldLabel}>Select Your Bus Stop</Text>
+              <Text style={styles.fieldLabel}>Select Your Stop</Text>
               <View style={styles.stopSelectList}>
                 {filteredStops.map((stop, idx) => {
                   const isSelected = selectedStopId === stop.id;
@@ -426,7 +432,7 @@ export default function ParentTransport() {
                           )}
                         </View>
                         <Text style={styles.stopOptionMeta}>
-                          {stop.bus_number ? `${stop.bus_number}` : 'School Bus'}
+                          {vLabel(stop.vehicle_type)} {stop.bus_number || ''}
                           {stop.route_name ? ` · ${stop.route_name}` : ''}
                           {stop.stop_order ? ` · Stop #${stop.stop_order}` : ` · Stop #${idx + 1}`}
                         </Text>
@@ -440,7 +446,7 @@ export default function ParentTransport() {
                       </View>
 
                       <View style={styles.stopFarePill}>
-                        <Text style={styles.stopFareText}>{formatCurrency(stop.amount)}</Text>
+                        <Text style={styles.stopFareText}>{formatCurrency(stop.amount)}{per(stop.fare_period)}</Text>
                       </View>
                     </TouchableOpacity>
                   );
@@ -452,7 +458,7 @@ export default function ParentTransport() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.selectedSummaryLabel}>Selected Stop</Text>
                     <Text style={styles.selectedSummaryValue}>
-                      {selectedStopObj.stop_name} ({selectedStopObj.bus_number || 'School Bus'})
+                      {selectedStopObj.stop_name} ({vLabel(selectedStopObj.vehicle_type)} {selectedStopObj.bus_number || ''})
                     </Text>
                   </View>
                   <Text style={styles.selectedSummaryFare}>
@@ -465,8 +471,8 @@ export default function ParentTransport() {
                 label={
                   submitting
                     ? 'Submitting Application...'
-                    : childAssignment
-                      ? 'Update Transport Application'
+                    : childAssignment && !isClosed
+                      ? childAssignment.status === 'pending' ? 'Update Application' : 'Request Stop Change'
                       : 'Apply for Transport'
                 }
                 variant="primary"
@@ -479,13 +485,13 @@ export default function ParentTransport() {
         </View>
 
         <View style={{ height: SPACING.xxl }} />
-      </ScrollView>
+      </RefreshScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F4F5FB' },
+  container: { flex: 1, backgroundColor: '#F5F7FA' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.md, paddingTop: SPACING.sm },
 
@@ -506,11 +512,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  childChipActive: { backgroundColor: '#EEF0FD', borderColor: '#5B6EE8' },
+  childChipActive: { backgroundColor: '#EBF2FE', borderColor: '#1E5BD8' },
   childChipName: { fontSize: 13, fontWeight: '700', color: '#64748B' },
-  childChipNameActive: { color: '#5B6EE8' },
+  childChipNameActive: { color: '#1E5BD8' },
   childChipSub: { fontSize: 11, color: '#94A3B8', marginTop: 1 },
-  childChipSubActive: { color: '#4B5DD8' },
+  childChipSubActive: { color: '#1A4FC4' },
 
   assignedCard: {
     backgroundColor: '#FFFFFF',
@@ -562,7 +568,7 @@ const styles = StyleSheet.create({
   },
   inactiveBadgeText: { fontSize: 10, fontWeight: '600', color: '#64748B' },
   assignedBody: {
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderRadius: RADIUS.md,
     padding: 12,
     borderWidth: 1,
@@ -626,7 +632,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: RADIUS.full,
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
@@ -648,7 +654,7 @@ const styles = StyleSheet.create({
   stopOptionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderRadius: RADIUS.md,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
@@ -719,7 +725,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderWidth: 1,
     borderColor: '#DBEAFE',
     borderRadius: RADIUS.md,

@@ -72,6 +72,7 @@ export interface Teacher {
   qualification: string | null;
   subject: string | null;
   date_of_joining: string | null;
+  address?: string | null;
   avatar_url: string | null;
   status: ActiveStatus;
   password?: string;
@@ -106,6 +107,11 @@ export interface Student {
   parent_email?: string | null;
   emergency_contact?: string | null;
   parent_phone?: string | null;
+  whatsapp_number?: string | null;
+  previous_school?: string | null;
+  previous_board?: string | null;
+  tc_number?: string | null;
+  tc_date?: string | null;
   date_of_birth: string | null;
   gender: string | null;
   class_id: string | null;
@@ -403,6 +409,8 @@ export interface FeeStructure {
 
 export type PaymentPlan = 'full' | 'emi' | 'quarterly';
 
+export type VehicleType = 'bus' | 'van';
+
 export interface TransportStop {
   id: string;
   stop_name: string;
@@ -412,6 +420,7 @@ export interface TransportStop {
   bus_id?: string;
   bus_number?: string;
   route_name?: string;
+  vehicle_type?: VehicleType;
   stop_order?: number;
   area_landmark?: string;
   distance_km?: number;
@@ -424,10 +433,16 @@ export interface TransportStop {
   created_at: string;
 }
 
+/** A school vehicle — a bus or a van (table: transport_buses). */
 export interface TransportBus {
   id: string;
+  /** Registration number of the vehicle */
   bus_number: string;
   route_name: string;
+  vehicle_type?: VehicleType;
+  insurance_expiry?: string | null;
+  fitness_expiry?: string | null;
+  permit_expiry?: string | null;
   /** Seat capacity — approved students must not exceed this */
   capacity?: number;
   driver_name?: string;
@@ -449,6 +464,7 @@ export interface TransportFareSnapshot {
   stop_name: string;
   bus_number?: string;
   route_name?: string;
+  vehicle_type?: VehicleType;
 }
 
 export interface StudentTransportAssignment {
@@ -466,6 +482,7 @@ export interface StudentTransportAssignment {
   fare_snapshot?: TransportFareSnapshot;
   route_name?: string;
   bus_number?: string;
+  vehicle_type?: VehicleType;
   area_landmark?: string;
   pickup_time?: string;
   drop_time?: string;

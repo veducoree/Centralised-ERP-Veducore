@@ -41,6 +41,7 @@ export interface Teacher {
   qualification: string;
   subject: string;
   date_of_joining: string;
+  address?: string | null;
   avatar_url: string | null;
   status: 'active' | 'inactive';
   created_at: string;
@@ -100,6 +101,11 @@ export interface Student {
   mother_name: string;
   parent_email: string;
   parent_phone?: string;
+  whatsapp_number?: string | null;
+  previous_school?: string | null;
+  previous_board?: string | null;
+  tc_number?: string | null;
+  tc_date?: string | null;
   emergency_contact?: string;
   date_of_birth: string;
   gender: 'male' | 'female' | 'other';
@@ -331,10 +337,14 @@ export interface MockUser {
   profile: Profile;
 }
 
+export type VehicleType = 'bus' | 'van';
+
 export interface TransportStop {
   id: string;
   stop_name: string;
   amount: number;
+  fare_period?: 'Monthly' | 'Quarterly' | 'Yearly';
+  vehicle_type?: VehicleType;
   bus_id?: string;
   bus_number?: string;
   route_name?: string;
@@ -354,6 +364,8 @@ export interface TransportBus {
   id: string;
   bus_number: string;
   route_name: string;
+  vehicle_type?: VehicleType;
+  status?: 'active' | 'maintenance' | 'inactive';
   driver_name?: string;
   driver_phone?: string;
   total_stops: number;
@@ -361,7 +373,17 @@ export interface TransportBus {
   created_at: string;
 }
 
+export interface TransportFareSnapshot {
+  amount: number;
+  fare_period: 'Monthly' | 'Quarterly' | 'Yearly';
+  stop_name: string;
+  bus_number?: string;
+  route_name?: string;
+  vehicle_type?: VehicleType;
+}
+
 export interface StudentTransportAssignment {
+  id?: string;
   student_id: string;
   student_name?: string;
   class_name?: string;
@@ -377,7 +399,11 @@ export interface StudentTransportAssignment {
   drop_time?: string;
   driver_name?: string;
   driver_phone?: string;
-  status?: 'pending' | 'active';
+  vehicle_type?: VehicleType;
+  fare_period?: 'Monthly' | 'Quarterly' | 'Yearly';
+  fare_snapshot?: TransportFareSnapshot;
+  reject_reason?: string;
+  status?: 'pending' | 'approved' | 'rejected' | 'stopped' | 'active';
   applied_by_parent?: boolean;
   assigned_at: string;
 }

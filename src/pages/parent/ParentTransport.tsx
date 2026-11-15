@@ -92,6 +92,9 @@ export default function ParentTransport() {
       .catch(() => {});
   }, [selectedChildId]);
 
+  const vLabel = (t?: string) => (t === 'van' ? 'Van' : 'Bus');
+  const per = (p?: string) => `/${(p || 'Monthly').toLowerCase().replace('ly', '')}`;
+
   const selectedChild = children.find((c) => c.id === selectedChildId);
   const childAssignment = selectedChild ? assignments[selectedChild.id] : undefined;
 
@@ -118,7 +121,7 @@ export default function ParentTransport() {
   async function handleApplyTransport() {
     if (!selectedChild) return;
     if (!selectedStopObj) {
-      toast('Please select a bus stop to apply for transport', 'error');
+      toast('Please select a stop to apply for transport', 'error');
       return;
     }
 
@@ -151,14 +154,14 @@ export default function ParentTransport() {
       const saved = await applyForTransport(schoolId, payload);
       setAssignments((prev) => ({
         ...prev,
-        [selectedChild.id]: saved,
+        [selectedChild.id]: { ...saved, vehicle_type: selectedStopObj.vehicle_type, fare_period: selectedStopObj.fare_period },
       }));
       toast(
         `Transport application submitted for ${selectedChild.full_name} (${selectedStopObj.stop_name})`,
         'success'
       );
-    } catch {
-      toast('Failed to submit transport application', 'error');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to submit transport application', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -181,7 +184,7 @@ export default function ParentTransport() {
       <div className="space-y-6">
         <PageHeader
           title="School Transport Application"
-          description="Select your preferred bus stop to apply for school transport and view your child's assigned bus details."
+          description="Apply for the school bus or van and see your child's vehicle, stop and driver details."
         />
 
         {children.length > 1 && (
@@ -223,11 +226,15 @@ export default function ParentTransport() {
                   className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold text-white border ${
                     childAssignment.status === 'pending'
                       ? 'bg-amber-400/25 border-amber-300/40'
-                      : 'bg-emerald-400/20 border-emerald-300/40'
+                      : childAssignment.status === 'rejected' || childAssignment.status === 'stopped'
+                        ? 'bg-red-400/25 border-red-300/40'
+                        : 'bg-emerald-400/20 border-emerald-300/40'
                   }`}
                 >
                   <CheckCircle2 className="h-3.5 w-3.5" />
-                  {childAssignment.status === 'pending' ? 'Pending Approval' : 'Active'}
+                  {childAssignment.status === 'pending' ? 'Pending Approval'
+                    : childAssignment.status === 'rejected' ? 'Not Approved'
+                    : childAssignment.status === 'stopped' ? 'Stopped' : 'Active'}
                 </span>
               ) : (
                 <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium text-brand-100">
@@ -237,12 +244,17 @@ export default function ParentTransport() {
             </div>
 
             <div className="p-5">
+              {childAssignment?.status === 'rejected' && childAssignment.reject_reason && (
+                <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+                  Reason from school: {childAssignment.reject_reason}
+                </p>
+              )}
               {childAssignment ? (
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <div className="rounded-xl border border-brand-100 bg-brand-50/50 p-4">
                     <div className="flex items-center gap-2 text-xs font-semibold text-brand-600 uppercase tracking-wider">
                       <MapPin className="h-4 w-4" />
-                      Selected Bus Stop
+                      Stop
                     </div>
                     <p className="mt-1.5 text-base font-semibold text-slate-900">
                       {childAssignment.stop_name}
@@ -257,10 +269,10 @@ export default function ParentTransport() {
                   <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
                     <div className="flex items-center gap-2 text-xs font-semibold text-indigo-700 uppercase tracking-wider">
                       <Clock className="h-4 w-4" />
-                      Bus &amp; Route
+                      {vLabel(childAssignment.vehicle_type)} &amp; Route
                     </div>
                     <p className="mt-1.5 text-base font-semibold text-indigo-900">
-                      {childAssignment.bus_number || 'School Bus'}
+                      {vLabel(childAssignment.vehicle_type)} {childAssignment.bus_number || ''}
                     </p>
                     <p className="text-xs text-slate-600 mt-0.5">
                       {childAssignment.route_name ? `Route: ${childAssignment.route_name}` : ''}
@@ -275,6 +287,7 @@ export default function ParentTransport() {
                     </div>
                     <p className="mt-1.5 text-base font-semibold text-emerald-700">
                       {formatCurrency(childAssignment.amount, '₹')}
+                      <span className="text-xs font-normal text-emerald-600">{per(childAssignment.fare_period)}</span>
                     </p>
                   </div>
 
@@ -300,7 +313,7 @@ export default function ParentTransport() {
                     No transport application submitted for {selectedChild.full_name} yet.
                   </p>
                   <p className="mt-1 text-xs text-slate-400">
-                    Select a bus stop below and click &ldquo;Apply for Transport&rdquo;.
+                    Select a stop below and click &ldquo;Apply for Transport&rdquo;.
                   </p>
                 </div>
               )}
@@ -312,10 +325,10 @@ export default function ParentTransport() {
         <Card className="p-5 space-y-4">
           <div>
             <h3 className="text-base font-bold text-slate-900">
-              {childAssignment ? 'Update Transport Bus Stop' : 'Apply for School Transport'}
+              {childAssignment && childAssignment.status !== 'rejected' && childAssignment.status !== 'stopped' ? 'Change Stop' : 'Apply for School Transport'}
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Choose your preferred bus stop from the list below and submit your application. It will be sent directly to the school administration.
+              Choose a bus or van stop below and submit. The school will review your application and notify you.
             </p>
           </div>
 
@@ -336,7 +349,7 @@ export default function ParentTransport() {
                         : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'
                     }`}
                   >
-                    All Buses ({stops.length} Stops)
+                    All ({stops.length} stops)
                   </button>
                   {buses.map((b) => (
                     <button
@@ -349,7 +362,7 @@ export default function ParentTransport() {
                           : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-white'
                       }`}
                     >
-                      {b.bus_number} · {b.route_name}
+                      {vLabel(b.vehicle_type)} {b.bus_number} · {b.route_name}
                     </button>
                   ))}
                 </div>
@@ -384,7 +397,7 @@ export default function ParentTransport() {
                             )}
                           </div>
                           <p className="text-xs font-medium text-slate-500 mt-0.5">
-                            {stop.bus_number || 'School Bus'}
+                            {vLabel(stop.vehicle_type)} {stop.bus_number || ''}
                             {stop.route_name ? ` · ${stop.route_name}` : ''}
                             {stop.stop_order ? ` · Stop #${stop.stop_order}` : ` · Stop #${idx + 1}`}
                           </p>
@@ -398,6 +411,7 @@ export default function ParentTransport() {
                         </div>
                         <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-sm font-semibold text-emerald-700 border border-emerald-200 flex-shrink-0">
                           {formatCurrency(stop.amount, '₹')}
+                          <span className="text-[10px] font-normal">{per(stop.fare_period)}</span>
                         </span>
                       </div>
                     </button>
@@ -407,10 +421,10 @@ export default function ParentTransport() {
 
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-brand-100 bg-brand-50/40 p-4">
                 <div>
-                  <p className="text-xs font-semibold text-slate-500 uppercase">Selected Bus Stop</p>
+                  <p className="text-xs font-semibold text-slate-500 uppercase">Selected Stop</p>
                   <p className="text-sm font-bold text-slate-900">
                     {selectedStopObj
-                      ? `${selectedStopObj.stop_name} (${selectedStopObj.bus_number || 'School Bus'}) — ${formatCurrency(selectedStopObj.amount, '₹')}`
+                      ? `${selectedStopObj.stop_name} (${vLabel(selectedStopObj.vehicle_type)} ${selectedStopObj.bus_number || ''}) — ${formatCurrency(selectedStopObj.amount, '₹')}${per(selectedStopObj.fare_period)}`
                       : 'None selected'}
                   </p>
                 </div>
@@ -419,7 +433,7 @@ export default function ParentTransport() {
                   onClick={handleApplyTransport}
                   icon={<Bus className="h-4 w-4" />}
                 >
-                  {childAssignment ? 'Update Transport Application' : 'Apply for Transport'}
+                  {childAssignment?.status === 'pending' ? 'Update Application' : childAssignment && childAssignment.status !== 'rejected' && childAssignment.status !== 'stopped' ? 'Request Stop Change' : 'Apply for Transport'}
                 </Button>
               </div>
             </>

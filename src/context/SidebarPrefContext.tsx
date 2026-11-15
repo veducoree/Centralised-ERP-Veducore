@@ -50,6 +50,12 @@ interface SidebarPrefContextValue {
   isFixed: (path: string) => boolean;
   /** Preferences loaded from DB */
   loaded: boolean;
+  /** Modules of this role that are not pinned (can be added back) */
+  hiddenItems: NavItem[];
+  /** Saves any pending change right away; resolves true when saved */
+  flush: () => Promise<boolean>;
+  /** A save is in progress or waiting */
+  saving: boolean;
 }
 
 const SidebarPrefContext = createContext<SidebarPrefContextValue | undefined>(undefined);
@@ -65,7 +71,12 @@ export function SidebarPrefProvider({ children }: { children: ReactNode }) {
 
   const [orderedPaths, setOrderedPaths] = useState<string[] | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [saving, setSaving] = useState(false);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Change waiting to be written: next value + value to restore on failure. */
+  const pendingRef = useRef<{ next: string[] | null; prev: string[] | null } | null>(null);
+  /** Bumped on every local edit so a slow initial DB read can't overwrite it. */
+  const editVersionRef = useRef(0);
 
   const role = profile?.role ?? 'admin';
   const allItems: NavItem[] =
@@ -93,9 +104,11 @@ export function SidebarPrefProvider({ children }: { children: ReactNode }) {
       }
     } catch { /* ignore */ }
 
-    // Then load from DB (authoritative)
+    // Then load from DB (authoritative) — unless the user already edited meanwhile.
+    const versionAtStart = editVersionRef.current;
     fetchSidebarPreference(profile.id, profile.school_id ?? null)
       .then((pref) => {
+        if (editVersionRef.current !== versionAtStart || pendingRef.current) return;
         const paths = pref?.ordered_paths ?? null;
         setOrderedPaths(paths);
         try {
@@ -104,7 +117,7 @@ export function SidebarPrefProvider({ children }: { children: ReactNode }) {
         setLoaded(true);
       })
       .catch(() => {
-        // DB load failed — stay with cache / default
+        // DB read failed — keep the cached copy (don't wipe it).
         setLoaded(true);
       });
   }, [profile?.id, profile?.school_id, profile?.role]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -142,30 +155,54 @@ export function SidebarPrefProvider({ children }: { children: ReactNode }) {
 
   // ── Persist helper (debounced, optimistic) ───────────────────────────────
 
+  const writeNow = useCallback(async (): Promise<boolean> => {
+    if (saveTimeoutRef.current) { clearTimeout(saveTimeoutRef.current); saveTimeoutRef.current = null; }
+    const job = pendingRef.current;
+    if (!job || !profile?.id) return true;
+    pendingRef.current = null;
+    setSaving(true);
+    try {
+      await saveSidebarPreference(profile.id, profile.school_id ?? null, role, job.next);
+      return true;
+    } catch {
+      // Revert to what was last saved, and say so.
+      setOrderedPaths(job.prev);
+      try { localStorage.setItem(CACHE_KEY(profile.id, profile.school_id ?? null), JSON.stringify(job.prev)); } catch { /* ignore */ }
+      toastRef.current('Could not save your sidebar. Please try again.', 'error');
+      return false;
+    } finally {
+      setSaving(!!pendingRef.current);
+    }
+  }, [profile?.id, profile?.school_id, role]);
+
   const persist = useCallback(
     (nextPaths: string[] | null, previousPaths: string[] | null) => {
       if (!profile?.id) return;
+      editVersionRef.current += 1;
       const cacheKey = CACHE_KEY(profile.id, profile.school_id ?? null);
       try { localStorage.setItem(cacheKey, JSON.stringify(nextPaths)); } catch { /* ignore */ }
 
-      // Debounce DB writes (user might drag multiple times quickly)
+      // Keep the oldest "previous" so a failed batch reverts to the last saved state.
+      pendingRef.current = { next: nextPaths, prev: pendingRef.current ? pendingRef.current.prev : previousPaths };
+      setSaving(true);
+      // Debounce DB writes (user might drag several times quickly).
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      saveTimeoutRef.current = setTimeout(() => {
-        saveSidebarPreference(
-          profile.id,
-          profile.school_id ?? null,
-          role,
-          nextPaths,
-        ).catch(() => {
-          // Revert on failure
-          setOrderedPaths(previousPaths);
-          try { localStorage.setItem(cacheKey, JSON.stringify(previousPaths)); } catch { /* ignore */ }
-          toastRef.current('Could not save sidebar preferences. Please try again.', 'error');
-        });
-      }, 600);
+      saveTimeoutRef.current = setTimeout(() => { void writeNow(); }, 600);
     },
-    [profile?.id, profile?.school_id, role]   // toast removed — using toastRef
+    [profile?.id, profile?.school_id, writeNow]
   );
+
+  // Don't lose a pending change when the tab is hidden or closed.
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') void writeNow(); };
+    const onUnload = () => { void writeNow(); };
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', onUnload);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', onUnload);
+    };
+  }, [writeNow]);
 
   // ── Actions ──────────────────────────────────────────────────────────────
 
@@ -198,6 +235,9 @@ export function SidebarPrefProvider({ children }: { children: ReactNode }) {
 
   const reset = useCallback(async () => {
     if (!profile?.id) return;
+    if (saveTimeoutRef.current) { clearTimeout(saveTimeoutRef.current); saveTimeoutRef.current = null; }
+    pendingRef.current = null;
+    editVersionRef.current += 1;
     const prev = orderedPaths;
     setOrderedPaths(null);
     try {
@@ -221,10 +261,13 @@ export function SidebarPrefProvider({ children }: { children: ReactNode }) {
     [fixedPaths]
   );
 
+  const hiddenItems = allItems.filter((i) => !pinnedItems.some((p) => p.path === i.path));
+
   return (
     <SidebarPrefContext.Provider value={{
       pinnedItems, isCustomised, togglePin, reorder,
       reset, allItems, isPinned, isFixed, loaded,
+      hiddenItems, flush: writeNow, saving,
     }}>
       {children}
     </SidebarPrefContext.Provider>

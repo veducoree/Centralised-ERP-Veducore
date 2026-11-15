@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { View, Text, ScrollView, RefreshControl, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useLiveNotifications } from '@/lib/useLiveNotifications';
 import { setBadgeCount } from '@/lib/notifications';
@@ -10,7 +11,7 @@ import {
   fetchParentByUserId, fetchParentStudents, fetchMyNotifications, fetchAttendance, fetchFees,
   fetchStudentRecords, fetchRemarks,
 } from '@/services/api';
-import { COLORS, SPACING, RADIUS, formatCurrency } from '@/lib/utils';
+import { COLORS, SPACING, RADIUS, HERO_GRADIENT, formatCurrency } from '@/lib/utils';
 import { toISODate } from '@/lib/timetable';
 import { Avatar } from '@/components/ui/Avatar';
 import { GlassCard } from '@/components/ui/GlassCard';
@@ -19,6 +20,7 @@ import { Header } from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
 import { useTabNavigation } from '@/context/TabNavigationContext';
 import type { Student, Notification, Remark, StudentRecord, Attendance } from '@/types';
+import { RefreshScrollView } from '@/components/ui/RefreshScrollView';
 
 interface ChildStats {
   attendancePct: number | null;
@@ -164,7 +166,7 @@ export default function ParentDashboard() {
   );
 
   const quick = useMemo(() => [
-    { label: 'Timetable', icon: 'calendar' as const, tint: '#5B6EE8', bg: '#EEF0FD', onPress: () => router.push('/parent-modal/timetable' as never) },
+    { label: 'Timetable', icon: 'calendar' as const, tint: '#1E5BD8', bg: '#EBF2FE', onPress: () => router.push('/parent-modal/timetable' as never) },
     { label: 'Remarks', icon: 'chatbubble-ellipses' as const, tint: '#F59E0B', bg: '#FEF3E0', onPress: () => setActiveTab('remarks') },
     { label: 'Transport', icon: 'bus' as const, tint: '#06B6D4', bg: '#E0F7FB', onPress: () => setActiveTab('transport') },
     { label: 'Notices', icon: 'notifications' as const, tint: '#EC4899', bg: '#FDE7F3', onPress: () => openInbox() },
@@ -186,10 +188,9 @@ export default function ParentDashboard() {
     <View style={styles.container}>
       <StatusBar style="dark" />
       {header}
-      <ScrollView
+      <RefreshScrollView refreshing={refreshing} onRefresh={onRefresh}
         contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.primary} colors={[COLORS.primary]} />}>
+        showsVerticalScrollIndicator={false}>
 
         {children.length === 0 ? (
           <GlassCard padding={SPACING.lg} style={styles.card}>
@@ -215,7 +216,7 @@ export default function ParentDashboard() {
 
             {/* Child hero */}
             {child && (
-              <View style={styles.hero}>
+              <LinearGradient colors={HERO_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.hero}>
                 <View style={styles.rowCenter}>
                   <Avatar name={child.full_name} uri={child.avatar_url ?? undefined} size={52} />
                   <View style={styles.flex1}>
@@ -230,7 +231,7 @@ export default function ParentDashboard() {
                   <Ionicons name={today_?.icon ?? 'ellipse-outline'} size={14} color={today_?.color ?? '#FFFFFF'} />
                   <Text style={[styles.todayText, { color: today_?.color ?? '#FFFFFF' }]}>{today_?.label ?? "Today's attendance not marked yet"}</Text>
                 </View>
-              </View>
+              </LinearGradient>
             )}
 
             {/* Stats */}
@@ -311,7 +312,7 @@ export default function ParentDashboard() {
           ) : notices.map((n, i) => (
             <TouchableOpacity key={n.id} style={[styles.noticeRow, i > 0 && styles.divider]} activeOpacity={0.7}
               onPress={() => openInbox()}>
-              <View style={[styles.dot, { backgroundColor: n.is_read ? 'transparent' : '#5B6EE8' }]} />
+              <View style={[styles.dot, { backgroundColor: n.is_read ? 'transparent' : '#1E5BD8' }]} />
               <View style={styles.flex1}>
                 <Text style={styles.noticeTitle} numberOfLines={1}>{n.title}</Text>
                 <Text style={styles.noticeBody} numberOfLines={2}>{n.message}</Text>
@@ -321,7 +322,7 @@ export default function ParentDashboard() {
         </GlassCard>
 
         <View style={{ height: SPACING.xl }} />
-      </ScrollView>
+      </RefreshScrollView>
     </View>
   );
 }
@@ -334,11 +335,11 @@ const styles = StyleSheet.create({
 
   switcher: { gap: 8, paddingBottom: SPACING.sm + 4 },
   switchChip: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 999, backgroundColor: '#FFFFFF' },
-  switchChipActive: { backgroundColor: '#5B6EE8' },
+  switchChipActive: { backgroundColor: '#0B1736' },
   switchText: { fontSize: 13, fontWeight: '600', color: COLORS.textMuted },
   switchTextActive: { color: '#FFFFFF' },
 
-  hero: { backgroundColor: '#5B6EE8', borderRadius: RADIUS.lg, padding: SPACING.md + 2, marginBottom: SPACING.md },
+  hero: { borderRadius: RADIUS.lg + 4, overflow: 'hidden', padding: SPACING.md + 2, marginBottom: SPACING.md },
   heroName: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
   heroMeta: { color: 'rgba(255,255,255,0.85)', fontSize: 13, marginTop: 2 },
   todayPill: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 6, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, marginTop: 14 },
@@ -346,7 +347,7 @@ const styles = StyleSheet.create({
 
   statRow: { flexDirection: 'row', gap: 10, marginBottom: SPACING.md },
   stat: { flex: 1, backgroundColor: '#FFFFFF', borderRadius: RADIUS.lg, paddingVertical: 14, paddingHorizontal: 12,
-    shadowColor: '#5B6EE8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 14, elevation: 2 },
+    shadowColor: '#1E5BD8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 14, elevation: 2 },
   statLabel: { fontSize: 12, color: COLORS.textMuted },
   statValue: { fontSize: 18, fontWeight: '700', color: COLORS.text, marginTop: 4 },
 
@@ -356,18 +357,18 @@ const styles = StyleSheet.create({
   card: { marginBottom: SPACING.md },
   quickGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.md },
   quickItem: { width: '23%', alignItems: 'center', backgroundColor: '#FFFFFF', borderRadius: RADIUS.lg, paddingVertical: 14,
-    shadowColor: '#5B6EE8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 14, elevation: 2 },
+    shadowColor: '#1E5BD8', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 14, elevation: 2 },
   quickIcon: { width: 42, height: 42, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
   quickLabel: { fontSize: 12, fontWeight: '600', color: COLORS.text },
 
   sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: SPACING.sm, marginTop: 4 },
   sectionTitle: { flexShrink: 1, fontSize: 16, fontWeight: '700', color: COLORS.text },
-  link: { fontSize: 13, fontWeight: '600', color: '#5B6EE8' },
+  link: { fontSize: 13, fontWeight: '600', color: '#1E5BD8' },
 
   remarkText: { fontSize: 14, color: COLORS.text, lineHeight: 20, fontStyle: 'italic' },
   remarkMeta: { fontSize: 12, color: COLORS.textMuted, marginTop: 8 },
 
-  divider: { borderTopWidth: 1, borderTopColor: '#F1F2F8' },
+  divider: { borderTopWidth: 1, borderTopColor: '#F1F4F8' },
   noticeRow: { flexDirection: 'row', gap: 10, paddingHorizontal: SPACING.md, paddingVertical: 12 },
   dot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
   noticeTitle: { fontSize: 14, fontWeight: '600', color: COLORS.text },

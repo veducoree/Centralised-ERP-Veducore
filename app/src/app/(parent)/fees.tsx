@@ -3,12 +3,9 @@ import {
   View,
   Text,
   ScrollView,
-  RefreshControl,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   Modal,
-  Share,
   Linking,
   AppState,
 } from 'react-native';
@@ -25,15 +22,17 @@ import {
   checkOnlinePayment,
   onlineCharges,
   reconcilePayments,
-  fetchConvenienceForReceipt,
   fetchSchool,
 } from '@/services/api';
 import { SPACING, RADIUS, formatDate, formatCurrency } from '@/lib/utils';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
+import { ReceiptSheet } from '@/components/fees/ReceiptSheet';
 import { MobileListSkeleton, MobileInlineSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/context/AuthContext';
 import type { Student, Fee, School } from '@/types';
+import { appAlert } from '@/components/ui/AppDialog';
+import { RefreshScrollView } from '@/components/ui/RefreshScrollView';
 
 interface ChildInfo {
   student: Student;
@@ -235,7 +234,6 @@ export default function ParentFees() {
 
   // Official Receipt modal state
   const [receiptFee, setReceiptFee] = useState<Fee | null>(null);
-  const [lastPaidInstallmentAmount, setLastPaidInstallmentAmount] = useState<number | null>(null);
 
   const loadChildren = useCallback(async () => {
     if (!user?.id) return;
@@ -359,14 +357,14 @@ export default function ParentFees() {
 
   const handleSelectStructureMode = (mode: FeeStructureMode) => {
     if (mode === 'quarterly' && !hasQuarterlyPlan) {
-      Alert.alert(
+      appAlert(
         'Quarterly Plan Not Available',
         'Quarterly payment option is only available when the school administrator creates a Quarterly Fee Plan.'
       );
       return;
     }
     if (mode === 'annually' && !hasAnnualPlan) {
-      Alert.alert(
+      appAlert(
         'Annual Plan Not Available',
         'Annual payment option is only available when the school administrator creates an Annual Fee Plan.'
       );
@@ -389,7 +387,6 @@ export default function ParentFees() {
 
   const finishPaid = useCallback(async (fee: Fee, installment: number, receipt?: string) => {
     setPendingPayment(null);
-    setLastPaidInstallmentAmount(installment);
     if (children[selectedIndex]) await loadFees(children[selectedIndex]);
     const paidSoFar = Math.min(Number(fee.amount), Number(fee.paid_amount) + installment);
     setReceiptFee({
@@ -409,10 +406,10 @@ export default function ParentFees() {
     try {
       const r = await checkOnlinePayment(pendingPayment.id);
       if (r.status === 'paid') await finishPaid(pendingPayment.fee, pendingPayment.installment, r.receipt_number);
-      else if (r.status === 'expired') { setPendingPayment(null); Alert.alert('Payment link expired', 'Please start the payment again.'); }
-      else if (!silent) Alert.alert('Not received yet', 'We have not received the payment yet. If money was deducted, it is confirmed within a few minutes.');
+      else if (r.status === 'expired') { setPendingPayment(null); appAlert('Payment link expired', 'Please start the payment again.'); }
+      else if (!silent) appAlert('Not received yet', 'We have not received the payment yet. If money was deducted, it is confirmed within a few minutes.');
     } catch (e) {
-      if (!silent) Alert.alert('Could not check', e instanceof Error ? e.message : 'Please try again.');
+      if (!silent) appAlert('Could not check', e instanceof Error ? e.message : 'Please try again.');
     } finally {
       setCheckingPayment(false);
     }
@@ -427,7 +424,7 @@ export default function ParentFees() {
   const handleConfirmPay = async () => {
     if (!selectedFeeToPay || !activeModalPlan) return;
     if (!onlineEnabled) {
-      Alert.alert('Online payment not available', 'The school has not enabled online payment yet. Please pay at the school office.');
+      appAlert('Online payment not available', 'The school has not enabled online payment yet. Please pay at the school office.');
       return;
     }
     setProcessingPayment(true);
@@ -445,53 +442,38 @@ export default function ParentFees() {
       setSelectedFeeToPay(null);
       await Linking.openURL(link.link_url);
     } catch (e) {
-      Alert.alert('Payment could not start', e instanceof Error ? e.message : 'Please try again.');
+      appAlert('Payment could not start', e instanceof Error ? e.message : 'Please try again.');
     } finally {
       setProcessingPayment(false);
     }
   };
 
-  const handleShareReceipt = async (fee: Fee) => {
-    const sName = schoolData?.name || authSchool?.name || 'School';
-    const stuName = selectedChild?.student.full_name || 'Student';
-    const clsName = selectedChild
-      ? `${selectedChild.className} - Section ${selectedChild.sectionName}`
-      : '';
-    const admNo = selectedChild?.student.admission_number || '—';
-    const receiptNo =
-      fee.receipt_number || `RCP-${fee.id.slice(0, 6).toUpperCase()}`;
-    const pDate = formatDate(fee.payment_date || fee.updated_at || new Date().toISOString());
-    const pMethod = fee.payment_method || 'Cash (School Office)';
+  const receiptSchool = useMemo(() => {
+    const sch = (schoolData || authSchool) as (School & { affiliation_board?: string; affiliation_code?: string }) | null;
+    const aff = sch?.affiliation_board
+      ? `Affiliated to ${sch.affiliation_board}${sch.affiliation_code ? ` · Affiliation No. ${sch.affiliation_code}` : ''}`
+      : null;
+    return {
+      name: sch?.name || 'School',
+      address: sch?.address,
+      phone: sch?.contact_number,
+      email: sch?.email,
+      logoUrl: sch?.logo_url,
+      affiliation: aff,
+      academicYear: sch?.academic_year,
+    };
+  }, [schoolData, authSchool]);
 
-    const online = await fetchConvenienceForReceipt(fee.receipt_number).catch(() => null);
-    const text = [
-      `================================`,
-      `${sName.toUpperCase()}`,
-      `OFFICIAL FEE PAYMENT RECEIPT`,
-      `================================`,
-      `Receipt No : ${receiptNo}`,
-      `Date       : ${pDate}`,
-      `Student    : ${stuName}`,
-      `Class      : ${clsName}`,
-      `Adm No.    : ${admNo}`,
-      `--------------------------------`,
-      `Fee Type   : ${fee.fee_type}`,
-      `Total Fee  : ${formatCurrency(fee.amount)}`,
-      `Amount Paid: ${formatCurrency(lastPaidInstallmentAmount ?? fee.paid_amount)}`,
-      `Total Paid : ${formatCurrency(fee.paid_amount)}`,
-      `Balance Due: ${formatCurrency(fee.remaining_amount)}`,
-      `Pay Mode   : ${pMethod}`,
-      ...(online ? [`Conv. Fee 2%: ${formatCurrency(online.convenience)}`, `GST 18%    : ${formatCurrency(online.gst)}`, `Paid Online: ${formatCurrency(online.total)}`] : []),
-      `Status     : ${Number(fee.remaining_amount) <= 0 ? 'PAID IN FULL' : 'PARTIALLY PAID'}`,
-      `================================`,
-    ].join('\n');
-
-    try {
-      await Share.share({ message: text, title: `Fee Receipt ${receiptNo}` });
-    } catch {
-      // ignore
-    }
-  };
+  const receiptStudent = useMemo(() => {
+    if (!selectedChild) return null;
+    const st = selectedChild.student;
+    return {
+      name: st.full_name,
+      fatherName: st.father_name,
+      className: `${selectedChild.className}${selectedChild.sectionName ? ` - ${selectedChild.sectionName}` : ''}`,
+      admissionNo: st.admission_number || '—',
+    };
+  }, [selectedChild]);
 
   if (loading) {
     return (
@@ -511,18 +493,10 @@ export default function ParentFees() {
       <View style={styles.content}>
         <Header title="Fees & Payments" />
 
-        <ScrollView
+        <RefreshScrollView refreshing={refreshing} onRefresh={onRefresh}
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#5B6EE8"
-              colors={['#5B6EE8']}
-            />
-          }
         >
           {pendingPayment && (
             <View style={styles.pendingCard}>
@@ -630,7 +604,7 @@ export default function ParentFees() {
                 <Ionicons
                   name="calendar-outline"
                   size={18}
-                  color={structureMode === 'monthly' ? '#FFFFFF' : '#5B6EE8'}
+                  color={structureMode === 'monthly' ? '#FFFFFF' : '#1E5BD8'}
                 />
                 <Text
                   style={[
@@ -667,7 +641,7 @@ export default function ParentFees() {
                     structureMode === 'quarterly'
                       ? '#FFFFFF'
                       : hasQuarterlyPlan
-                        ? '#5B6EE8'
+                        ? '#1E5BD8'
                         : '#94A3B8'
                   }
                 />
@@ -707,7 +681,7 @@ export default function ParentFees() {
                     structureMode === 'annually'
                       ? '#FFFFFF'
                       : hasAnnualPlan
-                        ? '#5B6EE8'
+                        ? '#1E5BD8'
                         : '#94A3B8'
                   }
                 />
@@ -789,12 +763,12 @@ export default function ParentFees() {
                             backgroundColor: isFullyPaid
                               ? '#ECFDF5'
                               : fee.status === 'partially_paid'
-                                ? '#EEF0FD'
+                                ? '#EBF2FE'
                                 : '#FFFBEB',
                             borderColor: isFullyPaid
                               ? '#A7F3D0'
                               : fee.status === 'partially_paid'
-                                ? '#C7CDFB'
+                                ? '#BFD6FB'
                                 : '#FDE68A',
                           },
                         ]}
@@ -806,7 +780,7 @@ export default function ParentFees() {
                               color: isFullyPaid
                                 ? '#059669'
                                 : fee.status === 'partially_paid'
-                                  ? '#5B6EE8'
+                                  ? '#1E5BD8'
                                   : '#D97706',
                             },
                           ]}
@@ -866,7 +840,7 @@ export default function ParentFees() {
                                     : 'lock-closed-outline'
                                 }
                                 size={11}
-                                color={plan.isPaymentWindowOpen ? '#5B6EE8' : '#D97706'}
+                                color={plan.isPaymentWindowOpen ? '#1E5BD8' : '#D97706'}
                               />
                               <Text
                                 style={[
@@ -1016,45 +990,27 @@ export default function ParentFees() {
                     {/* Action Buttons: Pay + Official Receipt */}
                     <View style={styles.actionsRow}>
                       {!isFullyPaid && (
-                        <TouchableOpacity
+                        <Button
+                          label={plan.isPaymentWindowOpen
+                            ? `Pay ${plan.currentPeriodLabel} (${formatCurrency(plan.installmentAmount)})`
+                            : `${plan.currentPeriodLabel} Opens on 25th`}
+                          icon={plan.isPaymentWindowOpen ? 'card-outline' : 'lock-closed-outline'}
+                          size="lg"
+                          fullWidth
                           disabled={!plan.isPaymentWindowOpen}
                           onPress={() => setSelectedFeeToPay(fee)}
-                          activeOpacity={0.85}
-                          style={[
-                            styles.payNowBtn,
-                            !plan.isPaymentWindowOpen && styles.payNowBtnDisabled,
-                          ]}
-                        >
-                          <Ionicons
-                            name={
-                              plan.isPaymentWindowOpen
-                                ? 'card-outline'
-                                : 'lock-closed-outline'
-                            }
-                            size={16}
-                            color="#FFFFFF"
-                            style={{ marginRight: 6 }}
-                          />
-                          <Text style={styles.payNowBtnText}>
-                            {plan.isPaymentWindowOpen
-                              ? `Pay ${plan.currentPeriodLabel} (${formatCurrency(plan.installmentAmount)})`
-                              : `${plan.currentPeriodLabel} Opens on 25th`}
-                          </Text>
-                        </TouchableOpacity>
+                        />
                       )}
 
                       {hasAnyPaid && (
-                        <TouchableOpacity
-                          onPress={() => {
-                            setLastPaidInstallmentAmount(null);
-                            setReceiptFee(fee);
-                          }}
-                          activeOpacity={0.8}
-                          style={styles.receiptBtn}
-                        >
-                          <Ionicons name="receipt-outline" size={16} color="#5B6EE8" />
-                          <Text style={styles.receiptBtnText}>View Receipt</Text>
-                        </TouchableOpacity>
+                        <Button
+                          label="View Receipt"
+                          variant="outline"
+                          icon="receipt-outline"
+                          size="lg"
+                          fullWidth
+                          onPress={() => setReceiptFee(fee)}
+                        />
                       )}
                     </View>
                   </View>
@@ -1064,7 +1020,7 @@ export default function ParentFees() {
           )}
 
           <View style={{ height: SPACING.xxl }} />
-        </ScrollView>
+        </RefreshScrollView>
 
         {/* ── MODAL 1: PAY FEE INSTALLMENT ── */}
         <Modal
@@ -1142,170 +1098,20 @@ export default function ParentFees() {
           </View>
         </Modal>
 
-        {/* ── MODAL 2: OFFICIAL FEE PAYMENT RECEIPT (FOR BOTH ADMIN CASH & APP ONLINE PAYMENTS) ── */}
-        <Modal
-          visible={!!receiptFee}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setReceiptFee(null)}
-        >
-          <View style={styles.modalBackdrop}>
-            <View style={styles.receiptModalBox}>
-              {receiptFee && (
-                <>
-                  {/* Receipt Header */}
-                  <View style={styles.receiptSchoolHeader}>
-                    <View style={styles.receiptVerifiedIcon}>
-                      <Ionicons name="checkmark-done-circle" size={32} color="#059669" />
-                    </View>
-                    <Text style={styles.receiptSchoolName}>
-                      {schoolData?.name || authSchool?.name || 'School'}
-                    </Text>
-                    {schoolData?.address ? (
-                      <Text style={styles.receiptSchoolAddress} numberOfLines={1}>
-                        {schoolData.address}
-                      </Text>
-                    ) : null}
-                    <View style={styles.officialReceiptBadge}>
-                      <Text style={styles.officialReceiptBadgeText}>
-                        OFFICIAL FEE PAYMENT RECEIPT
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Receipt No & Date Row */}
-                  <View style={styles.receiptMetaRow}>
-                    <View>
-                      <Text style={styles.receiptMetaLabel}>RECEIPT NO.</Text>
-                      <Text style={styles.receiptMetaValue}>
-                        {receiptFee.receipt_number ||
-                          `RCP-${receiptFee.id.slice(0, 6).toUpperCase()}`}
-                      </Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end' }}>
-                      <Text style={styles.receiptMetaLabel}>PAYMENT DATE</Text>
-                      <Text style={styles.receiptMetaValue}>
-                        {formatDate(
-                          receiptFee.payment_date ||
-                            receiptFee.updated_at ||
-                            new Date().toISOString()
-                        )}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Student Details */}
-                  <View style={styles.receiptStudentBox}>
-                    <View style={styles.receiptDetailRow}>
-                      <Text style={styles.receiptDetailKey}>Student Name</Text>
-                      <Text style={styles.receiptDetailVal}>
-                        {selectedChild?.student.full_name || 'Student'}
-                      </Text>
-                    </View>
-                    <View style={styles.receiptDetailRow}>
-                      <Text style={styles.receiptDetailKey}>Class &amp; Section</Text>
-                      <Text style={styles.receiptDetailVal}>
-                        {selectedChild
-                          ? `${selectedChild.className} - Sec ${selectedChild.sectionName}`
-                          : '—'}
-                      </Text>
-                    </View>
-                    <View style={styles.receiptDetailRow}>
-                      <Text style={styles.receiptDetailKey}>Admission No.</Text>
-                      <Text style={styles.receiptDetailVal}>
-                        {selectedChild?.student.admission_number || '—'}
-                      </Text>
-                    </View>
-                    <View style={styles.receiptDetailRow}>
-                      <Text style={styles.receiptDetailKey}>Payment Mode</Text>
-                      <View style={styles.paymentModePill}>
-                        <Text style={styles.paymentModePillText}>
-                          {receiptFee.payment_method || 'Cash (School Office)'}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Fee Breakdown Table */}
-                  <View style={styles.receiptTable}>
-                    <View style={styles.receiptTableRow}>
-                      <Text style={styles.receiptTableKey}>Fee Description</Text>
-                      <Text style={styles.receiptTableVal}>{receiptFee.fee_type}</Text>
-                    </View>
-                    <View style={styles.receiptTableRow}>
-                      <Text style={styles.receiptTableKey}>Total Fee Amount</Text>
-                      <Text style={styles.receiptTableVal}>
-                        {formatCurrency(receiptFee.amount)}
-                      </Text>
-                    </View>
-                    {lastPaidInstallmentAmount !== null && (
-                      <View style={styles.receiptTableRow}>
-                        <Text style={styles.receiptTableKey}>Current Installment Paid</Text>
-                        <Text style={[styles.receiptTableVal, { color: '#5B6EE8' }]}>
-                          {formatCurrency(lastPaidInstallmentAmount)}
-                        </Text>
-                      </View>
-                    )}
-                    <View style={styles.receiptTableRow}>
-                      <Text style={styles.receiptTableKey}>Total Amount Paid</Text>
-                      <Text style={[styles.receiptTableVal, { color: '#059669', fontSize: 15 }]}>
-                        {formatCurrency(receiptFee.paid_amount)}
-                      </Text>
-                    </View>
-                    <View style={[styles.receiptTableRow, { borderBottomWidth: 0 }]}>
-                      <Text style={styles.receiptTableKey}>Remaining Balance</Text>
-                      <Text
-                        style={[
-                          styles.receiptTableVal,
-                          {
-                            color:
-                              Number(receiptFee.remaining_amount) > 0 ? '#DC2626' : '#059669',
-                          },
-                        ]}
-                      >
-                        {formatCurrency(receiptFee.remaining_amount)}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Paid Stamp */}
-                  <View style={styles.paidStampBar}>
-                    <Ionicons name="shield-checkmark" size={16} color="#059669" />
-                    <Text style={styles.paidStampText}>
-                      PAYMENT VERIFIED ·{' '}
-                      {Number(receiptFee.remaining_amount) <= 0
-                        ? 'PAID IN FULL'
-                        : 'INSTALLMENT PAID'}
-                    </Text>
-                  </View>
-
-                  {/* Receipt Actions */}
-                  <View style={styles.modalActionsRow}>
-                    <Button
-                      label="Close"
-                      variant="ghost"
-                      onPress={() => setReceiptFee(null)}
-                      style={{ flex: 1 }}
-                    />
-                    <Button
-                      label="Share / Download Receipt"
-                      variant="primary"
-                      onPress={() => handleShareReceipt(receiptFee)}
-                      style={{ flex: 1.6 }}
-                    />
-                  </View>
-                </>
-              )}
-            </View>
-          </View>
-        </Modal>
+        {/* ── FEE RECEIPT (cash & online) ── */}
+        <ReceiptSheet
+          fee={receiptFee}
+          onClose={() => setReceiptFee(null)}
+          school={receiptSchool}
+          student={receiptStudent}
+        />
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F4F5FB' },
+  container: { flex: 1, backgroundColor: '#F5F7FA' },
   content: { flex: 1, backgroundColor: 'transparent' },
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: SPACING.md, paddingTop: SPACING.xs },
@@ -1327,25 +1133,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  childChipActive: { backgroundColor: '#EEF0FD', borderColor: '#5B6EE8' },
+  childChipActive: { backgroundColor: '#EBF2FE', borderColor: '#1E5BD8' },
   childChipName: { fontSize: 13, fontWeight: '700', color: '#64748B' },
-  childChipNameActive: { color: '#5B6EE8' },
+  childChipNameActive: { color: '#1E5BD8' },
   childChipSub: { fontSize: 11, color: '#94A3B8', marginTop: 1 },
-  childChipSubActive: { color: '#4B5DD8' },
+  childChipSubActive: { color: '#1A4FC4' },
 
   singleChildBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF0FD',
+    backgroundColor: '#EBF2FE',
     borderRadius: RADIUS.md,
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginBottom: SPACING.sm,
     borderWidth: 1,
-    borderColor: '#DFE3FC',
+    borderColor: '#DCE8FD',
   },
-  singleChildDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#5B6EE8', marginRight: 8 },
-  singleChildText: { fontSize: 12, fontWeight: '600', color: '#3B4DC8' },
+  singleChildDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#1E5BD8', marginRight: 8 },
+  singleChildText: { fontSize: 12, fontWeight: '600', color: '#1544AE' },
 
   statsCard: {
     backgroundColor: '#FFFFFF',
@@ -1375,7 +1181,7 @@ const styles = StyleSheet.create({
   modeTabsRow: { flexDirection: 'row', gap: 8 },
   modeTab: {
     flex: 1,
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderRadius: RADIUS.md,
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
@@ -1384,11 +1190,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modeTabActive: {
-    backgroundColor: '#5B6EE8',
-    borderColor: '#5B6EE8',
+    backgroundColor: '#0B1736',
+    borderColor: '#0B1736',
   },
   modeTabDisabled: {
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderColor: '#E2E8F0',
     opacity: 0.65,
   },
@@ -1396,7 +1202,7 @@ const styles = StyleSheet.create({
   modeTabTitleActive: { color: '#FFFFFF' },
   modeTabTitleDisabled: { color: '#64748B' },
   modeTabSub: { fontSize: 9, fontWeight: '600', color: '#64748B', marginTop: 1, textAlign: 'center' },
-  modeTabSubActive: { color: '#DFE3FC' },
+  modeTabSubActive: { color: '#DCE8FD' },
 
   emptyWrap: { marginTop: 40 },
   feesList: { gap: 12 },
@@ -1422,7 +1228,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderRadius: RADIUS.md,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -1435,7 +1241,7 @@ const styles = StyleSheet.create({
   amountColVal: { fontSize: 14, fontWeight: '700', color: '#0F172A' },
 
   scheduleBox: {
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderRadius: RADIUS.md,
     padding: 10,
     borderWidth: 1,
@@ -1453,7 +1259,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: '#EEF0FD',
+    backgroundColor: '#EBF2FE',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: RADIUS.full,
@@ -1464,7 +1270,7 @@ const styles = StyleSheet.create({
   windowPillText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#5B6EE8',
+    color: '#1E5BD8',
   },
   monthChipsRow: { flexDirection: 'row', gap: 6, paddingBottom: 4 },
   monthChip: {
@@ -1480,8 +1286,8 @@ const styles = StyleSheet.create({
     borderColor: '#A7F3D0',
   },
   monthChipCurrent: {
-    backgroundColor: '#5B6EE8',
-    borderColor: '#4B5DD8',
+    backgroundColor: '#1E5BD8',
+    borderColor: '#1A4FC4',
   },
   monthChipLockedWindow: {
     backgroundColor: '#FFFBEB',
@@ -1533,36 +1339,7 @@ const styles = StyleSheet.create({
   actionsRow: {
     gap: 8,
   },
-  payNowBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#5B6EE8',
-    borderRadius: RADIUS.md,
-    paddingVertical: 11,
-  },
-  payNowBtnDisabled: {
-    backgroundColor: '#94A3B8',
-  },
-  payNowBtnText: { color: '#FFFFFF', fontSize: 13, fontWeight: '700' },
 
-  receiptBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#EEF0FD',
-    borderWidth: 1,
-    borderColor: '#C7CDFB',
-    borderRadius: RADIUS.md,
-    paddingVertical: 10,
-  },
-  receiptBtnText: {
-    flexShrink: 1,
-    color: '#5B6EE8',
-    fontSize: 13,
-    fontWeight: '700',
-  },
 
   modalBackdrop: {
     flex: 1,
@@ -1586,7 +1363,7 @@ const styles = StyleSheet.create({
   modalTitle: { flexShrink: 1, fontSize: 17, fontWeight: '700', color: '#0F172A' },
   modalSummaryBox: {
     alignItems: 'center',
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderRadius: RADIUS.lg,
     paddingVertical: 16,
     paddingHorizontal: 12,
@@ -1595,21 +1372,21 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   modalPeriodBadge: {
-    backgroundColor: '#EEF0FD',
+    backgroundColor: '#EBF2FE',
     borderWidth: 1,
-    borderColor: '#C7CDFB',
+    borderColor: '#BFD6FB',
     paddingHorizontal: 10,
     paddingVertical: 3,
     borderRadius: RADIUS.full,
     marginBottom: 6,
   },
-  modalPeriodBadgeText: { fontSize: 10, fontWeight: '700', color: '#5B6EE8', letterSpacing: 0.4 },
+  modalPeriodBadgeText: { fontSize: 10, fontWeight: '700', color: '#1E5BD8', letterSpacing: 0.4 },
   modalFeeType: { fontSize: 13, color: '#334155', fontWeight: '700' },
-  breakdownBox: { borderWidth: 1, borderColor: '#E8EAF3', borderRadius: 14, padding: 12, marginBottom: 12 },
+  breakdownBox: { borderWidth: 1, borderColor: '#E5E9F0', borderRadius: 14, padding: 12, marginBottom: 12 },
   breakdownRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, gap: 8 },
   breakdownLabel: { flexShrink: 1, fontSize: 13, color: '#64748B' },
   breakdownValue: { fontSize: 13, color: '#0F172A', fontWeight: '600' },
-  breakdownTotalRow: { borderTopWidth: 1, borderTopColor: '#F1F2F8', marginTop: 4, paddingTop: 8 },
+  breakdownTotalRow: { borderTopWidth: 1, borderTopColor: '#F1F4F8', marginTop: 4, paddingTop: 8 },
   breakdownTotal: { fontSize: 14, color: '#0F172A', fontWeight: '700' },
   breakdownHint: { fontSize: 11, color: '#94A3B8', marginTop: 6 },
   breakdownWarn: { fontSize: 12, color: '#B45309', backgroundColor: '#FEF3E0', borderRadius: 10, padding: 10, marginBottom: 12 },
@@ -1617,7 +1394,7 @@ const styles = StyleSheet.create({
   pendingTitle: { fontSize: 14, fontWeight: '700', color: '#B45309' },
   pendingText: { fontSize: 12, color: '#92400E', marginTop: 2 },
   pendingActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  modalFeeAmount: { fontSize: 22, fontWeight: '700', color: '#5B6EE8', marginTop: 4 },
+  modalFeeAmount: { fontSize: 22, fontWeight: '700', color: '#1E5BD8', marginTop: 4 },
   modalNextPeriodText: {
     fontSize: 11,
     fontWeight: '600',
@@ -1625,177 +1402,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: 'center',
   },
-  modalSelectPayTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 8,
-  },
-  payMethodsWrap: { gap: 8 },
-  payMethodOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: RADIUS.md,
-    paddingHorizontal: 12,
-    paddingVertical: 11,
-  },
-  payMethodOptionActive: {
-    backgroundColor: '#EEF0FD',
-    borderColor: '#5B6EE8',
-  },
-  payMethodText: { fontSize: 13, fontWeight: '600', color: '#0F172A' },
-  payMethodTextActive: { color: '#5B6EE8', fontWeight: '700' },
   modalActionsRow: { flexDirection: 'row', gap: 10, marginTop: SPACING.lg },
 
   // Receipt Modal Styles
-  receiptModalBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: RADIUS.xl,
-    padding: SPACING.lg,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  receiptSchoolHeader: {
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-    paddingBottom: 12,
-    marginBottom: 12,
-  },
-  receiptVerifiedIcon: {
-    marginBottom: 4,
-  },
-  receiptSchoolName: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#0F172A',
-    textAlign: 'center',
-  },
-  receiptSchoolAddress: {
-    fontSize: 11,
-    color: '#64748B',
-    marginTop: 2,
-    textAlign: 'center',
-  },
-  officialReceiptBadge: {
-    marginTop: 8,
-    backgroundColor: '#EEF0FD',
-    borderWidth: 1,
-    borderColor: '#C7CDFB',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: RADIUS.full,
-  },
-  officialReceiptBadgeText: {
-    fontSize: 9.5,
-    fontWeight: '700',
-    color: '#5B6EE8',
-    letterSpacing: 0.5,
-  },
-  receiptMetaRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  receiptMetaLabel: {
-    flexShrink: 1,
-    fontSize: 9.5,
-    fontWeight: '700',
-    color: '#94A3B8',
-    letterSpacing: 0.4,
-  },
-  receiptMetaValue: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#0F172A',
-    marginTop: 2,
-  },
-  receiptStudentBox: {
-    backgroundColor: '#F4F5FB',
-    borderRadius: RADIUS.md,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    gap: 7,
-    marginBottom: 12,
-  },
-  receiptDetailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  receiptDetailKey: {
-    flexShrink: 1,
-    fontSize: 12,
-    color: '#64748B',
-    fontWeight: '600',
-  },
-  receiptDetailVal: {
-    fontSize: 12.5,
-    color: '#0F172A',
-    fontWeight: '700',
-  },
-  paymentModePill: {
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: RADIUS.full,
-  },
-  paymentModePillText: {
-    fontSize: 10.5,
-    fontWeight: '700',
-    color: '#065F46',
-  },
-  receiptTable: {
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    borderRadius: RADIUS.md,
-    overflow: 'hidden',
-    marginBottom: 12,
-  },
-  receiptTableRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
-  },
-  receiptTableKey: {
-    flexShrink: 1,
-    fontSize: 12,
-    color: '#475569',
-    fontWeight: '600',
-  },
-  receiptTableVal: {
-    fontSize: 13,
-    color: '#0F172A',
-    fontWeight: '700',
-  },
-  paidStampBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#ECFDF5',
-    borderWidth: 1,
-    borderColor: '#A7F3D0',
-    borderRadius: RADIUS.md,
-    paddingVertical: 9,
-  },
-  paidStampText: {
-    flexShrink: 1,
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#065F46',
-    letterSpacing: 0.4,
-  },
 });

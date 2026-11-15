@@ -3,11 +3,9 @@ import {
   View,
   Text,
   ScrollView,
-  RefreshControl,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   TextInput,
   Modal,
   KeyboardAvoidingView,
@@ -46,6 +44,8 @@ import type {
   StudentRecord,
   ExamDef,
 } from '@/types';
+import { appAlert } from '@/components/ui/AppDialog';
+import { RefreshScrollView } from '@/components/ui/RefreshScrollView';
 
 function computeGrade(marks: number, maxMarks: number): string {
   const pct = maxMarks > 0 ? (marks / maxMarks) * 100 : 0;
@@ -262,12 +262,12 @@ export default function TeacherMarks() {
       }
       await replaceStudentRecords(existing, rows);
 
-      Alert.alert('Marks Saved', 'Marks and comments have been recorded successfully.');
+      appAlert('Marks Saved', 'Marks and comments have been recorded successfully.');
       await loadData();
       setView('list');
     } catch (err) {
       const msg = err instanceof Error ? err.message : '';
-      Alert.alert('Error', /row-level security|policy/i.test(msg)
+      appAlert('Error', /row-level security|policy/i.test(msg)
         ? 'Results for this exam are published, so marks are locked. Ask the office to unpublish to make changes.'
         : 'Failed to save marks.');
     } finally {
@@ -458,18 +458,10 @@ export default function TeacherMarks() {
       <View style={styles.content}>
         <Header title="Examination & Marks" />
 
-        <ScrollView
+        <RefreshScrollView refreshing={refreshing} onRefresh={onRefresh}
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={COLORS.primary}
-              colors={[COLORS.primary]}
-            />
-          }>
+          showsVerticalScrollIndicator={false}>
 
           <View style={styles.examTopActionRow}>
             <View style={styles.pageTitleBlock}>
@@ -604,7 +596,7 @@ export default function TeacherMarks() {
           )}
 
           <View style={{ height: SPACING.xxl }} />
-        </ScrollView>
+        </RefreshScrollView>
 
       </View>
     </View>
@@ -655,8 +647,8 @@ const styles = StyleSheet.create({
     ...SHADOW.sm,
   },
   filterChipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: '#0B1736',
+    borderColor: '#0B1736',
   },
   filterChipText: { fontSize: 12, fontWeight: '600', color: COLORS.textMuted },
   filterChipTextActive: { color: '#FFFFFF', fontWeight: '700' },
@@ -669,7 +661,7 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
     borderRadius: RADIUS.md,
-    backgroundColor: '#EEF0FD',
+    backgroundColor: '#EBF2FE',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -709,7 +701,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderWidth: 1,
     borderColor: COLORS.borderLight,
     borderRadius: RADIUS.md,
@@ -727,7 +719,7 @@ const styles = StyleSheet.create({
   enterMarksBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EEF0FD',
+    backgroundColor: '#EBF2FE',
     paddingHorizontal: 9,
     paddingVertical: 4,
     borderRadius: RADIUS.sm,
@@ -740,9 +732,9 @@ const styles = StyleSheet.create({
   bannerExamName: { flexShrink: 1, fontSize: 18, fontWeight: '700', color: COLORS.text },
   bannerSubTitle: { fontSize: 13, color: COLORS.textMuted, marginTop: 2 },
   bannerMaxMarksPill: {
-    backgroundColor: '#EEF0FD',
+    backgroundColor: '#EBF2FE',
     borderWidth: 1,
-    borderColor: '#C7CDFB',
+    borderColor: '#BFD6FB',
     borderRadius: RADIUS.full,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -856,7 +848,7 @@ const styles = StyleSheet.create({
   modalLabel: { flexShrink: 1, fontSize: 12, fontWeight: '700', color: COLORS.textMuted, marginBottom: 5, marginTop: 10 },
   modalInput: {
     height: 44,
-    backgroundColor: '#F4F5FB',
+    backgroundColor: '#F5F7FA',
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADIUS.md,
@@ -875,8 +867,8 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   typeChipActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: '#0B1736',
+    borderColor: '#0B1736',
   },
   typeChipText: { fontSize: 12, fontWeight: '600', color: COLORS.textMuted },
   typeChipTextActive: { color: '#FFFFFF', fontWeight: '700' },

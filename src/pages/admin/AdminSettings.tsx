@@ -79,6 +79,7 @@ export default function AdminSettings() {
   const [affiliationBoard, setAffiliationBoard] = useState('CBSE');
   const [affiliationCode, setAffiliationCode] = useState('');
   const [settings, setSettings] = useState<InstitutionalSettings>(DEFAULT_SETTINGS);
+  const savedWorkingDays = useRef<string>(DEFAULT_SETTINGS.workingDays);
   const [timings, setTimings] = useState<SchoolTimings>(DEFAULT_TIMINGS);
   const [brandingOn, setBrandingOn] = useState(true);
 
@@ -99,6 +100,7 @@ export default function AdminSettings() {
             ...Object.fromEntries(Object.keys(DEFAULT_SETTINGS).filter((k) => k in st).map((k) => [k, st[k]])),
           } as InstitutionalSettings);
           setTimings({ ...DEFAULT_TIMINGS, ...((st.timings as Partial<SchoolTimings>) ?? {}) });
+          savedWorkingDays.current = String(st.workingDays ?? DEFAULT_SETTINGS.workingDays);
         }
         setBrandingOn(schoolBranding(data).enabled);
         setLogoPreview(data.logo_url || null);
@@ -157,12 +159,20 @@ export default function AdminSettings() {
       if (logoBase64 !== null) fields.logo_url = logoBase64;
       else if (logoPreview === null && school?.logo_url) fields.logo_url = null;
 
+      // Changing the working week also moves the timetable days (Saturday on/off).
+      const weekChanged = settings.workingDays !== savedWorkingDays.current;
       // Only this page's keys are sent; the server merges them into settings.
       await saveSchoolSettings(profile.school_id, {
         ...settings,
         timings,
         app_branding: { enabled: brandingOn },
+        ...(weekChanged ? { timetable_days: settings.workingDays === '5' ? [1, 2, 3, 4, 5] : [1, 2, 3, 4, 5, 6] } : {}),
       }, fields);
+      if (weekChanged) {
+        toast(settings.workingDays === '5'
+          ? 'Saturday is now a weekly off — holidays, attendance and timetable updated'
+          : 'Saturday is now a working day — holidays, attendance and timetable updated', 'success');
+      }
       toast('Settings saved', 'success');
       loadData();
     } catch (err) {
@@ -402,7 +412,11 @@ export default function AdminSettings() {
                     <option value="6">6 Working Days (Monday – Saturday)</option>
                     <option value="5">5 Working Days (Monday – Friday)</option>
                   </Select>
-                  <span className="text-[11px] text-slate-400 mt-1 block">Sets active attendance days across teacher portals.</span>
+                  <span className="text-[11px] text-slate-400 mt-1 block">
+                    {settings.workingDays === '5'
+                      ? 'Saturday and Sunday are weekly offs — the holiday calendar, attendance, leave counts and timetable follow this.'
+                      : 'Sunday is the weekly off — the holiday calendar, attendance, leave counts and timetable follow this.'}
+                  </span>
                 </div>
 
                 <div>

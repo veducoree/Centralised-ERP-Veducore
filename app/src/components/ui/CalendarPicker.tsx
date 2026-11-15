@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Button } from '@/components/ui/Button';
 
 const pad = (n: number) => String(n).padStart(2, '0');
 export const isoOf = (y: number, m: number, d: number) => `${y}-${pad(m + 1)}-${pad(d)}`;
@@ -111,13 +112,8 @@ export function CalendarPicker({ visible, mode, from, to, minDate, offDay, title
         <Text style={styles.hint}>Grey days are Sundays or holidays and are not counted as leave.</Text>
 
         <View style={styles.actions}>
-          <TouchableOpacity style={[styles.btn, styles.btnGhost]} onPress={onClose}>
-            <Text style={styles.btnGhostText}>Cancel</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.btn, styles.btnPrimary, !ready && { opacity: 0.5 }]} disabled={!ready}
-            onPress={() => { if (selFrom) onConfirm(selFrom, selTo ?? selFrom); }}>
-            <Text style={styles.btnPrimaryText}>Done</Text>
-          </TouchableOpacity>
+          <Button label="Cancel" variant="glass" size="lg" onPress={onClose} style={styles.btn} />
+          <Button label="Done" size="lg" disabled={!ready} onPress={() => { if (selFrom) onConfirm(selFrom, selTo ?? selFrom); }} style={styles.btn} />
         </View>
       </View>
     </Modal>
@@ -133,9 +129,9 @@ const styles = StyleSheet.create({
   sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 18, paddingTop: 8 },
   grabber: { alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', marginBottom: 12 },
   title: { fontSize: 16, fontWeight: '700', color: '#0F172A' },
-  summary: { fontSize: 13, color: '#5B6EE8', fontWeight: '600', marginTop: 2, marginBottom: 12 },
+  summary: { fontSize: 13, color: '#1E5BD8', fontWeight: '600', marginTop: 2, marginBottom: 12 },
   monthRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  navBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: '#F4F5FB', alignItems: 'center', justifyContent: 'center' },
+  navBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: '#F5F7FA', alignItems: 'center', justifyContent: 'center' },
   monthText: { fontSize: 15, fontWeight: '600', color: '#0F172A' },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   weekday: { width: `${100 / 7}%`, textAlign: 'center', fontSize: 11, fontWeight: '600', color: '#94A3B8', paddingVertical: 6 },
@@ -144,15 +140,11 @@ const styles = StyleSheet.create({
   dayText: { fontSize: 14, color: '#0F172A', fontWeight: '500' },
   dayOff: { color: '#CBD5E1' },
   dayDisabled: { color: '#E2E8F0' },
-  dayInRange: { backgroundColor: '#EEF0FD' },
-  dayInRangeText: { color: '#3B4DC8' },
-  daySelected: { backgroundColor: '#5B6EE8' },
+  dayInRange: { backgroundColor: '#EBF2FE' },
+  dayInRangeText: { color: '#1544AE' },
+  daySelected: { backgroundColor: '#1E5BD8' },
   daySelectedText: { color: '#FFFFFF', fontWeight: '700' },
   hint: { fontSize: 11, color: '#94A3B8', marginTop: 8 },
   actions: { flexDirection: 'row', gap: 10, marginTop: 14 },
   btn: { flex: 1, height: 44, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-  btnGhost: { backgroundColor: '#F4F5FB' },
-  btnGhostText: { fontSize: 14, fontWeight: '600', color: '#64748B' },
-  btnPrimary: { backgroundColor: '#5B6EE8' },
-  btnPrimaryText: { fontSize: 14, fontWeight: '600', color: '#FFFFFF' },
 });

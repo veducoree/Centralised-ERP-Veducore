@@ -3,7 +3,6 @@ import {
   View,
   Text,
   ScrollView,
-  RefreshControl,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
@@ -26,6 +25,7 @@ import { useAuth } from '@/context/AuthContext';
 import type {
   Parent, ParentStudent, Student, Class, Section, Remark, Teacher,
 } from '@/types';
+import { RefreshScrollView } from '@/components/ui/RefreshScrollView';
 
 interface ChildInfo {
   student: Student;
@@ -148,18 +148,10 @@ export default function ParentRemarks() {
       <View style={styles.content}>
         <Header title="Teacher Remarks" />
 
-        <ScrollView
+        <RefreshScrollView refreshing={refreshing} onRefresh={onRefresh}
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={COLORS.primary}
-              colors={[COLORS.primary]}
-            />
-          }>
+          showsVerticalScrollIndicator={false}>
 
           {/* Child selector if multiple children */}
           {children.length > 1 && (
@@ -274,7 +266,7 @@ export default function ParentRemarks() {
           )}
 
           <View style={{ height: SPACING.xxl }} />
-        </ScrollView>
+        </RefreshScrollView>
       </View>
     </View>
   );
@@ -302,7 +294,7 @@ const styles = StyleSheet.create({
     ...SHADOW.sm,
   },
   childChipActive: {
-    backgroundColor: '#EEF0FD',
+    backgroundColor: '#EBF2FE',
     borderColor: COLORS.primary,
   },
   childChipName: { fontSize: 13, fontWeight: '700', color: COLORS.text },
@@ -336,8 +328,8 @@ const styles = StyleSheet.create({
     ...SHADOW.sm,
   },
   filterPillActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
+    backgroundColor: '#0B1736',
+    borderColor: '#0B1736',
   },
   filterPillText: { fontSize: 12, fontWeight: '600', color: COLORS.textMuted },
   filterPillTextActive: { color: '#FFFFFF', fontWeight: '700' },

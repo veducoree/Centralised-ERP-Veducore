@@ -37,7 +37,7 @@ export default function AdminTeachers() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     full_name: '', username: '', password: '', phone: '', employee_id: '',
-    qualification: '', date_of_joining: '',
+    qualification: '', date_of_joining: '', address: '',
   });
   const [editForm, setEditForm] = useState<Partial<Teacher>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -142,7 +142,7 @@ export default function AdminTeachers() {
   function openAdd() {
     setForm({
       full_name: '', username: '', password: '', phone: '', employee_id: '',
-      qualification: '', date_of_joining: new Date().toISOString().split('T')[0],
+      qualification: '', date_of_joining: new Date().toISOString().split('T')[0], address: '',
     });
     setAllotRows([newAllotmentRow()]);
     setErrors({});
@@ -153,7 +153,7 @@ export default function AdminTeachers() {
     setEditing(t);
     setEditForm({
       full_name: t.full_name, phone: t.phone, qualification: t.qualification,
-      date_of_joining: t.date_of_joining, status: t.status,
+      date_of_joining: t.date_of_joining, status: t.status, address: t.address ?? '',
       password: '',
     });
     const own = allotmentsToRows(allotments.filter((a) => a.teacher_id === t.id));
@@ -197,6 +197,16 @@ export default function AdminTeachers() {
 
       const wanted = rowsToAllotments(allotRows);
       let createdTeacherId: string | undefined;
+      const address = form.address.trim();
+      if (address && res?.id) {
+        try {
+          const created = await fetchTeacherByUserId(res.id);
+          if (created) {
+            createdTeacherId = created.id;
+            await updateTeacher(created.id, { address });
+          }
+        } catch { /* address is optional — can be added later via Edit */ }
+      }
       if (wanted.length && res?.id) {
         try {
           const created = await fetchTeacherByUserId(res.id);
@@ -227,6 +237,7 @@ export default function AdminTeachers() {
         qualification: form.qualification || '',
         subject: subjectNamesFor(allotRows).join(', '),
         date_of_joining: form.date_of_joining || '',
+        address: form.address || null,
         status: 'active',
         password: form.password,
         avatar_url: null,
@@ -440,6 +451,9 @@ export default function AdminTeachers() {
           </div>
           <Input label="Qualification" value={form.qualification} onChange={(e) => setForm({ ...form, qualification: e.target.value })} placeholder="e.g. M.Sc, B.Ed" />
           <Input label="Date of Joining" type="date" value={form.date_of_joining} onChange={(e) => setForm({ ...form, date_of_joining: e.target.value })} />
+          <div className="sm:col-span-2">
+            <Input label="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="House no., street, city" />
+          </div>
         </div>
         <AllotmentSection error={errors.allotment}>
           <SubjectAllotmentEditor
@@ -486,6 +500,9 @@ export default function AdminTeachers() {
           </div>
           <Input label="Qualification" value={editForm.qualification || ''} onChange={(e) => setEditForm({ ...editForm, qualification: e.target.value })} />
           <Input label="Date of Joining" type="date" value={editForm.date_of_joining || ''} onChange={(e) => setEditForm({ ...editForm, date_of_joining: e.target.value })} />
+          <div className="sm:col-span-2">
+            <Input label="Address" value={editForm.address || ''} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} placeholder="House no., street, city" />
+          </div>
           <Input
             label="Password"
             type="password"

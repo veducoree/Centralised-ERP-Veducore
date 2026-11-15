@@ -23,6 +23,8 @@ import type {
   AttendanceDefaulter, StaffAttendanceStatus, StaffRegisterRow, StaffLeave,
 } from '@/types';
 import { sortByClassOrder, sortSections } from '@/lib/classOrder';
+import { useSchool } from '@/lib/useSchool';
+import { weeklyOffDays, makeOffDay } from '@/lib/holidays';
 
 type ClassWithSections = Class & { sections: Section[] };
 type Tab = 'today' | 'register' | 'low' | 'staff';
@@ -244,17 +246,12 @@ function ViewModal({ section, date, onClose }: { section: SectionDayOverview; da
 }
 
 // ─── Monthly register ───────────────────────────────────────────────────────
+/** Declared holidays + weekly offs from Settings → Weekly Working Days. */
 function useOffDays(holidays: Holiday[]) {
-  return useMemo(() => {
-    const holiday = new Map<string, string>();
-    const working = new Set<string>();
-    holidays.forEach((h) => { if (h.type === 'working') working.add(h.date); else holiday.set(h.date, h.label ?? 'Holiday'); });
-    return (d: string) => {
-      if (holiday.has(d)) return holiday.get(d)!;
-      if (working.has(d)) return null;
-      return new Date(d + 'T00:00:00').getDay() === 0 ? 'Sunday' : null;
-    };
-  }, [holidays]);
+  const school = useSchool();
+  const offDays = weeklyOffDays(school);
+  const key = offDays.join(',');
+  return useMemo(() => makeOffDay(holidays, offDays), [holidays, key]); // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 function RegisterTab({ classes, holidays }: { classes: ClassWithSections[]; holidays: Holiday[] }) {
@@ -296,7 +293,7 @@ function RegisterTab({ classes, holidays }: { classes: ClassWithSections[]; holi
       </div>
       <div className="flex flex-wrap gap-3 text-[11px] text-slate-500">
         {(Object.keys(STATUS) as AttendanceStatus[]).map((k) => <span key={k} className="flex items-center gap-1"><span className={`rounded px-1 font-semibold ${STATUS[k].cell}`}>{STATUS[k].short}</span>{STATUS[k].label}</span>)}
-        <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-slate-200" /> Sunday / holiday</span>
+        <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-slate-200" /> Weekly off / holiday</span>
       </div>
       <Card className="overflow-hidden">
         {loading ? <div className="p-6"><LoadingSpinner /></div> : rows.length === 0 ? <p className="p-10 text-center text-sm text-slate-500">{sectionId ? 'No students in this section.' : 'Choose a section.'}</p> : (
