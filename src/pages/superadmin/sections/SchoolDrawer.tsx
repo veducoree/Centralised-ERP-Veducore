@@ -520,10 +520,19 @@ function AccessTab({ d, canManage, onSaved }: { d: Detail; canManage: boolean; o
   async function impersonate() {
     setImpersonating(true);
     try {
-      const r = await callManageSchools<{ link: string }>({
+      const r = await callManageSchools<{ link: string; token_hash?: string }>({
         action: 'impersonate', school_id: s.id, redirect_to: appLink('/admin/dashboard'),
       });
-      setLink(r.link);
+      // Supabase's own action_link redirects to the project's Site URL whenever
+      // redirect_to isn't allow-listed (that is how links ended up on
+      // localhost:3000). Point at our own page instead, which verifies the
+      // one-time token directly. Older function builds don't return token_hash,
+      // but the action_link carries the same hashed token as ?token=.
+      let tokenHash = r.token_hash;
+      if (!tokenHash) {
+        try { tokenHash = new URL(r.link).searchParams.get('token') ?? undefined; } catch { /* keep raw link */ }
+      }
+      setLink(tokenHash ? appLink(`/auth/impersonate?token_hash=${encodeURIComponent(tokenHash)}`) : r.link);
     } catch (e) {
       toast(errMsg(e), 'error');
     } finally {

@@ -14,6 +14,7 @@ const PageLoader = () => (
 );
 
 const NotFound = lazy(() => import('@/pages/NotFound'));
+const ImpersonatePage = lazy(() => import('@/pages/ImpersonatePage'));
 
 // Superadmin portal
 const Superadmin = lazy(() => import('@/pages/superadmin/Superadmin'));
@@ -139,6 +140,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/login" replace />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/auth/impersonate" element={<ImpersonatePage />} />
 
             {/* Root Section Redirects */}
             <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />

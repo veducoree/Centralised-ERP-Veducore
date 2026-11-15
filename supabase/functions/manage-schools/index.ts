@@ -596,7 +596,9 @@ const ACTIONS: Record<string, { roles: Role[]; run: (ctx: Ctx) => Promise<unknow
       });
       if (error || !data?.properties?.action_link) throw new HttpError(400, error?.message ?? "Could not create sign-in link");
       await audit(ctx, "school.impersonated", schoolId, { admin_email: adminProfile.email });
-      return { link: data.properties.action_link, email: adminProfile.email };
+      // hashed_token lets the web app verify the sign-in itself (/auth/impersonate),
+      // so it never depends on Supabase's redirect allow-list / Site URL.
+      return { link: data.properties.action_link, token_hash: data.properties.hashed_token, email: adminProfile.email };
     },
   },
 
