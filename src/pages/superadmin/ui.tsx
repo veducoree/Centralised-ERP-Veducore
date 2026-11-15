@@ -1,5 +1,6 @@
 // Shared building blocks for the Veducore management portal.
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AlertCircle, CheckCircle2, Info, Loader2, X } from 'lucide-react';
 import type { SchoolHealth, Subscription, TeamRole } from './api';
 
@@ -187,6 +188,28 @@ function useEscape(open: boolean, onClose: () => void) {
   }, [open, onClose]);
 }
 
+// Freeze the page behind an open overlay. Without this the page underneath
+// keeps scrolling / rubber-banding, which drags the dimmed backdrop off the
+// top edge and leaves an undimmed strip. Ref-counted so a Modal stacked on a
+// Drawer doesn't unlock the page when only the Modal closes.
+let scrollLocks = 0;
+export function useScrollLock(open: boolean) {
+  useEffect(() => {
+    if (!open) return;
+    const root = document.documentElement;
+    if (scrollLocks++ === 0) {
+      root.style.overflow = 'hidden';
+      root.style.overscrollBehavior = 'none';
+    }
+    return () => {
+      if (--scrollLocks === 0) {
+        root.style.overflow = '';
+        root.style.overscrollBehavior = '';
+      }
+    };
+  }, [open]);
+}
+
 export function Modal({
   open, onClose, title, subtitle, children, footer, size = 'md',
 }: {
@@ -194,9 +217,10 @@ export function Modal({
   children: React.ReactNode; footer?: React.ReactNode; size?: 'sm' | 'md' | 'lg';
 }) {
   useEscape(open, onClose);
+  useScrollLock(open);
   if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-end overscroll-none justify-center bg-slate-900/40 p-0 backdrop-blur-sm sm:items-center sm:p-4" onMouseDown={onClose}>
       <div
         onMouseDown={(e) => e.stopPropagation()}
         className={cx(
@@ -213,10 +237,11 @@ export function Modal({
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
+        <div className="flex-1 overflow-y-auto overscroll-contain px-6 py-5">{children}</div>
         {footer && <div className="flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50/60 px-6 py-3.5">{footer}</div>}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -224,13 +249,15 @@ export function Drawer({
   open, onClose, children, width = 'max-w-3xl',
 }: { open: boolean; onClose: () => void; children: React.ReactNode; width?: string }) {
   useEscape(open, onClose);
+  useScrollLock(open);
   if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-slate-900/30 backdrop-blur-[2px]" onMouseDown={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-40 flex justify-end overscroll-none bg-slate-900/30 backdrop-blur-[2px]" onMouseDown={onClose}>
       <div onMouseDown={(e) => e.stopPropagation()} className={cx('flex h-full w-full flex-col bg-[#f6f7fc] shadow-2xl', width)}>
         {children}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

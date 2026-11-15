@@ -7,6 +7,7 @@ import {
   UserX, Users, X,
 } from 'lucide-react';
 import { callManageSchools, type SchoolRecord } from '../api';
+import { useScrollLock } from '../ui';
 
 export interface StudentIdCardRecord {
   id: string;
@@ -362,6 +363,7 @@ export default function IdCardsSection({
   const [filterMode, setFilterMode] = useState<'all' | 'ready' | 'missing-photo' | 'incomplete'>('all');
   const [selectedClass, setSelectedClass] = useState<string>('all');
   const [zoomedStudent, setZoomedStudent] = useState<StudentIdCardRecord | null>(null);
+  useScrollLock(!!zoomedStudent);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 

@@ -100,7 +100,7 @@ export default function SchoolDrawer({
         <div className="mt-4"><Tabs tabs={tabs} value={tab} onChange={setTab} /></div>
       </div>
 
-      <div className="flex-1 space-y-5 overflow-y-auto p-5 sm:p-7">
+      <div className="flex-1 space-y-5 overflow-y-auto overscroll-contain p-5 sm:p-7">
         {error && <ErrorBanner message={error} onRetry={load} />}
         {!detail && loading && <LoadingBlock rows={6} />}
         {detail && s && (

@@ -1,4 +1,5 @@
 import { type ReactNode, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -101,9 +102,12 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
 
   if (!open) return null;
 
-  return (
+  // Portal to <body>: if a page renders the modal inside a wrapper that has a
+  // transform / animation / z-index, `fixed` would be trapped in that wrapper
+  // and the fixed top header (z-40) would sit above the blur, un-dimmed.
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
@@ -144,7 +148,8 @@ export function Modal({ open, onClose, title, description, children, size = 'md'
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
