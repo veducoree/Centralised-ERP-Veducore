@@ -209,12 +209,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: 'Supabase environment variables are missing. Please contact the administrator.' };
     }
 
-    const raw = identifier.trim();
+    const raw = identifier.trim().toLowerCase();
     const pw = password.trim();
-    const emailsToTry = [raw];
-    if (!raw.includes('@')) {
-      emailsToTry.push(`${raw}@veducore.internal`);
-    }
+    // Usernames map to synthetic internal emails. A bare username is never a valid
+    // email, so go straight to the internal address (saves one network round trip).
+    const emailsToTry = raw.includes('@') ? [raw] : [`${raw}@veducore.internal`];
 
     let lastError: string | null = null;
     for (const email of emailsToTry) {

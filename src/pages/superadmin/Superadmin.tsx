@@ -2,7 +2,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import {
   AlertCircle, BarChart3, Building2, Contact2, CreditCard, Eye, EyeOff, History, LifeBuoy, Loader2, LogOut,
-  Megaphone, Menu, Plus, Settings, ShieldCheck, Users, Wallet, X,
+  GalleryHorizontal, Megaphone, Menu, Plus, Settings, ShieldCheck, Users, Wallet, X,
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import veducoreLogo from '@/assets/veducore-logo.png';
@@ -20,6 +20,7 @@ const AddSchoolSection = lazy(() => import('./sections/AddSchool'));
 const BillingSection = lazy(() => import('./sections/Billing'));
 const PaymentsSection = lazy(() => import('./sections/Payments'));
 const AnnouncementsSection = lazy(() => import('./sections/Announcements'));
+const AdsSection = lazy(() => import('./sections/Ads'));
 const SupportSection = lazy(() => import('./sections/Support'));
 const TeamSection = lazy(() => import('./sections/Team'));
 const AuditLogSection = lazy(() => import('./sections/AuditLog'));
@@ -28,7 +29,7 @@ const IdCardsSection = lazy(() => import('./sections/IdCards'));
 
 type Section =
   | 'dashboard' | 'schools' | 'add-school' | 'id-cards' | 'billing' | 'payments'
-  | 'announcements' | 'support' | 'team' | 'audit' | 'settings';
+  | 'announcements' | 'ads' | 'support' | 'team' | 'audit' | 'settings';
 
 const NAV: { group: string; items: { id: Section; label: string; icon: React.ReactNode; managersOnly?: boolean }[] }[] = [
   { group: '', items: [{ id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="h-[18px] w-[18px]" /> }] },
@@ -48,6 +49,7 @@ const NAV: { group: string; items: { id: Section; label: string; icon: React.Rea
   {
     group: 'Engage', items: [
       { id: 'announcements', label: 'Announcements', icon: <Megaphone className="h-[18px] w-[18px]" /> },
+      { id: 'ads', label: 'Login page ads', icon: <GalleryHorizontal className="h-[18px] w-[18px]" />, managersOnly: true },
       { id: 'support', label: 'Support desk', icon: <LifeBuoy className="h-[18px] w-[18px]" /> },
     ],
   },
@@ -68,6 +70,7 @@ const TITLES: Record<Section, [string, string]> = {
   billing: ['Billing & plans', "Subscriptions, invoices and Veducore's pricing"],
   payments: ['Online payments', 'Parent fee payments across all schools'],
   announcements: ['Announcements', 'Messages to school admins, teachers and parents'],
+  ads: ['Login page ads', 'Banner ads that rotate at the bottom of the login page'],
   support: ['Support desk', 'Tickets raised by school admins'],
   team: ['Team & roles', 'Who can access this portal and what they can do'],
   audit: ['Audit log', 'A record of every change made here'],
@@ -151,7 +154,7 @@ export default function Superadmin() {
   useEffect(() => { if (me) loadSchools(); }, [me, loadSchools]);
 
   // Support staff can't open manager-only sections: send them to the dashboard URL.
-  const managerOnly = section === 'add-school' || section === 'id-cards';
+  const managerOnly = section === 'add-school' || section === 'id-cards' || section === 'ads';
   useEffect(() => {
     if (me && me.role === 'support' && managerOnly) navigate(BASE, { replace: true });
   }, [me, managerOnly, navigate]);
@@ -254,6 +257,7 @@ export default function Superadmin() {
           {current === 'billing' && <BillingSection me={me} schools={schools} onOpenSchool={setOpenSchool} onSchoolsChanged={loadSchools} />}
           {current === 'payments' && <PaymentsSection />}
           {current === 'announcements' && <AnnouncementsSection me={me} schools={schools} />}
+          {current === 'ads' && <AdsSection me={me} />}
           {current === 'support' && <SupportSection me={me} onOpenSchool={setOpenSchool} />}
           {current === 'team' && <TeamSection me={me} />}
           {current === 'audit' && <AuditLogSection />}

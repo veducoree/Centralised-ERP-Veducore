@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react';
-import { useNavigate, useLocation, Link } from 'react-router-dom';
-import { Eye, EyeOff, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Eye, EyeOff, Loader2, AlertCircle, RefreshCw, Info } from 'lucide-react';
 import { useAuth, getDashboardPath } from '@/auth/AuthContext';
 import { CenteredLoader } from '@/components/ui/Skeleton';
 import veducoreLogo from '@/assets/veducore-logo.png';
+import LoginAdBanner from '@/components/ads/LoginAdBanner';
 
 // ── Image Captcha Helper ──────────────────────────────────────────────────────
 
@@ -113,6 +114,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showForgotHint, setShowForgotHint] = useState(false);
 
   // Image Captcha state
   const [captchaCode, setCaptchaCode] = useState(() => generateRandomCaptcha(5));
@@ -164,7 +166,7 @@ export default function LoginPage() {
     setError('');
     setCaptchaError('');
 
-    if (!identifier || !password) {
+    if (!identifier.trim() || !password) {
       setError('Please enter both username and password.');
       return;
     }
@@ -180,16 +182,19 @@ export default function LoginPage() {
 
     setLoading(true);
     const { error: signInError } = await signIn(identifier, password);
-    setLoading(false);
 
+    // On success keep the spinner — the redirect effect takes over.
     if (signInError) {
+      setLoading(false);
       // Refresh captcha on failed login, but preserve username & password
       refreshCaptcha();
       setCaptchaInput('');
-      if (signInError.includes('Invalid login')) {
+      if (/invalid login|invalid credentials/i.test(signInError)) {
         setError('Invalid credentials. Please check your username and password.');
       } else if (signInError.includes('Email not confirmed')) {
         setError('Your account has not been confirmed. Please contact your administrator.');
+      } else if (/fetch|network/i.test(signInError)) {
+        setError('Network error. Please check your internet connection and try again.');
       } else {
         setError(signInError);
       }
@@ -197,7 +202,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-50 px-4 py-8">
+    <div className="flex min-h-screen min-h-[100dvh] flex-col bg-gradient-to-br from-gray-50 via-blue-50/30 to-gray-50">
+      <main className="flex flex-1 items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
 
         {/* Branding */}
@@ -214,7 +220,7 @@ export default function LoginPage() {
         <div className="rounded-2xl border border-gray-200 bg-white p-5 sm:p-8 shadow-sm">
 
           {error && (
-            <div className="mb-4 flex items-start gap-2.5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div role="alert" className="mb-4 flex items-start gap-2.5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
               <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
               <p>{error}</p>
             </div>
@@ -234,6 +240,10 @@ export default function LoginPage() {
                 onChange={(e) => setIdentifier(e.target.value)}
                 placeholder="Enter your username or email"
                 autoComplete="username"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                autoFocus
                 className="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 placeholder-gray-400 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
                 disabled={loading}
               />
@@ -258,6 +268,8 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  tabIndex={-1}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -297,6 +309,7 @@ export default function LoginPage() {
                     disabled={loading}
                     className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-500 shadow-2xs hover:bg-gray-50 hover:text-blue-600 transition-colors disabled:opacity-40"
                     title="Refresh Captcha Image"
+                    aria-label="Refresh captcha"
                   >
                     <RefreshCw className="h-4 w-4" />
                   </button>
@@ -312,6 +325,8 @@ export default function LoginPage() {
                     if (captchaError) setCaptchaError('');
                   }}
                   placeholder="Enter code"
+                  inputMode="text"
+                  autoCapitalize="characters"
                   maxLength={6}
                   className={`w-full min-w-0 sm:flex-1 rounded-lg border px-3.5 py-2.5 sm:px-3 sm:py-2 text-sm font-mono tracking-widest text-gray-900 placeholder-gray-400 uppercase transition-colors focus:outline-none focus:ring-2 ${
                     captchaError
@@ -332,15 +347,27 @@ export default function LoginPage() {
               )}
             </div>
 
-            {/* Remember me / Forgot password */}
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
-                <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500/30" />
-                Remember me
-              </label>
-              <Link to="/forgot-password" className="text-sm font-medium text-blue-600 hover:text-blue-700">
-                Forgot password?
-              </Link>
+            {/* Forgot password — accounts are created by the school, so the school resets them */}
+            <div>
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowForgotHint((v) => !v)}
+                  className="text-sm font-medium text-blue-600 hover:text-blue-700"
+                  aria-expanded={showForgotHint}
+                >
+                  Forgot password?
+                </button>
+              </div>
+              {showForgotHint && (
+                <div className="mt-2 flex items-start gap-2 rounded-lg bg-blue-50 px-3 py-2.5 text-xs leading-relaxed text-blue-800">
+                  <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+                  <p>
+                    Please contact your school office. Your school admin can reset your password
+                    from the Veducore admin panel.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Submit */}
@@ -359,6 +386,16 @@ export default function LoginPage() {
           Veducore &middot; Secure access for authorized users only
         </p>
       </div>
+
+      </main>
+
+      {/* Bottom banner ad, flush with the bottom edge. Kept in normal flow (not fixed) so it
+          never overlaps the form on small screens (AdSense accidental-click policy). */}
+      <aside className="w-full border-t border-gray-200 bg-white/80 px-4 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-sm">
+        <div className="mx-auto w-full max-w-xl">
+          <LoginAdBanner />
+        </div>
+      </aside>
     </div>
   );
 }
