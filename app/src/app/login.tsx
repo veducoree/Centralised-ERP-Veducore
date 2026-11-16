@@ -18,6 +18,11 @@ import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { COLORS, SPACING, RADIUS } from '@/lib/utils';
 import { appAlert } from '@/components/ui/AppDialog';
+import Constants from 'expo-constants';
+import * as Updates from 'expo-updates';
+
+// e.g. "v1.0.0 · a1b2c3" (OTA update id) or "v1.0.0 · build" (no OTA applied yet)
+const VERSION_LABEL = `v${Constants.expoConfig?.version ?? '1.0.0'} · ${Updates.updateId && !Updates.isEmbeddedLaunch ? Updates.updateId.slice(0, 6) : 'build'}`;
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -168,6 +173,7 @@ export default function LoginScreen() {
             <Text style={styles.footerText}>
               Veducore · ERP Portal © 2026
             </Text>
+            <Text style={styles.versionText}>{VERSION_LABEL}</Text>
           </ScrollView>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -293,5 +299,11 @@ const styles = StyleSheet.create({
     color: '#94A3B8',
     fontSize: 12,
     marginTop: SPACING.xl,
+  },
+  versionText: {
+    textAlign: 'center',
+    color: '#CBD5E1',
+    fontSize: 11,
+    marginTop: 4,
   },
 });

@@ -53,9 +53,9 @@ Tokens live in `push_tokens` (saved on sign-in, removed on sign-out). Each user'
 | What changed | How it reaches phones |
 |---|---|
 | Supabase (migrations, edge functions, data) | Live immediately |
-| App JS/TS (screens, styles, logic) | OTA: `eas update --branch preview -m "what changed"` (use `--branch production` for Play Store users) |
-| Native (new native package, permissions, icon, Expo SDK) | Bump `version` in `app.json`, then `eas build` and reinstall / Play Store update |
+| App JS/TS (screens, styles, logic) | OTA: `eas update --branch preview --platform android -m "what changed"` (use `--branch production` for Play Store users) |
+| Native (new native package, permissions, icon, Expo SDK) | Bump both `version` and `runtimeVersion` in `app.json` (keep them equal), then `eas build` and reinstall / Play Store update |
 
-`runtimeVersion` follows `version` (policy `appVersion`). An OTA update only reaches builds with the same `version`. After a native change, always bump `version` so old builds never get JS they can't run.
+`runtimeVersion` is a fixed string. A policy can't be used because the old `ios/` folder makes EAS treat the project as bare. An OTA update only reaches builds with the same `runtimeVersion`. After a native change, always bump it so old builds never get JS they can't run.
 
 The app checks for updates on launch and when it returns to the foreground (`src/lib/useOtaUpdates.ts`), then offers a restart.

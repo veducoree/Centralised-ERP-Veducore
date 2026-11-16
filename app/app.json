@@ -74,9 +74,7 @@
       }
     },
     "owner": "veducore",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/e2de6e1b-ec78-4e1b-b839-c543746f9815",
       "checkAutomatically": "ON_LOAD",
