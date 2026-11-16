@@ -9,6 +9,7 @@ import { fetchTeacherByUserId, fetchTeacherAssignments } from '@/services/api';
 import { COLORS, SPACING, formatDate } from '@/lib/utils';
 import { Header } from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
+import { appIconSupported } from '@/lib/appIcon';
 import type { Teacher } from '@/types';
 import { appAlert } from '@/components/ui/AppDialog';
 import { Button } from '@/components/ui/Button';
@@ -167,6 +168,9 @@ export default function TeacherProfileModal() {
                   <NavRow first icon="finger-print-outline" label="My attendance & leave" tint="#0E8F6E" onPress={() => router.push('/teacher-modal/my-attendance' as never)} />
                   <NavRow icon="time-outline" label="My schedule" tint="#0E7490" onPress={() => router.push('/teacher-modal/schedule' as never)} />
                   <NavRow icon="notifications-outline" label="Notifications" tint={COLORS.primary} onPress={() => router.push('/teacher-modal/notifications' as never)} />
+                  {appIconSupported() && (
+                    <NavRow icon="apps-outline" label="App icon" tint="#7C3AED" onPress={() => router.push('/teacher-modal/app-icon' as never)} />
+                  )}
                 </Section>
               </FadeUp>
 

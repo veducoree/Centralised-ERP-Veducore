@@ -2,7 +2,7 @@
   "expo": {
     "name": "Veducore",
     "slug": "veducore",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "scheme": "veducore",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -74,7 +74,7 @@
       }
     },
     "owner": "veducore",
-    "runtimeVersion": "1.0.0",
+    "runtimeVersion": "1.1.0",
     "updates": {
       "url": "https://u.expo.dev/e2de6e1b-ec78-4e1b-b839-c543746f9815",
       "checkAutomatically": "ON_LOAD",

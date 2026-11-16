@@ -5,6 +5,7 @@ import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { clearApiCache, fetchSchool, fetchTeacherByUserId, fetchParentByUserId } from '@/services/api';
 import type { Profile, School } from '@/types';
+import { resetAppIconSafely } from '@/lib/appIcon';
 
 const PROFILE_CACHE_KEY = 'veducore_mobile_profile_cache';
 const SCHOOL_CACHE_KEY = 'veducore_mobile_school_cache';
@@ -272,6 +273,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await Promise.race([unregisterPushToken(), new Promise((r) => setTimeout(r, 800))]);
     currentUserIdRef.current = null;
     clearApiCache();
+    // Back to the default Veducore launcher icon.
+    resetAppIconSafely();
     setState({
       session: null,
       user: null,

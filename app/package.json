@@ -6,13 +6,17 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "icons:sync": "node scripts/sync-school-icons.mjs",
+    "build:apk": "npm run icons:sync && eas build -p android --profile preview",
+    "build:aab": "npm run icons:sync && eas build -p android --profile production"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@supabase/supabase-js": "^2.57.4",
     "expo": "~58.0.25",
+    "expo-alternate-app-icons": "^11.0.0",
     "expo-constants": "~58.0.13",
     "expo-document-picker": "~58.0.5",
     "expo-file-system": "~58.0.10",
@@ -44,6 +48,7 @@
     "@expo/ngrok": "^4.1.3",
     "@react-native/babel-preset": "^0.87.1",
     "@types/react": "~19.3.0",
+    "sharp": "^0.34.5",
     "typescript": "~6.0.3"
   }
 }

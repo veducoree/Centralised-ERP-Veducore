@@ -9,6 +9,7 @@ import { COLORS, SPACING } from '@/lib/utils';
 import { Avatar } from '@/components/ui/Avatar';
 import { Header } from '@/components/layout/Header';
 import { useAuth } from '@/context/AuthContext';
+import { appIconSupported } from '@/lib/appIcon';
 import type { Parent, Student } from '@/types';
 import { appAlert } from '@/components/ui/AppDialog';
 import { Button } from '@/components/ui/Button';
@@ -136,6 +137,9 @@ export default function ParentProfile() {
                 <Section title="Quick links">
                   <NavRow first icon="notifications-outline" label="Notifications" tint={COLORS.primary} onPress={() => router.push('/parent-modal/notifications' as never)} />
                   <NavRow icon="time-outline" label="Class timetable" tint="#0E7490" onPress={() => router.push('/parent-modal/timetable' as never)} />
+                  {appIconSupported() && (
+                    <NavRow icon="apps-outline" label="App icon" tint="#7C3AED" onPress={() => router.push('/parent-modal/app-icon' as never)} />
+                  )}
                   {!!school?.contact_number && (
                     <NavRow icon="call-outline" label="Call school office" tint="#0E8F6E" trailing={school.contact_number} onPress={() => call(school.contact_number)} />
                   )}
