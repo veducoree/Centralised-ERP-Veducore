@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Users, GraduationCap, BookOpen, UserCog, IndianRupee, TrendingUp, ClipboardCheck,
-  UserPlus, Send, CalendarDays, AlertTriangle, ChevronRight, Bus, Cake, Bell, CheckCircle2, Wallet, CalendarRange,
+  AlertTriangle, ChevronRight, Bus, Cake, Bell, CheckCircle2,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { StatCard, Card } from '@/components/ui/Card';
@@ -77,28 +77,11 @@ export default function AdminDashboard() {
   const strengthMax = Math.max(...strength.map((c) => c.students), 1);
 
   const alerts: { text: ReactNode; icon: ReactNode; tone: string; path: string }[] = [];
-  if (summary?.unmarked_sections.length) {
-    const n = summary.unmarked_sections.length;
-    alerts.push({ path: '/admin/attendance', icon: <ClipboardCheck className="h-4 w-4" />, tone: 'bg-[#FEF3E0] text-[#B26B00]',
-      text: <><b>{n}</b> section{n === 1 ? '' : 's'} haven't marked attendance today</> });
-  }
-  if (summary?.fees.overdue_students) {
-    const n = summary.fees.overdue_students;
-    alerts.push({ path: '/admin/fees', icon: <Wallet className="h-4 w-4" />, tone: 'bg-[#FEECEC] text-[#C53030]',
-      text: <><b>{formatCurrency(Number(summary.fees.overdue_amount), '₹')}</b> overdue from {n} student{n === 1 ? '' : 's'}</> });
-  }
   if (summary?.pending_transport) {
     const n = summary.pending_transport;
     alerts.push({ path: '/admin/transport', icon: <Bus className="h-4 w-4" />, tone: 'bg-[#E0F7FB] text-[#0E7490]',
       text: <><b>{n}</b> transport application{n === 1 ? '' : 's'} waiting for approval</> });
   }
-
-  const quickActions = [
-    { label: 'New Admission', icon: <UserPlus className="h-5 w-5" />, path: '/admin/new-admission', tint: 'bg-[#EEF0FD] text-[#5B6EE8]' },
-    { label: 'Collect Fee', icon: <IndianRupee className="h-5 w-5" />, path: '/admin/fees', tint: 'bg-[#E6F8F1] text-[#22C08A]' },
-    { label: 'Send Notice', icon: <Send className="h-5 w-5" />, path: '/admin/notifications', tint: 'bg-[#FEF0E6] text-[#F97316]' },
-    { label: 'Add Holiday', icon: <CalendarDays className="h-5 w-5" />, path: '/admin/holidays', tint: 'bg-[#FDE7F3] text-[#EC4899]' },
-  ];
 
   const panelTitle = (title: string, link?: { label: string; path: string }) => (
     <div className="mb-5 flex items-center justify-between">
@@ -133,29 +116,9 @@ export default function AdminDashboard() {
           <DashboardSkeleton cards={8} />
         ) : (
           <>
-            {/* Quick actions */}
-            <div className="grid grid-cols-2 gap-5 lg:grid-cols-4">
-              {quickActions.map((a, i) => (
-                <button
-                  key={a.label}
-                  onClick={() => navigate(a.path)}
-                  className="flex items-center gap-3 rounded-[20px] bg-white px-5 py-4 text-left shadow-[0_4px_20px_rgba(91,110,232,0.08)] transition-transform duration-200 hover:-translate-y-0.5"
-                  style={{ animation: 'fadeSlideUp 350ms ease both', animationDelay: `${i * 40}ms` }}
-                >
-                  <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${a.tint}`}>{a.icon}</span>
-                  <span className="text-sm font-semibold text-[#0F172A]">{a.label}</span>
-                </button>
-              ))}
-            </div>
-
             {/* Alerts */}
-            {(alerts.length > 0 || summary?.session) && (
+            {alerts.length > 0 && (
               <div className="flex flex-wrap gap-3">
-                {summary?.session && (
-                  <button onClick={() => navigate('/admin/sessions')} className="flex items-center gap-2 rounded-xl bg-[#EEF0FD] px-4 py-2.5 text-sm text-[#3B4DC8]">
-                    <CalendarRange className="h-4 w-4" /> Session <b>{summary.session.name}</b>
-                  </button>
-                )}
                 {alerts.map((a) => (
                   <button key={a.path} onClick={() => navigate(a.path)} className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm ${a.tone}`}>
                     <AlertTriangle className="h-4 w-4" /> <span>{a.text}</span> <ChevronRight className="h-4 w-4 opacity-60" />

@@ -91,6 +91,7 @@ export default function AdminSessions() {
     try {
       await setCurrentAcademicSession(switchTo.id, schoolId);
       clearApiCache();
+      window.dispatchEvent(new Event('veducore:session-updated'));
       toast(`${switchTo.name} is now the current session`, 'success');
       load();
     } catch (err) {

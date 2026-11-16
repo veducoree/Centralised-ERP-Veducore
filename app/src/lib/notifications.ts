@@ -141,6 +141,10 @@ export function routeForNotification(
     return '/parent-modal/notifications';
   }
   if (link.startsWith('/teacher/schedule') || data.category === 'timetable') return '/teacher-modal/schedule';
+  // Teachers only get attendance news about their own attendance / leave decisions.
+  if (link.startsWith('/teacher/my-attendance') || data.category === 'attendance') return '/teacher-modal/my-attendance';
+  if (link.startsWith('/teacher/remarks') || data.category === 'remark') return '/teacher-modal/remarks';
+  if (link.startsWith('/teacher/exam-marks') || data.category === 'exam') return '/(teacher)/marks';
   return '/teacher-modal/notifications';
 }
 

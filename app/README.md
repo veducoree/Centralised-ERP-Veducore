@@ -1,47 +1,49 @@
 # Veducore Mobile App
 
-React Native (Expo) mobile app for **Greenwood International School** — built specifically for **Teachers** and **Parents**. Works seamlessly on both **iOS** and **Android**.
+Expo (React Native) app for **teachers** and **parents**. It talks to the same Supabase project as the web portal. The admin and office portal is web-only.
 
-> **Note:** The Admin portal is exclusively available on the Web dashboard.
-
-## Tech Stack
-
-- Expo SDK 51 + Expo Router v3 (file-based routing)
-- React Native 0.74, TypeScript (strict mode, zero errors)
-- AsyncStorage — local mock database (no backend needed)
-- `@expo/vector-icons` Ionicons, `expo-linear-gradient`
-
-## Demo Credentials
-
-| Role    | Email                    | Password     |
-|---------|--------------------------|--------------|
-| Teacher | `teacher1@greenwood.edu` | `Teacher@123`|
-| Parent  | `parent1@greenwood.edu`  | `Parent@123` |
-
-## Getting Started
+## Run locally
 
 ```bash
 cd app
 npm install
-npm start          # or: npx expo start
-npm run ios        # iOS simulator
-npm run android    # Android emulator
+npx expo start        # Expo Go works for everything except push on Android
 ```
 
-Install [Expo Go](https://expo.dev/go) on your phone to scan the QR and run on device.
+## Screens
 
-## Teacher Screens
-- **Dashboard** — Time-aware greeting, today's schedule, assigned classes, quick actions
-- **My Classes** — Class assignments with expandable student lists and student profile view
-- **Attendance** — Mark present/absent/late per student, submit saves to AsyncStorage DB
-- **Marks** — Enter exam marks per student, auto-computed grade badges
-- **Students** — Search, section filter, student enrollment, and full 4-tab student detail modal
-- **Modals** — Timetable schedule, remarks feedback, notifications, profile and logout
+**Teacher:** dashboard, my classes, student attendance (class teacher), exam marks, students, schedule, remarks, my attendance + leave, notifications, profile.
 
-## Parent Screens
-- **Dashboard** — Multi-child switch card, attendance rate gauge, pending fees, recent academic score & remark
-- **Attendance** — Monthly attendance calendar with present/absent/late status tags
-- **Fees** — Breakdown of fee invoices, paid vs pending balance, due dates, and receipts
-- **Academic Records** — Exam scores, max marks, percentage, and grade badges
-- **Remarks** — Teacher remarks grouped by category (Academic, Behaviour, General)
-- **Profile** — Parent guardian details, linked children, and sign out
+**Parent:** dashboard (multi-child), attendance calendar, fees + online payment + receipts, academic records, remarks, transport (apply / status), timetable, notifications, profile.
+
+## Push notifications: one-time setup
+
+Push needs a real build. Expo Go on Android can't receive remote push.
+
+1. **Link the EAS project** (adds `extra.eas.projectId` to `app.json`):
+   ```bash
+   cd app
+   eas login
+   eas init
+   ```
+2. **Server secret.** Supabase runs the `push-dispatch` edge function from a DB trigger:
+   ```bash
+   SECRET=$(openssl rand -hex 32)
+   supabase secrets set PUSH_DISPATCH_SECRET=$SECRET
+   ```
+   Then in the Supabase SQL editor:
+   ```sql
+   INSERT INTO app_settings (key, value) VALUES
+     ('push_dispatch_url', 'https://earrifjgtsympejzfrtx.supabase.co/functions/v1/push-dispatch'),
+     ('push_dispatch_secret', '<same SECRET>')
+   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+   ```
+3. **Android credentials (FCM).** Create a Firebase project with Android package `com.veducore.app`, then upload its FCM V1 service-account key with `eas credentials` (Android → Push Notifications). iOS push needs an Apple Developer account. EAS sets up the APNs key on the first iOS build.
+4. **Build and install:**
+   ```bash
+   eas build -p android --profile preview      # installable APK
+   eas build -p android --profile production   # Play Store bundle
+   ```
+5. **Test:** sign in on the phone as a parent and mark that child absent from a teacher account. The parent should get a push, and tapping it should open Attendance.
+
+Tokens live in `push_tokens` (saved on sign-in, removed on sign-out). Each user's mute settings live in `notification_preferences`.

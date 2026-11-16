@@ -5,7 +5,7 @@ import {
   IndianRupee, FileText, Bell, Settings, LogOut,
   X, UserCircle, ChevronDown, Shield, User,
   Megaphone, ClipboardCheck, CalendarDays, Bus,
-  LayoutGrid, GripVertical, RotateCcw, Pencil, Check, Plus, Loader2, ChevronRight, ChevronLeft, UserRound, Boxes, Library, CalendarClock, CalendarRange, UserCog, ArrowUpCircle, CalendarCheck2, LifeBuoy,
+  LayoutGrid, GripVertical, RotateCcw, Pencil, Check, Plus, Loader2, ChevronRight, ChevronLeft, UserRound, Boxes, Library, CalendarClock, CalendarRange, UserCog, ArrowUpCircle, CalendarCheck2, LifeBuoy, Send,
 } from 'lucide-react';
 import {
   DndContext, closestCenter, PointerSensor, KeyboardSensor,
@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useAuth } from '@/auth/AuthContext';
-import { fetchSchool, getCachedSchoolSync } from '@/services/api';
+import { fetchSchool, getCachedSchoolSync, fetchAcademicSessions } from '@/services/api';
 import { NotificationBell } from './NotificationBell';
 import { PlatformBanner } from './PlatformNotices';
 import { portalName, schoolBranding } from '@/lib/branding';
@@ -451,6 +451,19 @@ export function DashboardLayout({
     return () => { cancelled = true; window.removeEventListener('veducore:school-updated', onUpdate); };
   }, [profile?.school_id]);
 
+  // ── Current academic session (admin navbar chip) ──────────
+  const [currentSession, setCurrentSession] = useState<string | null>(null);
+  useEffect(() => {
+    if (profile?.role !== 'admin' || !profile.school_id) return;
+    let cancelled = false;
+    const load = () => fetchAcademicSessions(profile.school_id!)
+      .then((list) => { if (!cancelled) setCurrentSession(list.find((s) => s.is_current)?.name ?? null); })
+      .catch(() => {});
+    load();
+    window.addEventListener('veducore:session-updated', load);
+    return () => { cancelled = true; window.removeEventListener('veducore:session-updated', load); };
+  }, [profile?.role, profile?.school_id]);
+
   // ── Browser tab: "Attendance · GVCS Teacher Portal" + school logo favicon ──
   const portal = portalName(school, profile?.role);
   useEffect(() => {
@@ -496,37 +509,62 @@ export function DashboardLayout({
       <header className="fixed top-0 left-0 right-0 z-40 flex h-[72px] items-center gap-3 border-b border-[#E8EAF3] bg-white/90 pl-4 pr-4 backdrop-blur-md sm:pl-6 sm:pr-6">
 
           {/* School logo + name — always visible in navbar */}
-          <div className="flex min-w-0 items-center gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5 sm:gap-3">
             {school?.logo_url ? (
               <img
                 src={school.logo_url}
                 alt={school.name}
                 title={school.name}
-                className="h-11 w-11 flex-shrink-0 rounded-xl border border-[#E8EAF3] object-contain"
+                className="h-9 w-9 flex-shrink-0 rounded-xl border border-[#E8EAF3] object-contain sm:h-11 sm:w-11"
               />
             ) : (
               <div
                 title={school?.name}
-                className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl border border-[#E8EAF3] bg-[#EEF0FD] text-base font-bold text-[#5B6EE8]"
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-[#E8EAF3] bg-[#EEF0FD] text-base font-bold text-[#5B6EE8] sm:h-11 sm:w-11"
               >
                 {school?.name ? school.name.charAt(0).toUpperCase() : '?'}
               </div>
             )}
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               {school?.name ? (
-                <p title={school.name} className="truncate max-w-[160px] text-[15px] font-semibold leading-tight text-[#0F172A] sm:max-w-[260px]">
+                <p title={school.name} className="line-clamp-2 break-words text-[13px] font-semibold leading-tight text-[#0F172A] sm:text-[15px]">
                   {school.name}
                 </p>
               ) : (
                 <div className="h-4 w-28 animate-pulse rounded bg-slate-200" />
               )}
-              {school && schoolBranding(school).enabled && portal !== 'Veducore' && (
-                <p className="mt-0.5 hidden truncate text-[11px] font-medium text-slate-500 sm:block">{portal}</p>
-              )}
+              {(() => {
+                const showPortal = !!school && schoolBranding(school).enabled && portal !== 'Veducore';
+                const showSession = profile?.role === 'admin' && !!currentSession && canPath('/admin/sessions');
+                if (!showPortal && !showSession) return null;
+                return (
+                  <div className="mt-0.5 flex min-w-0 items-center gap-1.5">
+                    {showPortal && <p className="min-w-0 truncate text-[10px] font-medium text-slate-500 sm:text-[11px]">{portal}</p>}
+                    {showSession && (
+                      <button
+                        onClick={() => navigate('/admin/sessions')}
+                        title="Academic session — click to manage"
+                        className="flex flex-shrink-0 items-center gap-1 rounded-md bg-[#EEF0FD] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-[#3B4DC8] transition hover:bg-[#DDE2FB]"
+                      >
+                        <CalendarRange className="h-3 w-3" /> {currentSession}
+                      </button>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
 
-          <div className="flex-1" />
+          {profile?.role === 'admin' && canPath('/admin/notifications') && (
+            <button
+              onClick={() => navigate('/admin/notifications')}
+              title="Send Notice"
+              aria-label="Send Notice"
+              className="flex flex-shrink-0 items-center gap-2 rounded-xl bg-[#FEF0E6] p-2.5 text-sm font-medium text-[#F97316] transition hover:brightness-95 sm:px-3 sm:py-2"
+            >
+              <Send className="h-5 w-5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">Send Notice</span>
+            </button>
+          )}
 
           {/* Notifications */}
           <NotificationBell role={profile?.role} schoolId={profile?.school_id} />

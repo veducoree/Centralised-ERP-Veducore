@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "269809091156",
+    "project_id": "veducore-org",
+    "storage_bucket": "veducore-org.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:269809091156:android:b4f264be951010f67863c1",
+        "android_client_info": {
+          "package_name": "com.veducore.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAwXdS9Eyo09ORYFnIqSr7RDE-A5OzRLGQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
