@@ -1,41 +1,10 @@
-// Veducore platform notices inside the school app: the suspended-school
-// screen, Veducore announcements and subscription renewal reminders.
+// Veducore platform notices inside the school app: Veducore announcements and subscription renewal reminders.
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, CheckCircle2, Info, LogOut, Megaphone, ShieldAlert, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Info, Megaphone, X } from 'lucide-react';
 import { useAuth } from '@/auth/AuthContext';
 import { usePermissions } from '@/auth/PermissionsContext';
 import { fetchPlatformAnnouncements, type PlatformAnnouncement } from '@/services/platformApi';
-
-export function SchoolSuspendedScreen() {
-  const { signOut } = useAuth();
-  const { platform } = usePermissions();
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-md rounded-3xl border border-gray-100 bg-white p-8 text-center shadow-lg">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-red-600">
-          <ShieldAlert className="h-7 w-7" />
-        </div>
-        <h1 className="mt-5 text-xl font-bold text-gray-900">Access paused</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          {platform?.school_name ? <b>{platform.school_name}</b> : 'Your school'}'s Veducore account has been suspended.
-        </p>
-        {platform?.suspension_reason && (
-          <p className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-left text-sm text-red-800">{platform.suspension_reason}</p>
-        )}
-        <p className="mt-4 text-xs text-gray-500">
-          Your data is safe. Please contact your school office or Veducore support to restore access.
-        </p>
-        <button
-          onClick={() => signOut()}
-          className="mt-6 inline-flex items-center gap-2 rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
-        >
-          <LogOut className="h-4 w-4" /> Sign out
-        </button>
-      </div>
-    </div>
-  );
-}
 
 const TONE = {
   info: { cls: 'border-sky-200 bg-sky-50 text-sky-900', icon: <Info className="h-4 w-4 text-sky-600" /> },

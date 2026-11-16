@@ -553,7 +553,9 @@ const ACTIONS: Record<string, { roles: Role[]; run: (ctx: Ctx) => Promise<unknow
           status: "Inactive", suspended_at: new Date().toISOString(), suspension_reason: reason,
         }).eq("id", schoolId);
         if (error) throw new HttpError(400, error.message);
-        await audit(ctx, "school.suspended", schoolId, { reason });
+        // Sign everyone out now; the apps also re-check on every open/focus.
+        const { data: revoked } = await ctx.db.rpc("platform_revoke_school_sessions", { p_school_id: schoolId });
+        await audit(ctx, "school.suspended", schoolId, { reason, sessions_revoked: revoked ?? 0 });
       } else {
         // Schools suspended before migration 038 had every profile switched off.
         if ((current.status ?? "Active") !== "Active" && !current.suspended_at) {
@@ -612,20 +614,30 @@ const ACTIONS: Record<string, { roles: Role[]; run: (ctx: Ctx) => Promise<unknow
         throw new HttpError(400, "Type the school name exactly to confirm");
       }
 
-      const { data: users } = await ctx.db.from("profiles").select("id").eq("school_id", schoolId);
-      const userIds = (users ?? []).map((u: any) => u.id);
-
-      // Tables reference schools ON DELETE CASCADE; delete the school, then logins.
-      const { error } = await ctx.db.from("schools").delete().eq("id", schoolId);
+      // One transaction in the database: the school, every row tied to it
+      // (cascades + a sweep of any table with a school_id) — then the logins.
+      const { data: result, error } = await ctx.db.rpc("platform_delete_school", { p_school_id: schoolId });
       if (error) throw new HttpError(500, `Failed to delete school: ${error.message}`);
+      const userIds: string[] = Array.isArray(result?.user_ids) ? result.user_ids : [];
 
-      let authUsersDeleted = 0;
-      for (const uid of userIds) {
-        const { error: e } = await ctx.db.auth.admin.deleteUser(uid);
-        if (!e) authUsersDeleted++;
+      // Remove Auth logins (also cascades push tokens, notification reads, …).
+      const failed: string[] = [];
+      for (let i = 0; i < userIds.length; i += 10) {
+        const chunk = userIds.slice(i, i + 10);
+        await Promise.all(chunk.map(async (uid) => {
+          let { error: e } = await ctx.db.auth.admin.deleteUser(uid);
+          if (e && !/not.?found/i.test(e.message)) {
+            ({ error: e } = await ctx.db.auth.admin.deleteUser(uid));
+          }
+          if (e && !/not.?found/i.test(e.message)) failed.push(uid);
+        }));
       }
-      await audit(ctx, "school.deleted", schoolId, { school_name: school.name, logins_deleted: authUsersDeleted });
-      return { success: true, authUsersDeleted };
+      const authUsersDeleted = userIds.length - failed.length;
+      await audit(ctx, "school.deleted", schoolId, {
+        school_name: school.name, logins_deleted: authUsersDeleted,
+        logins_failed: failed, rows_deleted: result?.rows_deleted ?? 0,
+      });
+      return { success: true, authUsersDeleted, loginsFailed: failed.length };
     },
   },
 

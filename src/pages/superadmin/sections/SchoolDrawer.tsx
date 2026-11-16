@@ -644,7 +644,7 @@ function DangerTab({ s, isOwner, onSaved, onDeleted }: {
     setBusy(true);
     try {
       await callManageSchools({ action: 'set-status', school_id: s.id, status, reason });
-      toast(status === 'Active' ? 'School reactivated' : 'School suspended');
+      toast(status === 'Active' ? 'School reactivated' : 'School paused — everyone has been signed out');
       setReason('');
       onSaved();
     } catch (e) {
@@ -657,8 +657,12 @@ function DangerTab({ s, isOwner, onSaved, onDeleted }: {
   async function del() {
     setBusy(true);
     try {
-      await callManageSchools({ action: 'delete', school_id: s.id, confirm_name: confirmName });
-      toast(`${s.name} deleted`);
+      const res = await callManageSchools<{ authUsersDeleted?: number; loginsFailed?: number }>({ action: 'delete', school_id: s.id, confirm_name: confirmName });
+      if (res?.loginsFailed) {
+        toast(`${s.name} deleted, but ${res.loginsFailed} login(s) could not be removed — see audit log`, 'error');
+      } else {
+        toast(`${s.name} and all its data deleted (${res?.authUsersDeleted ?? 0} logins removed)`);
+      }
       setDeleteOpen(false);
       onDeleted();
     } catch (e) {

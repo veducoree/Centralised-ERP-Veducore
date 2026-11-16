@@ -15,6 +15,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
+import { takeLoginNotice } from '@/lib/accountAccess';
 import { Button } from '@/components/ui/Button';
 import { COLORS, SPACING, RADIUS } from '@/lib/utils';
 import Constants from 'expo-constants';
@@ -33,7 +34,8 @@ export default function LoginScreen() {
   const { login } = useAuth();
   const router = useRouter();
 
-  const [error, setError] = useState<string | null>(null);
+  // Set when a paused school / deactivated login was just signed out.
+  const [error, setError] = useState<string | null>(() => takeLoginNotice());
   const [fieldError, setFieldError] = useState<{ email?: boolean; password?: boolean }>({});
 
   const friendlyError = (msg: string) => {

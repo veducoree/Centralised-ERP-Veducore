@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef, ty
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { clearApiCache, fetchSchool } from '@/services/api';
+import { checkAccountAccess, setLoginNotice, takeLoginNotice } from '@/lib/accountAccess';
 import type { Profile, Student, UserRole } from '@/types';
 
 export interface AuthContextValue {
@@ -12,6 +13,8 @@ export interface AuthContextValue {
   signIn: (identifier: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  /** Sign out and show `message` inline on the login screen. */
+  forceSignOut: (message: string) => Promise<void>;
   /** Children linked to a parent account (populated by ParentDashboard/ParentChild pages). */
   parentChildren?: Student[];
 }
@@ -65,6 +68,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const currentUserIdRef = useRef<string | null>(null);
   const profileInFlightRef = useRef<{ uid: string; promise: Promise<Profile | null> } | null>(null);
+  // Set below; fetchProfile is created first, so it goes through a ref.
+  const forceSignOutRef = useRef<(message: string) => Promise<void>>(async () => {});
 
   const fetchProfile = useCallback(async (uid: string): Promise<Profile | null> => {
     if (!supabase) {
@@ -78,11 +83,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const promise = (async () => {
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', uid)
-          .maybeSingle();
+        const [{ data, error }, access] = await Promise.all([
+          supabase.from('profiles').select('*').eq('id', uid).maybeSingle(),
+          checkAccountAccess(),
+        ]);
+
+        // Paused school / deactivated login: never open the dashboard.
+        if (access.blocked && access.message) {
+          await forceSignOutRef.current(access.message);
+          return null;
+        }
+        // Signed out (or switched user) while this was in flight.
+        if (currentUserIdRef.current !== uid) return null;
 
         if (error) {
           console.error('Error fetching profile:', error);
@@ -128,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Initial session check
     supabase.auth
       .getSession()
-      .then(({ data: { session: initSession } }) => {
+      .then(async ({ data: { session: initSession } }) => {
         if (!mounted) return;
         setSession(initSession);
         setUser(initSession?.user ?? null);
@@ -137,6 +149,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (initSession?.user) {
           const cached = getCachedProfile();
           if (cached && cached.id === initSession.user.id) {
+            // Fast path, but never open the dashboard of a paused school.
+            const access = await checkAccountAccess();
+            if (!mounted) return;
+            if (access.blocked && access.message) {
+              await forceSignOutRef.current(access.message);
+              return;
+            }
             setProfile(cached);
             setLoading(false);
             // Refresh silently in background outside current tick
@@ -222,8 +241,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         currentUserIdRef.current = data.user.id;
         setSession(data.session);
         setUser(data.user);
-        await fetchProfile(data.user.id);
+        const p = await fetchProfile(data.user.id);
         setLoading(false);
+        if (!p) {
+          // Blocked (paused school / deactivated) — show it inline right here.
+          const notice = takeLoginNotice();
+          if (notice) return { error: notice };
+        }
         return { error: null };
       }
       if (error) lastError = error.message;
@@ -231,6 +255,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: lastError };
   };
 
+  const signOutRef = useRef<() => Promise<void>>(async () => {});
   const signOut = async () => {
     // Clear all local state & caches immediately so UI transitions in 0ms without hanging
     currentUserIdRef.current = null;
@@ -257,12 +282,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const forceSignOut = useCallback(async (message: string) => {
+    setLoginNotice(message);
+    await signOutRef.current();
+  }, []);
+  forceSignOutRef.current = forceSignOut;
+
+  // Re-check while signed in: a school paused by Veducore (or a login
+  // deactivated by the school) is signed out on the next focus / tick.
+  const signedInUid = profile?.id ?? null;
+  useEffect(() => {
+    if (!signedInUid) return;
+    let busy = false;
+    const recheck = async () => {
+      if (busy || document.visibilityState !== 'visible') return;
+      busy = true;
+      try {
+        const access = await checkAccountAccess();
+        if (access.blocked && access.message && currentUserIdRef.current === signedInUid) {
+          await forceSignOut(access.message);
+        }
+      } finally {
+        busy = false;
+      }
+    };
+    const timer = window.setInterval(recheck, 2 * 60_000);
+    document.addEventListener('visibilitychange', recheck);
+    window.addEventListener('focus', recheck);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', recheck);
+      window.removeEventListener('focus', recheck);
+    };
+  }, [signedInUid, forceSignOut]);
+
+  signOutRef.current = signOut;
+
   const refreshProfile = async () => {
     if (user) await fetchProfile(user.id);
   };
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, loading, signIn, signOut, refreshProfile, parentChildren: undefined }}>
+    <AuthContext.Provider value={{ session, user, profile, loading, signIn, signOut, refreshProfile, forceSignOut, parentChildren: undefined }}>
       {children}
     </AuthContext.Provider>
   );

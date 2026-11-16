@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, type FormEvent } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Eye, EyeOff, Loader2, AlertCircle, RefreshCw, Info } from 'lucide-react';
 import { useAuth, getDashboardPath } from '@/auth/AuthContext';
+import { takeLoginNotice } from '@/lib/accountAccess';
 import { CenteredLoader } from '@/components/ui/Skeleton';
 import veducoreLogo from '@/assets/veducore-logo.png';
 import LoginAdBanner from '@/components/ads/LoginAdBanner';
@@ -113,7 +114,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  // A paused school / deactivated login that was just signed out says why.
+  const [error, setError] = useState(() => takeLoginNotice() ?? '');
   const [showForgotHint, setShowForgotHint] = useState(false);
 
   // Image Captcha state

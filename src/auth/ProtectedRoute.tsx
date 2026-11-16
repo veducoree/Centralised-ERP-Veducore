@@ -1,11 +1,11 @@
-import { type ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
 import type { UserRole } from '@/types';
 import { LoadingSpinner } from '@/components/ui/Primitives';
 import { usePermissions } from '@/auth/PermissionsContext';
 import { adminNav } from '@/components/layout/DashboardLayout';
-import { SchoolSuspendedScreen } from '@/components/layout/PlatformNotices';
+import { blockedMessage, type AccessBlock } from '@/lib/accountAccess';
 
 interface ProtectedRouteProps {
   children: ReactNode;
@@ -31,13 +31,13 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   }
 
   if (profile.status === 'inactive') {
-    return <Navigate to="/login" replace />;
+    return <BlockedSignOut block="account_inactive" role={profile.role} />;
   }
 
   if (!permsLoaded) return <LoadingSpinner size="lg" />;
 
-  // Suspended by Veducore: the database already hides the school's data.
-  if (suspended) return <SchoolSuspendedScreen />;
+  // Paused by Veducore: no dashboard — sign out and explain on the login screen.
+  if (suspended) return <BlockedSignOut block="school_paused" role={profile.role} />;
 
   // Staff roles: only modules the role allows.
   if (profile.role === 'admin') {
@@ -48,4 +48,12 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   }
 
   return <>{children}</>;
+}
+
+function BlockedSignOut({ block, role }: { block: AccessBlock; role: UserRole }) {
+  const { forceSignOut } = useAuth();
+  useEffect(() => {
+    void forceSignOut(blockedMessage(block, role));
+  }, [block, role, forceSignOut]);
+  return <LoadingSpinner size="lg" />;
 }

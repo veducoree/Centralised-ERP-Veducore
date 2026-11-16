@@ -6,6 +6,8 @@ import { supabase } from '@/lib/supabase';
 import { clearApiCache, fetchSchool, fetchTeacherByUserId, fetchParentByUserId } from '@/services/api';
 import type { Profile, School } from '@/types';
 import { resetAppIconSafely } from '@/lib/appIcon';
+import { AppState } from 'react-native';
+import { checkAccountAccess, setLoginNotice } from '@/lib/accountAccess';
 
 const PROFILE_CACHE_KEY = 'veducore_mobile_profile_cache';
 const SCHOOL_CACHE_KEY = 'veducore_mobile_school_cache';
@@ -37,6 +39,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: false,
   });
   const currentUserIdRef = useRef<string | null>(null);
+  // Sign out + explain on the login screen (paused school / deactivated login).
+  const forceLogoutRef = useRef<(message: string) => Promise<void>>(async () => {});
   const profileInFlightRef = useRef<{ uid: string; promise: Promise<{ profile: Profile | null; school: School | null }> } | null>(null);
 
   const fetchProfileAndSchool = useCallback(async (uid: string, email?: string, forceSchoolRefresh = false): Promise<{ profile: Profile | null; school: School | null }> => {
@@ -104,6 +108,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       if (session?.user && isMounted) {
         currentUserIdRef.current = session.user.id;
+        // Never open the app for a paused school / deactivated login.
+        const access = await checkAccountAccess();
+        if (!isMounted) return;
+        if (access.blocked && access.message) {
+          await forceLogoutRef.current(access.message);
+          return;
+        }
         try {
           const [cachedProfileRaw, cachedSchoolRaw] = await Promise.all([
             AsyncStorage.getItem(PROFILE_CACHE_KEY),
@@ -188,7 +199,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setTimeout(() => {
           if (!isMounted) return;
           fetchProfileAndSchool(nextUserId, session.user.email).then(({ profile, school }) => {
-            if (isMounted) {
+            // Ignore if signed out / switched user meanwhile (e.g. blocked login).
+            if (isMounted && currentUserIdRef.current === nextUserId) {
               setState({
                 session,
                 user: session.user,
@@ -233,15 +245,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
 
           if (!error && data?.user) {
-            // Suspended by Veducore: the database hides the school's data, so
-            // say why instead of showing an empty app.
-            const { data: platform } = await supabase.rpc('school_platform_status');
-            if ((platform as { status?: string } | null)?.status === 'Inactive') {
+            // Paused school / deactivated login: say why, inline, instead
+            // of opening an empty app.
+            const access = await checkAccountAccess();
+            if (access.blocked && access.message) {
+              currentUserIdRef.current = null;
               await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
-              const reason = (platform as { suspension_reason?: string | null }).suspension_reason;
-              return {
-                error: `Your school's Veducore access is paused.${reason ? ` ${reason}` : ''} Please contact the school office.`,
-              };
+              return { error: access.message };
             }
             currentUserIdRef.current = data.user.id;
             const { profile, school } = await fetchProfileAndSchool(data.user.id, data.user.email, true);
@@ -295,6 +305,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.error('Sign out error:', err);
     }
   }, []);
+
+  forceLogoutRef.current = async (message: string) => {
+    setLoginNotice(message);
+    await logout();
+  };
+
+  // Re-check whenever the app comes back to the foreground (and every few
+  // minutes while open): a school paused meanwhile is signed out.
+  const signedInUid = state.isAuthenticated ? state.user?.id ?? null : null;
+  useEffect(() => {
+    if (!signedInUid) return;
+    let busy = false;
+    const recheck = async () => {
+      if (busy || AppState.currentState !== 'active') return;
+      busy = true;
+      try {
+        const access = await checkAccountAccess();
+        if (access.blocked && access.message && currentUserIdRef.current === signedInUid) {
+          await forceLogoutRef.current(access.message);
+        }
+      } finally {
+        busy = false;
+      }
+    };
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') void recheck();
+    });
+    const timer = setInterval(recheck, 5 * 60_000);
+    return () => {
+      sub.remove();
+      clearInterval(timer);
+    };
+  }, [signedInUid]);
 
   const refreshProfile = useCallback(async () => {
     if (!state.user) return;
