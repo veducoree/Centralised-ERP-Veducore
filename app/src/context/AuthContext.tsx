@@ -216,7 +216,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = useCallback(
     async (identifier: string, password: string): Promise<{ error?: string }> => {
-      const raw = identifier.trim();
+      const raw = identifier.trim().toLowerCase();
       const pw = password.trim();
       const emailsToTry = [raw];
       if (!raw.includes('@')) {
