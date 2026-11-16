@@ -47,3 +47,15 @@ Push needs a real build. Expo Go on Android can't receive remote push.
 5. **Test:** sign in on the phone as a parent and mark that child absent from a teacher account. The parent should get a push, and tapping it should open Attendance.
 
 Tokens live in `push_tokens` (saved on sign-in, removed on sign-out). Each user's mute settings live in `notification_preferences`.
+
+## Shipping changes
+
+| What changed | How it reaches phones |
+|---|---|
+| Supabase (migrations, edge functions, data) | Live immediately |
+| App JS/TS (screens, styles, logic) | OTA: `eas update --branch preview -m "what changed"` (use `--branch production` for Play Store users) |
+| Native (new native package, permissions, icon, Expo SDK) | Bump `version` in `app.json`, then `eas build` and reinstall / Play Store update |
+
+`runtimeVersion` follows `version` (policy `appVersion`). An OTA update only reaches builds with the same `version`. After a native change, always bump `version` so old builds never get JS they can't run.
+
+The app checks for updates on launch and when it returns to the foreground (`src/lib/useOtaUpdates.ts`), then offers a restart.

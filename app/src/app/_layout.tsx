@@ -6,6 +6,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '@/context/AuthContext';
 import { enableScreens } from 'react-native-screens';
 import { DialogHost } from '@/components/ui/AppDialog';
+import { useOtaUpdates } from '@/lib/useOtaUpdates';
 import { setupNotifications, registerPushToken, onNotificationTap, routeForNotification } from '@/lib/notifications';
 
 enableScreens(true);
@@ -37,6 +38,7 @@ function PushBridge() {
 }
 
 export default function RootLayout() {
+  useOtaUpdates();
   useEffect(() => {
     if (Platform.OS === 'android') {
       (RNStatusBar as any).setTranslucent?.(true);
