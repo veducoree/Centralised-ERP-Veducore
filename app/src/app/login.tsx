@@ -17,7 +17,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/Button';
 import { COLORS, SPACING, RADIUS } from '@/lib/utils';
-import { appAlert } from '@/components/ui/AppDialog';
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
 
@@ -34,23 +33,45 @@ export default function LoginScreen() {
   const { login } = useAuth();
   const router = useRouter();
 
+  const [error, setError] = useState<string | null>(null);
+  const [fieldError, setFieldError] = useState<{ email?: boolean; password?: boolean }>({});
+
+  const friendlyError = (msg: string) => {
+    const m = msg.toLowerCase();
+    if (m.includes('invalid') || m.includes('credential') || m.includes('password') || m.includes('not found'))
+      return 'Incorrect email or password. Please try again.';
+    if (m.includes('network') || m.includes('fetch') || m.includes('timeout'))
+      return 'No internet connection. Check your network and try again.';
+    return msg;
+  };
+
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      appAlert('Required Fields', 'Please enter your email and password to continue.');
+    const missingEmail = !email.trim();
+    const missingPass = !password.trim();
+    if (missingEmail || missingPass) {
+      setFieldError({ email: missingEmail, password: missingPass });
+      setError(
+        missingEmail && missingPass
+          ? 'Please enter your email and password.'
+          : missingEmail
+            ? 'Please enter your email address.'
+            : 'Please enter your password.'
+      );
       return;
     }
+    setError(null);
+    setFieldError({});
     setLoading(true);
     try {
-      const { error } = await login(email.trim(), password);
-      if (error) {
-        appAlert('Login Failed', error);
+      const { error: loginError } = await login(email.trim(), password);
+      if (loginError) {
+        const msg = friendlyError(loginError);
+        setError(msg);
+        if (msg.startsWith('Incorrect')) setFieldError({ email: true, password: true });
       } else {
         const adminEmail = 'iamaryan721@gmail.com';
         if (email.trim().toLowerCase() === adminEmail.toLowerCase()) {
-          appAlert(
-            'Web Portal Required',
-            'The Administrator dashboard is optimized for desktop web browsers. Mobile app is tailored for Teachers and Parents.'
-          );
+          setError('Admin dashboard is available on the web portal only. This app is for Teachers and Parents.');
           return;
         }
         router.replace('/');
@@ -58,6 +79,17 @@ export default function LoginScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const onEmailChange = (v: string) => {
+    setEmail(v);
+    if (error) setError(null);
+    if (fieldError.email) setFieldError((f) => ({ ...f, email: false }));
+  };
+  const onPasswordChange = (v: string) => {
+    setPassword(v);
+    if (error) setError(null);
+    if (fieldError.password) setFieldError((f) => ({ ...f, password: false }));
   };
 
   return (
@@ -97,6 +129,7 @@ export default function LoginScreen() {
                 style={[
                   styles.inputField,
                   emailFocused && styles.inputFieldFocused,
+                  fieldError.email && styles.inputFieldError,
                 ]}>
                 <Ionicons
                   name="mail-outline"
@@ -109,7 +142,7 @@ export default function LoginScreen() {
                   placeholder="Email address"
                   placeholderTextColor="#94A3B8"
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={onEmailChange}
                   onFocus={() => setEmailFocused(true)}
                   onBlur={() => setEmailFocused(false)}
                   keyboardType="email-address"
@@ -117,7 +150,7 @@ export default function LoginScreen() {
                   autoCorrect={false}
                 />
                 {email.length > 0 && (
-                  <TouchableOpacity onPress={() => setEmail('')} style={styles.clearBtn}>
+                  <TouchableOpacity onPress={() => onEmailChange('')} style={styles.clearBtn}>
                     <Ionicons name="close-circle" size={16} color="#94A3B8" />
                   </TouchableOpacity>
                 )}
@@ -128,6 +161,7 @@ export default function LoginScreen() {
                 style={[
                   styles.inputField,
                   passFocused && styles.inputFieldFocused,
+                  fieldError.password && styles.inputFieldError,
                 ]}>
                 <Ionicons
                   name="lock-closed-outline"
@@ -140,10 +174,12 @@ export default function LoginScreen() {
                   placeholder="Password"
                   placeholderTextColor="#94A3B8"
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={onPasswordChange}
                   onFocus={() => setPassFocused(true)}
                   onBlur={() => setPassFocused(false)}
                   secureTextEntry={!showPass}
+                  returnKeyType="go"
+                  onSubmitEditing={handleLogin}
                 />
                 <TouchableOpacity
                   onPress={() => setShowPass(p => !p)}
@@ -156,6 +192,13 @@ export default function LoginScreen() {
                   />
                 </TouchableOpacity>
               </View>
+
+              {error && (
+                <View style={styles.errorBox} accessibilityRole="alert" accessibilityLiveRegion="polite">
+                  <Ionicons name="alert-circle" size={16} color="#DC2626" />
+                  <Text style={styles.errorText}>{error}</Text>
+                </View>
+              )}
 
               {/* Sign In Button */}
               <Button
@@ -278,6 +321,29 @@ const styles = StyleSheet.create({
   inputFieldFocused: {
     borderColor: '#1E5BD8',
     backgroundColor: '#FFFFFF',
+  },
+  inputFieldError: {
+    borderColor: '#F87171',
+    backgroundColor: '#FEF2F2',
+  },
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: SPACING.sm,
+  },
+  errorText: {
+    flex: 1,
+    color: '#B91C1C',
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
   },
   inputIcon: {
     marginRight: 10,

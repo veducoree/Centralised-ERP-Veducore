@@ -1,11 +1,5 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-} from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 
@@ -14,21 +8,11 @@ import {
   fetchParentByUserId,
   fetchParentStudents,
   fetchSchoolTransportData,
-  applyForTransport,
 } from '@/services/api';
 import { SPACING, RADIUS, formatCurrency } from '@/lib/utils';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { Button } from '@/components/ui/Button';
 import { MobileListSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/context/AuthContext';
-import { useTabNavigation } from '@/context/TabNavigationContext';
-import type {
-  Student,
-  TransportBus,
-  TransportStop,
-  StudentTransportAssignment,
-} from '@/types';
-import { appAlert } from '@/components/ui/AppDialog';
+import type { Student, StudentTransportAssignment } from '@/types';
 import { RefreshScrollView } from '@/components/ui/RefreshScrollView';
 
 interface ChildInfo {
@@ -39,20 +23,12 @@ interface ChildInfo {
 
 export default function ParentTransport() {
   const { user, profile } = useAuth();
-  const { setActiveTab } = useTabNavigation();
 
   const [children, setChildren] = useState<ChildInfo[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [buses, setBuses] = useState<TransportBus[]>([]);
-  const [stops, setStops] = useState<TransportStop[]>([]);
   const [assignments, setAssignments] = useState<Record<string, StudentTransportAssignment>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-
-  // Application selection state
-  const [selectedBusFilter, setSelectedBusFilter] = useState<string>('all');
-  const [selectedStopId, setSelectedStopId] = useState<string>('');
-  const [submitting, setSubmitting] = useState(false);
 
   const loadTransport = useCallback(async () => {
     if (!user?.id) return;
@@ -75,8 +51,6 @@ export default function ParentTransport() {
       const schoolId = profile?.school_id || childInfos[0]?.student?.school_id;
       if (schoolId) {
         const tData = await fetchSchoolTransportData(schoolId);
-        setBuses(tData.buses || []);
-        setStops(tData.stops || []);
         setAssignments(tData.assignments || {});
       }
     } catch (err) {
@@ -88,88 +62,23 @@ export default function ParentTransport() {
     loadTransport().finally(() => setLoading(false));
   }, [loadTransport]);
 
-  const selectedChild = children[selectedIndex] ?? null;
-  const childAssignment = selectedChild ? assignments[selectedChild.student.id] : undefined;
-
-  useEffect(() => {
-    if (childAssignment?.stop_id) {
-      setSelectedStopId(childAssignment.stop_id);
-    } else if (stops.length > 0 && !selectedStopId) {
-      setSelectedStopId(stops[0].id);
-    }
-  }, [childAssignment?.stop_id, stops, selectedStopId]);
-
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadTransport();
     setRefreshing(false);
   }, [loadTransport]);
 
-  const filteredStops = useMemo(() => {
-    if (selectedBusFilter === 'all') return stops;
-    return stops.filter(
-      (s) => s.bus_id === selectedBusFilter || s.bus_number === selectedBusFilter
-    );
-  }, [stops, selectedBusFilter]);
-
-  const selectedStopObj = useMemo(
-    () => stops.find((s) => s.id === selectedStopId) || null,
-    [stops, selectedStopId]
-  );
+  const selectedChild = children[selectedIndex] ?? null;
+  const rawAssignment = selectedChild ? assignments[selectedChild.student.id] : undefined;
+  // Only an approved/active assignment counts as "transport taken"
+  const transport =
+    rawAssignment && (!rawAssignment.status || rawAssignment.status === 'active' || rawAssignment.status === 'approved')
+      ? rawAssignment
+      : undefined;
 
   const vLabel = (t?: string) => (t === 'van' ? 'Van' : 'Bus');
   const per = (p?: string) => `/${(p || 'Monthly').toLowerCase().replace('ly', '')}`;
-  const isClosed = childAssignment?.status === 'rejected' || childAssignment?.status === 'stopped';
-
-  const handleApplyTransport = async () => {
-    if (!selectedChild) return;
-    if (!selectedStopObj) {
-      appAlert('Select Stop', 'Please select a stop to apply for transport.');
-      return;
-    }
-
-    const schoolId = profile?.school_id || selectedChild.student.school_id;
-    if (!schoolId) return;
-
-    setSubmitting(true);
-    try {
-      const payload: StudentTransportAssignment = {
-        student_id: selectedChild.student.id,
-        student_name: selectedChild.student.full_name,
-        class_name: selectedChild.className,
-        section_name: selectedChild.sectionName,
-        bus_id: selectedStopObj.bus_id,
-        bus_number: selectedStopObj.bus_number,
-        route_name: selectedStopObj.route_name,
-        stop_id: selectedStopObj.id,
-        stop_name: selectedStopObj.stop_name,
-        area_landmark: selectedStopObj.area_landmark,
-        amount: selectedStopObj.amount,
-        pickup_time: selectedStopObj.pickup_time,
-        drop_time: selectedStopObj.drop_time,
-        driver_name: selectedStopObj.driver_name,
-        driver_phone: selectedStopObj.driver_phone,
-        status: 'pending',
-        applied_by_parent: true,
-        assigned_at: new Date().toISOString(),
-      };
-
-      const saved = await applyForTransport(schoolId, payload);
-      setAssignments((prev) => ({
-        ...prev,
-        [selectedChild.student.id]: { ...saved, vehicle_type: selectedStopObj.vehicle_type, fare_period: selectedStopObj.fare_period },
-      }));
-
-      appAlert(
-        'Transport Application Submitted',
-        `Your transport application for ${selectedChild.student.full_name} at "${selectedStopObj.stop_name}" (${formatCurrency(selectedStopObj.amount)}) has been sent to the school admin.`
-      );
-    } catch (err) {
-      appAlert('Error', err instanceof Error ? err.message : 'Could not submit transport application. Please try again.');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const isVan = transport?.vehicle_type === 'van';
 
   if (loading) {
     return (
@@ -191,7 +100,6 @@ export default function ParentTransport() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Child selector if multiple children */}
         {children.length > 1 && (
           <View style={styles.childSelectSection}>
             <Text style={styles.sectionTitle}>Select Child</Text>
@@ -213,7 +121,7 @@ export default function ParentTransport() {
                       {child.student.full_name}
                     </Text>
                     <Text style={[styles.childChipSub, active && styles.childChipSubActive]}>
-                      {child.className} - {child.sectionName}
+                      {child.className}{child.sectionName ? ` - ${child.sectionName}` : ''}
                     </Text>
                   </TouchableOpacity>
                 );
@@ -222,267 +130,113 @@ export default function ParentTransport() {
           </View>
         )}
 
-        {/* ── 1. CURRENT TRANSPORT STATUS FOR CHILD ── */}
         {selectedChild && (
           <View style={styles.assignedCard}>
             <View style={styles.assignedHeader}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
                 <View style={styles.busIconWrap}>
-                  <Ionicons name="bus" size={20} color="#2563EB" />
+                  <Ionicons name={isVan ? 'car' : 'bus'} size={20} color="#2563EB" />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.assignedTitle}>
-                    {selectedChild.student.full_name}&apos;s Transport Status
+                    {selectedChild.student.full_name}&apos;s Transport
                   </Text>
                   <Text style={styles.assignedSub}>
-                    {selectedChild.className} · Section {selectedChild.sectionName}
+                    {selectedChild.className}
+                    {selectedChild.sectionName ? ` · Section ${selectedChild.sectionName}` : ''}
                   </Text>
                 </View>
               </View>
-              {childAssignment ? (
-                <View
-                  style={[
-                    styles.statusBadge,
-                    childAssignment.status === 'pending' || isClosed
-                      ? styles.pendingBadge
-                      : styles.activeBadge,
-                  ]}
-                >
-                  <Ionicons
-                    name={
-                      childAssignment.status === 'pending'
-                        ? 'time-outline'
-                        : 'checkmark-circle'
-                    }
-                    size={12}
-                    color={childAssignment.status === 'pending' ? '#D97706' : '#059669'}
-                  />
-                  <Text
-                    style={[
-                      styles.statusBadgeText,
-                      {
-                        color:
-                          childAssignment.status === 'pending' ? '#B45309' : '#065F46',
-                      },
-                    ]}
-                  >
-                    {childAssignment.status === 'pending'
-                      ? 'Pending Approval'
-                      : childAssignment.status === 'rejected'
-                        ? 'Not Approved'
-                        : childAssignment.status === 'stopped'
-                          ? 'Stopped'
-                          : 'Active'}
+              {transport ? (
+                <View style={[styles.statusBadge, styles.activeBadge]}>
+                  <Ionicons name="checkmark-circle" size={12} color="#059669" />
+                  <Text style={[styles.statusBadgeText, { color: '#065F46' }]}>
+                    {vLabel(transport.vehicle_type)}
                   </Text>
                 </View>
               ) : (
                 <View style={styles.inactiveBadge}>
-                  <Text style={styles.inactiveBadgeText}>Not Applied</Text>
+                  <Text style={styles.inactiveBadgeText}>No Transport</Text>
                 </View>
               )}
             </View>
 
-            {childAssignment ? (
+            {transport ? (
               <View style={styles.assignedBody}>
-                <View style={styles.assignedRow}>
+                <View style={styles.vehicleRow}>
+                  <Ionicons name={isVan ? 'car-outline' : 'bus-outline'} size={18} color="#1E5BD8" />
                   <View style={{ flex: 1 }}>
-                    {childAssignment.status === 'rejected' && childAssignment.reject_reason ? (
-                      <Text style={[styles.assignedLandmark, { color: '#B91C1C', marginBottom: 6 }]}>
-                        Reason from school: {childAssignment.reject_reason}
-                      </Text>
+                    <Text style={styles.assignedLabel}>{vLabel(transport.vehicle_type).toUpperCase()}</Text>
+                    <Text style={styles.assignedStopName}>
+                      {vLabel(transport.vehicle_type)} {transport.bus_number || ''}
+                    </Text>
+                    {transport.route_name ? (
+                      <Text style={styles.assignedLandmark}>Route: {transport.route_name}</Text>
                     ) : null}
+                  </View>
+                </View>
+
+                <View style={[styles.assignedRow, styles.sectionDivider]}>
+                  <View style={{ flex: 1 }}>
                     <Text style={styles.assignedLabel}>STOP</Text>
-                    <Text style={styles.assignedStopName}>{childAssignment.stop_name}</Text>
-                    {childAssignment.area_landmark ? (
-                      <Text style={styles.assignedLandmark}>
-                        Area: {childAssignment.area_landmark}
-                      </Text>
+                    <Text style={styles.assignedStopName}>{transport.stop_name}</Text>
+                    {transport.area_landmark ? (
+                      <Text style={styles.assignedLandmark}>Area: {transport.area_landmark}</Text>
                     ) : null}
                   </View>
                   <View style={styles.assignedAmountBox}>
                     <Text style={styles.assignedAmountLabel}>TRANSPORT FEE</Text>
                     <Text style={styles.assignedAmountVal}>
-                      {formatCurrency(childAssignment.amount)}
-                      <Text style={{ fontSize: 11, fontWeight: '500' }}>{per(childAssignment.fare_period)}</Text>
+                      {formatCurrency(transport.amount)}
+                      <Text style={{ fontSize: 11, fontWeight: '500' }}>{per(transport.fare_period)}</Text>
                     </Text>
                   </View>
                 </View>
 
                 <View style={styles.assignedMetaGrid}>
-                  <View style={styles.assignedMetaItem}>
-                    <Ionicons name={childAssignment.vehicle_type === 'van' ? 'car-outline' : 'bus-outline'} size={15} color="#1E5BD8" />
-                    <Text style={styles.assignedMetaText}>
-                      {vLabel(childAssignment.vehicle_type)} {childAssignment.bus_number || ''}
-                      {childAssignment.route_name ? ` · Route: ${childAssignment.route_name}` : ''}
-                    </Text>
-                  </View>
-                  {childAssignment.pickup_time ? (
+                  {transport.pickup_time || transport.drop_time ? (
                     <View style={styles.assignedMetaItem}>
                       <Ionicons name="time-outline" size={15} color="#059669" />
                       <Text style={styles.assignedMetaText}>
-                        Pickup: {childAssignment.pickup_time}
-                        {childAssignment.drop_time ? ` · Drop: ${childAssignment.drop_time}` : ''}
+                        {transport.pickup_time ? `Pickup: ${transport.pickup_time}` : ''}
+                        {transport.pickup_time && transport.drop_time ? ' · ' : ''}
+                        {transport.drop_time ? `Drop: ${transport.drop_time}` : ''}
                       </Text>
                     </View>
+                  ) : null}
+                  <View style={styles.assignedMetaItem}>
+                    <Ionicons name="person-outline" size={15} color="#475569" />
+                    <Text style={styles.assignedMetaText}>
+                      Driver: {transport.driver_name || 'School Transport Desk'}
+                    </Text>
+                  </View>
+                  {transport.driver_phone ? (
+                    <TouchableOpacity
+                      style={styles.assignedMetaItem}
+                      onPress={() => Linking.openURL(`tel:${transport.driver_phone}`)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="call-outline" size={15} color="#1E5BD8" />
+                      <Text style={[styles.assignedMetaText, { color: '#1E5BD8' }]}>
+                        {transport.driver_phone}
+                      </Text>
+                    </TouchableOpacity>
                   ) : null}
                 </View>
               </View>
             ) : (
-              <Text style={styles.emptySmall}>
-                No stop selected yet. Pick a bus or van stop below and apply for transport.
-              </Text>
+              <View style={styles.noTransportBox}>
+                <View style={styles.noTransportIcon}>
+                  <Ionicons name="bus-outline" size={26} color="#94A3B8" />
+                </View>
+                <Text style={styles.noTransportTitle}>You have not taken school transport</Text>
+                <Text style={styles.noTransportSub}>
+                  Please contact the school office if you want to start transport for {selectedChild.student.full_name}.
+                </Text>
+              </View>
             )}
           </View>
         )}
-
-        {/* ── 2. APPLY FOR SCHOOL TRANSPORT (SELECT BUS & BUS STOP) ── */}
-        <View style={styles.applyCard}>
-          <Text style={styles.applyCardTitle}>
-            {childAssignment ? 'Change Stop' : 'Apply for School Transport'}
-          </Text>
-          <Text style={styles.applyCardSub}>
-            Select your preferred bus stop below and submit your application. It will be sent directly to the school administration.
-          </Text>
-
-          {stops.length === 0 ? (
-            <EmptyState
-              icon="bus-outline"
-              title="No transport stops available"
-              subtitle="Bus and van routes will appear here once the school adds them."
-            />
-          ) : (
-            <>
-              {/* Bus / Route Filter Chips */}
-              {buses.length > 1 && (
-                <View style={{ marginBottom: 12 }}>
-                  <Text style={styles.fieldLabel}>Filter by Bus / Van</Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ gap: 8 }}
-                  >
-                    <TouchableOpacity
-                      onPress={() => setSelectedBusFilter('all')}
-                      style={[
-                        styles.busFilterChip,
-                        selectedBusFilter === 'all' && styles.busFilterChipActive,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.busFilterChipText,
-                          selectedBusFilter === 'all' && styles.busFilterChipTextActive,
-                        ]}
-                      >
-                        All ({stops.length} Stops)
-                      </Text>
-                    </TouchableOpacity>
-                    {buses.map((b) => {
-                      const active = selectedBusFilter === b.id;
-                      return (
-                        <TouchableOpacity
-                          key={b.id}
-                          onPress={() => setSelectedBusFilter(b.id)}
-                          style={[
-                            styles.busFilterChip,
-                            active && styles.busFilterChipActive,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.busFilterChipText,
-                              active && styles.busFilterChipTextActive,
-                            ]}
-                          >
-                            {vLabel(b.vehicle_type)} {b.bus_number} · {b.route_name}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </ScrollView>
-                </View>
-              )}
-
-              <Text style={styles.fieldLabel}>Select Your Stop</Text>
-              <View style={styles.stopSelectList}>
-                {filteredStops.map((stop, idx) => {
-                  const isSelected = selectedStopId === stop.id;
-                  const isCurrentApplied = childAssignment?.stop_id === stop.id;
-                  return (
-                    <TouchableOpacity
-                      key={stop.id}
-                      onPress={() => setSelectedStopId(stop.id)}
-                      activeOpacity={0.8}
-                      style={[
-                        styles.stopOptionCard,
-                        isSelected && styles.stopOptionCardSelected,
-                      ]}
-                    >
-                      <View style={styles.radioOuter}>
-                        {isSelected && <View style={styles.radioInner} />}
-                      </View>
-
-                      <View style={{ flex: 1, marginLeft: 10 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                          <Text style={styles.stopOptionName}>{stop.stop_name}</Text>
-                          {isCurrentApplied && (
-                            <View style={styles.currentStopBadge}>
-                              <Text style={styles.currentStopBadgeText}>Current</Text>
-                            </View>
-                          )}
-                        </View>
-                        <Text style={styles.stopOptionMeta}>
-                          {vLabel(stop.vehicle_type)} {stop.bus_number || ''}
-                          {stop.route_name ? ` · ${stop.route_name}` : ''}
-                          {stop.stop_order ? ` · Stop #${stop.stop_order}` : ` · Stop #${idx + 1}`}
-                        </Text>
-                        {(stop.area_landmark || stop.pickup_time) && (
-                          <Text style={styles.stopOptionSub}>
-                            {stop.area_landmark ? `${stop.area_landmark}` : ''}
-                            {stop.area_landmark && stop.pickup_time ? ' · ' : ''}
-                            {stop.pickup_time ? `Pickup: ${stop.pickup_time}` : ''}
-                          </Text>
-                        )}
-                      </View>
-
-                      <View style={styles.stopFarePill}>
-                        <Text style={styles.stopFareText}>{formatCurrency(stop.amount)}{per(stop.fare_period)}</Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {selectedStopObj && (
-                <View style={styles.selectedSummaryBar}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.selectedSummaryLabel}>Selected Stop</Text>
-                    <Text style={styles.selectedSummaryValue}>
-                      {selectedStopObj.stop_name} ({vLabel(selectedStopObj.vehicle_type)} {selectedStopObj.bus_number || ''})
-                    </Text>
-                  </View>
-                  <Text style={styles.selectedSummaryFare}>
-                    {formatCurrency(selectedStopObj.amount)}
-                  </Text>
-                </View>
-              )}
-
-              <Button
-                label={
-                  submitting
-                    ? 'Submitting Application...'
-                    : childAssignment && !isClosed
-                      ? childAssignment.status === 'pending' ? 'Update Application' : 'Request Stop Change'
-                      : 'Apply for Transport'
-                }
-                variant="primary"
-                loading={submitting}
-                onPress={handleApplyTransport}
-                style={{ marginTop: 14 }}
-              />
-            </>
-          )}
-        </View>
 
         <View style={{ height: SPACING.xxl }} />
       </RefreshScrollView>
@@ -750,5 +504,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#2563EB',
   },
+  vehicleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  sectionDivider: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#E2E8F0' },
+  noTransportBox: { alignItems: 'center', paddingVertical: 18, paddingHorizontal: 8 },
+  noTransportIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noTransportTitle: { fontSize: 14, fontWeight: '700', color: '#334155', marginTop: 10, textAlign: 'center' },
+  noTransportSub: { fontSize: 12, color: '#64748B', marginTop: 4, textAlign: 'center', lineHeight: 17 },
   emptySmall: { fontSize: 12, color: '#64748B', marginTop: 4, lineHeight: 17 },
 });
