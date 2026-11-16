@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { GLASS, SPACING } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { portalName } from '@/lib/branding';
+import { useBell } from '@/lib/notificationBell';
 
 interface HeaderProps {
   title: string;
@@ -36,9 +37,9 @@ export function Header({
   logoUrl,
   showBack,
   onBackPress,
-  showNotificationBell = false,
+  showNotificationBell,
   onNotificationPress,
-  notificationCount = 0,
+  notificationCount,
   showProfile = false,
   onProfilePress,
   rightAction,
@@ -46,6 +47,11 @@ export function Header({
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, profile, school } = useAuth();
+  const bell = useBell();
+  // Tab screens (no back button) show the bell by default, wired to the shared unread count.
+  const bellVisible = showNotificationBell ?? (!showBack && !!bell.openInbox);
+  const bellCount = notificationCount ?? bell.unread;
+  const onBellPress = onNotificationPress ?? bell.openInbox ?? undefined;
 
   // Safely compute top status bar insets across Android and iOS notch
   const topInset = Math.max(
@@ -114,16 +120,16 @@ export function Header({
         </View>
 
         <View style={styles.rightActions}>
-          {showNotificationBell && (
+          {bellVisible && (
             <TouchableOpacity
-              onPress={onNotificationPress}
+              onPress={onBellPress}
               style={styles.iconCircleBtn}
               activeOpacity={0.75}>
               <Ionicons name="notifications-outline" size={20} color="#64748B" />
-              {notificationCount > 0 && (
+              {bellCount > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>
-                    {notificationCount > 9 ? '9+' : String(notificationCount)}
+                    {bellCount > 9 ? '9+' : String(bellCount)}
                   </Text>
                 </View>
               )}

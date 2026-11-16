@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useLiveNotifications } from '@/lib/useLiveNotifications';
+import { setBell } from '@/lib/notificationBell';
 import { setBadgeCount } from '@/lib/notifications';
 import { StatusBar } from 'expo-status-bar';
 
@@ -73,6 +74,14 @@ export default function ParentDashboard() {
     } catch { /* offline */ }
   }, []);
   useLiveNotifications(refreshNotices);
+  // Share the bell with every tab's header.
+  const openInboxRef = React.useRef(openInbox);
+  openInboxRef.current = openInbox;
+  useEffect(() => { setBell({ unread }); }, [unread]);
+  useEffect(() => {
+    setBell({ openInbox: () => openInboxRef.current() });
+    return () => setBell({ openInbox: null, unread: 0 });
+  }, []);
   useFocusEffect(useCallback(() => {
     focusedRef.current = true;
     refreshNotices();
@@ -157,9 +166,6 @@ export default function ParentDashboard() {
   const header = (
     <Header
       title={school?.name || 'School'}
-      showNotificationBell
-      notificationCount={unread}
-      onNotificationPress={() => openInbox()}
       showProfile
       onProfilePress={() => router.push('/parent-modal/profile' as never)}
     />

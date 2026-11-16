@@ -16,12 +16,10 @@ import { Header } from '@/components/layout/Header';
 import {
   fetchParentByUserId,
   fetchParentStudents,
-  fetchNotifications,
   fetchAttendance,
 } from '@/services/api';
 import { GLASS_BG, GLASS, SPACING, RADIUS, formatDate } from '@/lib/utils';
 import { GlassCard } from '@/components/ui/GlassCard';
-import { useRouter } from 'expo-router';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { MobileListSkeleton, MobileInlineSkeleton } from '@/components/ui/Skeleton';
 import { useAuth } from '@/context/AuthContext';
@@ -44,40 +42,15 @@ const STATUS_THEME: Record<AttendanceStatus, { color: string; bg: string; label:
 };
 
 export default function ParentAttendance() {
-  const { user, profile } = useAuth();
-  const router = useRouter();
+  const { user } = useAuth();
 
   const [children, setChildren] = useState<ChildInfo[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [attendance, setAttendance] = useState<Attendance[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | AttendanceStatus>('all');
-  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [attLoading, setAttLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
-  const loadUnreadNotifications = useCallback(async () => {
-    if (!user?.id) return;
-    try {
-      const parent = await fetchParentByUserId(user.id);
-      let linkedStudentIds: string[] = [];
-      if (parent) {
-        const links = await fetchParentStudents(parent.id);
-        linkedStudentIds = links.map(l => l.student_id);
-      }
-      const allNotifs = await fetchNotifications(user.id, profile?.school_id);
-      const unread = allNotifs.filter(n => {
-        if (n.is_read) return false;
-        if (n.user_id === user.id) return true;
-        if (n.user_id === null) return true;
-        if (n.entity_id && linkedStudentIds.includes(n.entity_id)) return true;
-        return false;
-      });
-      setUnreadCount(unread.length);
-    } catch (err) {
-      console.error('Failed to load unread count:', err);
-    }
-  }, [user?.id, profile?.school_id]);
 
   const loadChildren = useCallback(async () => {
     if (!user?.id) return;
@@ -119,8 +92,8 @@ export default function ParentAttendance() {
   }, []);
 
   useEffect(() => {
-    Promise.all([loadChildren(), loadUnreadNotifications()]).finally(() => setLoading(false));
-  }, [loadChildren, loadUnreadNotifications]);
+    loadChildren().finally(() => setLoading(false));
+  }, [loadChildren]);
 
   useEffect(() => {
     if (children.length > 0) {
@@ -130,12 +103,12 @@ export default function ParentAttendance() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await Promise.all([loadChildren(), loadUnreadNotifications()]);
+    await loadChildren();
     if (children.length > 0) {
       await loadAttendance(children[selectedIndex]);
     }
     setRefreshing(false);
-  }, [loadChildren, loadUnreadNotifications, children, selectedIndex, loadAttendance]);
+  }, [loadChildren, children, selectedIndex, loadAttendance]);
 
   const medicalCount = attendance.filter(a => a.status === 'medical').length;
   // Medical leave (ML) counts as present.
@@ -157,9 +130,6 @@ export default function ParentAttendance() {
         <View style={styles.content}>
           <Header
             title="Attendance"
-            showNotificationBell
-            notificationCount={unreadCount}
-            onNotificationPress={() => router.push('/parent-modal/notifications' as never)}
           />
           <MobileListSkeleton rows={6} />
         </View>
@@ -175,9 +145,6 @@ export default function ParentAttendance() {
       <View style={styles.content}>
         <Header
           title="Attendance"
-          showNotificationBell
-          notificationCount={unreadCount}
-          onNotificationPress={() => router.push('/parent-modal/notifications' as never)}
         />
 
         <RefreshScrollView refreshing={refreshing} onRefresh={onRefresh}
