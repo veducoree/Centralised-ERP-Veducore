@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { errorMessage } from '@/lib/timetable';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { Printer } from 'lucide-react';
 import { useAuth } from '@/auth/AuthContext';
@@ -13,7 +14,7 @@ type Att = Record<string, { present: number; absent: number; late: number; on_le
 const fmtDate = (d: string | null | undefined) =>
   d ? new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
-/** Printable report cards: one A4 page per student in the section. */
+/** Printable per-exam marksheets: one A4 page per student in the section. */
 export default function ExamReportCards() {
   const { id = '' } = useParams();
   const [params] = useSearchParams();
@@ -51,13 +52,13 @@ export default function ExamReportCards() {
           setAttendance(await fetchAttendanceSummary(sectionId, sess.start_date, to < sess.end_date ? to : sess.end_date).catch(() => ({})));
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load report cards');
+        setError(errorMessage(err, 'Failed to load marksheets'));
       } finally { setLoading(false); }
     })();
   }, [id, sectionId, profile?.school_id]);
 
-  if (!sectionId) return <p className="p-10 text-center text-slate-600">Choose a section from the exam's Report cards tab.</p>;
-  if (loading) return <p className="p-10 text-center text-slate-500">Preparing report cards…</p>;
+  if (!sectionId) return <p className="p-10 text-center text-slate-600">Choose a section from the exam's Marksheets tab.</p>;
+  if (loading) return <p className="p-10 text-center text-slate-500">Preparing marksheets…</p>;
   if (error || !exam) return <p className="p-10 text-center text-red-600">{error ?? 'Exam not found'}</p>;
 
   return (
@@ -68,7 +69,7 @@ export default function ExamReportCards() {
       `}</style>
 
       <div className="no-print sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-6 py-3">
-        <p className="text-sm text-slate-600"><b>{results.length}</b> report cards · {exam.name}{exam.status !== 'published' && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700">Results not published yet</span>}</p>
+        <p className="text-sm text-slate-600"><b>{results.length}</b> marksheets · {exam.name}{exam.status !== 'published' && <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-700">Results not published yet</span>}</p>
         <button onClick={() => window.print()} className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-sm font-medium text-white hover:bg-brand-600">
           <Printer className="h-4 w-4" /> Print / Save PDF
         </button>
@@ -96,12 +97,13 @@ export default function ExamReportCards() {
                 {school?.logo_url && <div className="w-16" />}
               </div>
               <div className="my-4 text-center">
-                <p className="text-base font-bold uppercase">Report Card</p>
+                <p className="text-base font-bold uppercase">Marksheet</p>
                 <p className="text-sm text-slate-600">{exam.name}{session ? ` · Session ${session.name}` : ''}</p>
               </div>
 
-              {/* Student */}
-              <table className="mb-4 w-full border border-slate-300">
+              {/* Student details + passport photo (from the student's profile) */}
+              <div className="mb-4 flex items-stretch gap-3">
+              <table className="w-full flex-1 border border-slate-300">
                 <tbody>
                   <tr className="border-b border-slate-300">
                     <td className="w-1/4 bg-slate-50 px-3 py-1.5 font-medium">Student</td><td className="px-3 py-1.5 font-semibold">{r.full_name}</td>
@@ -117,6 +119,16 @@ export default function ExamReportCards() {
                   </tr>
                 </tbody>
               </table>
+              <div className="flex w-[25mm] flex-shrink-0 items-center justify-center overflow-hidden border border-slate-300 bg-slate-50">
+                {st?.avatar_url ? (
+                  <img src={st.avatar_url} alt={r.full_name} className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-2xl font-bold text-slate-300">
+                    {r.full_name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase()}
+                  </span>
+                )}
+              </div>
+              </div>
 
               {/* Marks */}
               <table className="mb-4 w-full border border-slate-300 text-center">

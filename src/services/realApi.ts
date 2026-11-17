@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { parseTemplate as parseReportCardTemplate } from '@/lib/reportCard/template';
 export { generateSubjectCode } from '@/lib/subjectUtils';
 import { generateSubjectCode } from '@/lib/subjectUtils';
 import { generateParentCredentials } from '@/lib/parentUtils';
@@ -3691,5 +3692,40 @@ export async function fetchConvenienceForReceipt(receiptNumber: string) {
 
 export async function markPaymentRefunded(id: string) {
   const { error } = await supabase.rpc('mark_payment_refunded', { p_id: id });
+  if (error) throw error;
+}
+
+// ── Annual report cards (template designed by the Veducore team) ─────────────
+
+export async function fetchReportCardTemplate(schoolId: string) {
+  const { data, error } = await supabase.from('report_card_templates').select('*').eq('school_id', schoolId).maybeSingle();
+  if (error) throw error;
+  return data ? parseReportCardTemplate(data as Record<string, unknown>) : null;
+}
+
+/** slot key → exam id, for one session. */
+export async function fetchReportCardExamMap(schoolId: string, sessionId: string) {
+  const { data, error } = await supabase.from('report_card_exam_map').select('slot_key, exam_id')
+    .eq('school_id', schoolId).eq('session_id', sessionId);
+  if (error) throw error;
+  return Object.fromEntries(((data ?? []) as { slot_key: string; exam_id: string }[]).map((r) => [r.slot_key, r.exam_id])) as Record<string, string>;
+}
+
+export async function setReportCardExamSlot(schoolId: string, sessionId: string, slotKey: string, examId: string | null) {
+  if (!examId) {
+    const { error } = await supabase.from('report_card_exam_map').delete()
+      .eq('school_id', schoolId).eq('session_id', sessionId).eq('slot_key', slotKey);
+    if (error) throw error;
+    return;
+  }
+  const { error } = await supabase.from('report_card_exam_map').upsert(
+    { school_id: schoolId, session_id: sessionId, slot_key: slotKey, exam_id: examId, updated_at: new Date().toISOString() },
+    { onConflict: 'school_id,session_id,slot_key' },
+  );
+  if (error) throw error;
+}
+
+export async function setReportCardPrintOffset(x: number, y: number) {
+  const { error } = await supabase.rpc('set_report_card_print_offset', { p_x: x, p_y: y });
   if (error) throw error;
 }

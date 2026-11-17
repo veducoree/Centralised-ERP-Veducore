@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { errorMessage } from '@/lib/timetable';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Plus, CalendarDays, Pencil, Trash2, Award, ChevronRight, SlidersHorizontal, X } from 'lucide-react';
+import { FileText, Plus, CalendarDays, Pencil, Trash2, Award, ChevronRight, SlidersHorizontal, X, FileSpreadsheet } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -116,14 +117,14 @@ export default function AdminExams() {
       setModal(null);
       if (!modal.id) navigate(`/admin/exams/${id}`); else load();
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to save exam', 'error');
+      toast(errorMessage(err, 'Failed to save exam'), 'error');
     } finally { setSaving(false); }
   }
 
   async function handleDelete() {
     if (!deleteTarget) return;
     try { await deleteExam(deleteTarget.id); toast('Exam deleted', 'success'); load(); }
-    catch (err) { toast(err instanceof Error ? err.message : 'Failed to delete', 'error'); }
+    catch (err) { toast(errorMessage(err, 'Failed to delete'), 'error'); }
   }
 
   function openGrading() {
@@ -146,7 +147,7 @@ export default function AdminExams() {
       toast('Grading scale saved', 'success');
       setGradingOpen(false);
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to save grading', 'error');
+      toast(errorMessage(err, 'Failed to save grading'), 'error');
     } finally { setSavingBands(false); }
   }
 
@@ -159,7 +160,7 @@ export default function AdminExams() {
       <div className="space-y-6">
         <PageHeader
           title="Exams & Results"
-          description="Schedule exams, track marks entry, publish results and print report cards."
+          description="Schedule exams, track marks entry, publish results and print marksheets and annual report cards."
           action={<>
             <div className="w-40">
               <Select fieldSize="sm" value={sessionId} onChange={(e) => setSessionId(e.target.value)} aria-label="Session">
@@ -167,6 +168,7 @@ export default function AdminExams() {
               </Select>
             </div>
             <Button variant="outline" icon={<SlidersHorizontal className="h-4 w-4" />} onClick={openGrading} disabled={!defaultScale}>Grading</Button>
+            <Button variant="outline" icon={<FileSpreadsheet className="h-4 w-4" />} onClick={() => navigate('/admin/exams/annual-report-cards')}>Annual report cards</Button>
             {canEdit && <Button icon={<Plus className="h-4 w-4" />} onClick={openNew}>New exam</Button>}
           </>}
         />

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { errorMessage } from '@/lib/timetable';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, CalendarDays, ClipboardList, Trophy, Printer, Send, Undo2, Save, Copy, Download,
@@ -73,7 +74,7 @@ export default function AdminExamDetail() {
       toast(publishOpen === 'publish' ? `Results published — ${n} parent notification${n === 1 ? '' : 's'} sent` : 'Results hidden from parents again', 'success');
       await loadExam();
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed', 'error');
+      toast(errorMessage(err, 'Failed'), 'error');
     }
   }
 
@@ -94,7 +95,7 @@ export default function AdminExamDetail() {
     { key: 'datesheet', label: 'Datesheet', icon: CalendarDays },
     { key: 'marks', label: 'Marks entry', icon: ClipboardList },
     { key: 'results', label: 'Results', icon: Trophy },
-    { key: 'reports', label: 'Report cards', icon: Printer },
+    { key: 'reports', label: 'Marksheets', icon: Printer },
   ];
 
   return (
@@ -220,7 +221,7 @@ function DatesheetTab({ exam, classes, subjects, schedule, canEdit, onSaved }: {
       await onSaved();
       toast('Datesheet saved — teachers can now enter marks', 'success');
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Failed to save datesheet', 'error');
+      toast(errorMessage(e, 'Failed to save datesheet'), 'error');
     } finally { setSaving(false); }
   }
 
@@ -245,7 +246,7 @@ function DatesheetTab({ exam, classes, subjects, schedule, canEdit, onSaved }: {
       await onSaved();
       toast(`Copied to ${copied} class${copied === 1 ? '' : 'es'} (matching subject names)`, 'success');
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Failed to copy', 'error');
+      toast(errorMessage(e, 'Failed to copy'), 'error');
     } finally { setCopying(false); }
   }
 
@@ -440,7 +441,7 @@ function MarksEntryModal({ exam, schoolId, entry, max, canEdit, onClose, onSaved
       toast('Marks saved', 'success');
       onSaved();
     } catch (e) {
-      toast(e instanceof Error ? e.message : 'Failed to save marks', 'error');
+      toast(errorMessage(e, 'Failed to save marks'), 'error');
     } finally { setSaving(false); }
   }
 
@@ -497,7 +498,7 @@ function ResultsTab({ exam, classes }: { exam: Exam; classes: ClassWithSections[
     setLoading(true);
     fetchExamResults(exam.id, sectionId || null)
       .then(setRows)
-      .catch((e) => toast(e instanceof Error ? e.message : 'Failed to load results', 'error'))
+      .catch((e) => toast(errorMessage(e, 'Failed to load results'), 'error'))
       .finally(() => setLoading(false));
   }, [exam.id, sectionId, toast]);
 
@@ -618,7 +619,7 @@ function ResultsTab({ exam, classes }: { exam: Exam; classes: ClassWithSections[
   );
 }
 
-// ─── Report cards ───────────────────────────────────────────────────────────
+// ─── Marksheets ───────────────────────────────────────────────────────────
 
 function ReportsTab({ exam, classes }: { exam: Exam; classes: ClassWithSections[] }) {
   const [sectionId, setSectionId] = useState(classes[0]?.sections[0]?.id ?? '');
@@ -627,11 +628,11 @@ function ReportsTab({ exam, classes }: { exam: Exam; classes: ClassWithSections[
     <Card className="p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end">
         <div className="flex-1">
-          <p className="mb-1 text-sm font-semibold text-slate-900">Print report cards</p>
-          <p className="mb-3 text-sm text-slate-500">One A4 page per student with marks, grades, rank and attendance. Opens in a new tab — use Print → Save as PDF.</p>
+          <p className="mb-1 text-sm font-semibold text-slate-900">Print marksheets for this exam</p>
+          <p className="mb-3 text-sm text-slate-500">One A4 page per student with this exam's marks, grades, rank and attendance. The year-end report card is under Exams → Annual report cards.</p>
           <SectionPicker classes={classes} value={sectionId} onChange={setSectionId} />
         </div>
-        <Button icon={<Printer className="h-4 w-4" />} onClick={open} disabled={!sectionId}>Open report cards</Button>
+        <Button icon={<Printer className="h-4 w-4" />} onClick={open} disabled={!sectionId}>Open marksheets</Button>
       </div>
     </Card>
   );

@@ -42,6 +42,8 @@ const AdminStaff = lazy(() => import('@/pages/admin/AdminStaff'));
 const AdminExams = lazy(() => import('@/pages/admin/AdminExams'));
 const AdminExamDetail = lazy(() => import('@/pages/admin/AdminExamDetail'));
 const ExamReportCards = lazy(() => import('@/pages/admin/ExamReportCards'));
+const AnnualReportCards = lazy(() => import('@/pages/admin/AnnualReportCards'));
+const AnnualReportCardsPrint = lazy(() => import('@/pages/admin/AnnualReportCardsPrint'));
 const AdminPromotion = lazy(() => import('@/pages/admin/AdminPromotion'));
 const ProfilePage = lazy(() => import('@/pages/shared/ProfilePage'));
 const StudentDetailPage = lazy(() => import('@/pages/admin/StudentDetailPage'));
@@ -170,6 +172,8 @@ function App() {
             <Route path="/admin/staff" element={<ProtectedRoute allowedRoles={['admin']}><AdminStaff /></ProtectedRoute>} />
             <Route path="/admin/promotion" element={<ProtectedRoute allowedRoles={['admin']}><AdminPromotion /></ProtectedRoute>} />
             <Route path="/admin/exams" element={<ProtectedRoute allowedRoles={['admin']}><AdminExams /></ProtectedRoute>} />
+            <Route path="/admin/exams/annual-report-cards" element={<ProtectedRoute allowedRoles={['admin']}><AnnualReportCards /></ProtectedRoute>} />
+            <Route path="/admin/exams/annual-report-cards/print" element={<ProtectedRoute allowedRoles={['admin']}><AnnualReportCardsPrint /></ProtectedRoute>} />
             <Route path="/admin/exams/:id" element={<ProtectedRoute allowedRoles={['admin']}><AdminExamDetail /></ProtectedRoute>} />
             <Route path="/admin/exams/:id/report-cards" element={<ProtectedRoute allowedRoles={['admin']}><ExamReportCards /></ProtectedRoute>} />
             <Route path="/admin/notifications" element={<ProtectedRoute allowedRoles={['admin']}><AdminNotifications /></ProtectedRoute>} />
