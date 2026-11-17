@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { errorMessage } from '@/lib/timetable';
 import { ClipboardList, ChevronRight, Save, ArrowLeft, Lock } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/Button';
@@ -193,7 +194,7 @@ export default function TeacherExamMarks() {
       await loadData();
       setView('list');
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to save marks', 'error');
+      toast(errorMessage(err, 'Failed to save marks'), 'error');
     } finally {
       setSubmittingMarks(false);
     }
