@@ -8,6 +8,9 @@ const corsHeaders = {
 };
 
 interface CreateUserBody {
+  /** "set_password": admin resets an existing teacher/parent login (needs user_id). */
+  action?: "create" | "set_password";
+  user_id?: string;
   email: string;
   password: string;
   full_name: string;
@@ -60,7 +63,8 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     const body: CreateUserBody = await req.json();
-    const { email, password, full_name, role, school_id, phone, extra } = body;
+    const { action, user_id, email, password, full_name, role, school_id, phone, extra } = body;
+    const isSetPassword = action === "set_password";
     const studentId = (extra?.student_id as string | undefined) ?? null;
 
     if (!profile || profile.role !== "admin" || profile.status !== "active") {
@@ -70,7 +74,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!email || !password || !full_name || !role || !school_id) {
+    if (isSetPassword ? (!user_id || !password || !role || !school_id) : (!email || !password || !full_name || !role || !school_id)) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -122,6 +126,52 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ error: "Cannot create users for another school" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Admin password reset: change the real Auth password and keep the stored
+    // copy (shown on the credentials card) in sync, so the two never drift.
+    if (isSetPassword) {
+      if (role === "admin") {
+        return new Response(
+          JSON.stringify({ error: "Use the staff screen to reset staff passwords" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      if (password.length < 6) {
+        return new Response(
+          JSON.stringify({ error: "Password must be at least 6 characters" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const table = role === "teacher" ? "teachers" : "parents";
+      const { data: target } = await adminClient
+        .from(table).select("id").eq("user_id", user_id).eq("school_id", school_id).maybeSingle();
+      if (!target) {
+        return new Response(
+          JSON.stringify({ error: `No ${role} login found in your school` }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const { error: pwErr } = await adminClient.auth.admin.updateUserById(user_id!, { password });
+      if (pwErr) {
+        return new Response(
+          JSON.stringify({ error: pwErr.message }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      await adminClient.from(table).update({ password }).eq("id", target.id);
+      await adminClient.from("audit_logs").insert({
+        school_id,
+        user_id: userData.user.id,
+        action: `${role}_password_reset`,
+        entity_type: "user",
+        entity_id: user_id,
+        metadata: {},
+      });
+      return new Response(
+        JSON.stringify({ id: user_id, message: "Password updated" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 

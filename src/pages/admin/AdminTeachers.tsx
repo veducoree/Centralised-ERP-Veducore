@@ -10,7 +10,7 @@ import { SearchInput, PageHeader, LoadingSpinner } from '@/components/ui/Primiti
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
 import {
-  fetchTeachers, updateTeacher, deleteTeacher, createTeacherAccount, fetchSchool,
+  fetchTeachers, updateTeacher, resetUserPassword, deleteTeacher, createTeacherAccount, fetchSchool,
   fetchTeacherByUserId, fetchClasses, fetchSubjects, fetchSubjectAllotments,
   setTeacherSubjectAllotments,
 } from '@/services/api';
@@ -173,7 +173,7 @@ export default function AdminTeachers() {
     if (!form.username) e.username = 'Name is required to generate username';
     if (!form.employee_id.trim()) e.employee_id = 'Employee ID is required';
     if (!form.password) e.password = 'Password is required';
-    else if (form.password.length < 6) e.password = 'Password must be at least 6 characters';
+    else if (form.password.trim().length < 6) e.password = 'Password must be at least 6 characters';
     const allotErr = validateAllotmentRows(allotRows);
     if (allotErr) e.allotment = allotErr;
     setErrors(e);
@@ -186,7 +186,7 @@ export default function AdminTeachers() {
     try {
       const res = await createTeacherAccount({
         email: form.username,   // username IS the login identifier
-        password: form.password,
+        password: form.password.trim(), // login trims, so store it trimmed too
         full_name: form.full_name,
         school_id: profile.school_id,
         phone: form.phone || undefined,
@@ -239,7 +239,7 @@ export default function AdminTeachers() {
         date_of_joining: form.date_of_joining || '',
         address: form.address || null,
         status: 'active',
-        password: form.password,
+        password: form.password.trim(),
         avatar_url: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -262,16 +262,33 @@ export default function AdminTeachers() {
     const allotErr = validateAllotmentRows(allotRows);
     if (allotErr) { toast(allotErr, 'error'); return; }
     const updates: Partial<Teacher> = { ...editForm };
-    if (updates.password !== undefined && updates.password !== '') {
-      if (updates.password.length < 6) {
-        toast('Password must be at least 6 characters', 'error');
-        return;
-      }
-    } else {
-      delete updates.password; // keep the existing password
+    // The password lives in Supabase Auth; writing only the teachers column made
+    // the credentials card show a password that login rejected.
+    const newPassword = (updates.password ?? '').trim();
+    delete updates.password;
+    if (newPassword && newPassword.length < 6) {
+      toast('Password must be at least 6 characters', 'error');
+      return;
+    }
+    if (newPassword && !editing.user_id) {
+      toast('This teacher has no login account, so the password cannot be set', 'error');
+      return;
     }
     setSaving(true);
     try {
+      if (newPassword && editing.user_id) {
+        try {
+          await resetUserPassword({
+            user_id: editing.user_id,
+            role: 'teacher',
+            school_id: profile.school_id,
+            password: newPassword,
+          });
+        } catch (err) {
+          toast(err instanceof Error ? err.message : 'Failed to update password', 'error');
+          return;
+        }
+      }
       await updateTeacher(editing.id, updates);
       await setTeacherSubjectAllotments({
         schoolId: profile.school_id,

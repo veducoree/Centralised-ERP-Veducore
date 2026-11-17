@@ -309,6 +309,27 @@ export async function updateTeacher(id: string, updates: Partial<Teacher>) {
   return data as Teacher | null;
 }
 
+/** Admin resets a teacher/parent login: changes the real Auth password and the
+ *  stored copy shown on the credentials card, together (via create-user). */
+export async function resetUserPassword(params: {
+  user_id: string;
+  role: 'teacher' | 'parent';
+  school_id: string;
+  password: string;
+}) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error('Not authenticated');
+  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+    body: JSON.stringify({ action: 'set_password', ...params }),
+  });
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(result.error || 'Failed to update password');
+  invalidateCache(params.role === 'teacher' ? 'teachers:' : 'parents:');
+  return result;
+}
+
 export async function deleteTeacher(id: string) {
   const { error } = await supabase.from('teachers').delete().eq('id', id);
   if (error) throw error;

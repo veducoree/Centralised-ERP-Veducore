@@ -9,6 +9,7 @@ export {
   fetchTeachers,
   createTeacherAccount,
   updateTeacher,
+  resetUserPassword,
   deleteTeacher,
   fetchTeacherByUserId,
   fetchTeacherProfileForDisplay,

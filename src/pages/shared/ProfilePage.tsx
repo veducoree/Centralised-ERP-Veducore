@@ -69,6 +69,8 @@ export default function ProfilePage() {
       // Update password via Supabase Auth
       const { error: updateErr } = await supabase.auth.updateUser({ password: pwForm.next });
       if (updateErr) throw updateErr;
+      // Keep the admin's credentials card in step with the new password.
+      await supabase.rpc('sync_my_stored_password', { p_password: pwForm.next }).then(() => {}, () => {});
 
       toast('Password changed successfully', 'success');
       setPwModalOpen(false);
