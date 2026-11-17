@@ -30,6 +30,7 @@ export {
   updateClass,
   deleteClass,
   createSection,
+  linkSubjectsToSection,
   deleteSection,
   fetchSubjects,
   subjectsForSection,

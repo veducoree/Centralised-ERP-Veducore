@@ -673,6 +673,19 @@ export async function createSection(schoolId: string, classId: string, name: str
   return data as Section | null;
 }
 
+/** Link existing class subjects to a (new) section. */
+export async function linkSubjectsToSection(schoolId: string, sectionId: string, subjectIds: string[]) {
+  if (!subjectIds.length) return;
+  const { error } = await supabase
+    .from('section_subjects')
+    .upsert(
+      subjectIds.map((subject_id) => ({ school_id: schoolId, section_id: sectionId, subject_id })),
+      { onConflict: 'section_id,subject_id', ignoreDuplicates: true },
+    );
+  if (error) throw error;
+  invalidateCache(`subjects:${schoolId}`);
+}
+
 export async function deleteSection(id: string) {
   const { error } = await supabase.from('sections').delete().eq('id', id);
   if (error) throw error;

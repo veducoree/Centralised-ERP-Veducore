@@ -14,7 +14,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
 import {
   fetchClasses, createClass, deleteClass,
-  createSection, deleteSection,
+  createSection, deleteSection, linkSubjectsToSection,
   fetchSubjects, subjectsForSection,
   fetchTeachers,
   fetchClassTeacherForSection, assignClassTeacher, removeClassTeacher,
@@ -66,6 +66,13 @@ export default function AdminClasses() {
     { name: string; gradeLevel: string; sections: string[] }[]
   >([{ name: '', gradeLevel: '', sections: ['A'] }]);
   const [savingClasses, setSavingClasses] = useState(false);
+
+  // ── Add Section (to an existing class) modal ─────────────────────────
+  const [addSecTarget, setAddSecTarget] = useState<ClassRow | null>(null);
+  const [addSecName, setAddSecName] = useState('');
+  const [addSecCapacity, setAddSecCapacity] = useState('40');
+  const [addSecCopySubjects, setAddSecCopySubjects] = useState(true);
+  const [savingSec, setSavingSec] = useState(false);
 
   // ── Assign Class Teacher modal ───────────────────────────────────────
   const [assignCTOpen, setAssignCTOpen] = useState(false);
@@ -218,6 +225,65 @@ export default function AdminClasses() {
     }
   }
 
+  // ── Add Section to an existing class ────────────────────────────────
+  /** Next free letter after the class's existing sections (A, B → C). */
+  function nextSectionName(cls: ClassRow): string {
+    const taken = new Set(cls.sections.map((s) => s.name.trim().toUpperCase()));
+    for (let i = 0; i < 26; i++) {
+      const letter = String.fromCharCode(65 + i);
+      if (!taken.has(letter)) return letter;
+    }
+    return '';
+  }
+
+  /** Subjects taught in any section of the class — offered to the new section. */
+  function classSubjectIds(cls: ClassRow): string[] {
+    const secIds = new Set(cls.sections.map((s) => s.id));
+    return subjects
+      .filter((s) => s.class_id === cls.id && s.section_ids.some((id) => secIds.has(id)))
+      .map((s) => s.id);
+  }
+
+  function openAddSection(cls: ClassRow) {
+    setAddSecTarget(cls);
+    setAddSecName(nextSectionName(cls));
+    setAddSecCapacity('40');
+    setAddSecCopySubjects(true);
+  }
+
+  async function handleAddSection() {
+    if (!profile?.school_id || !addSecTarget) return;
+    const name = addSecName.trim().toUpperCase();
+    if (!name) { toast('Enter a section name', 'error'); return; }
+    if (addSecTarget.sections.some((s) => s.name.trim().toUpperCase() === name)) {
+      toast(`Section ${name} already exists in ${addSecTarget.name}`, 'error');
+      return;
+    }
+    const capacity = parseInt(addSecCapacity, 10);
+    setSavingSec(true);
+    try {
+      const sec = await createSection(profile.school_id, addSecTarget.id, name,
+        Number.isFinite(capacity) && capacity > 0 ? capacity : 40);
+      if (sec && addSecCopySubjects) {
+        try {
+          await linkSubjectsToSection(profile.school_id, sec.id, classSubjectIds(addSecTarget));
+        } catch {
+          toast('Section added, but subjects could not be linked. Link them from Manage Subjects.', 'error');
+        }
+      }
+      toast(`Section ${name} added to ${addSecTarget.name}`, 'success');
+      setAddSecTarget(null);
+      loadData();
+    } catch (err) {
+      const code = (err as { code?: string } | null)?.code;
+      toast(code === '23505'
+        ? `Section ${name} already exists in ${addSecTarget.name}`
+        : err instanceof Error ? err.message : 'Failed to add section', 'error');
+    } finally {
+      setSavingSec(false);
+    }
+  }
+
   // ── Assign Class Teacher ─────────────────────────────────────────────
   function openAssignCT(classId: string, sectionId: string, label: string) {
     setSelectedCTId(sectionData[sectionId]?.classTeacher?.id || '');
@@ -365,19 +431,38 @@ export default function AdminClasses() {
                       {cls.sections.length} section{cls.sections.length !== 1 ? 's' : ''}
                     </Badge>
                   </button>
-                  <button
-                    onClick={() => setDeleteClassId(cls.id)}
-                    className="ml-3 flex-shrink-0 rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <div className="ml-3 flex flex-shrink-0 items-center gap-1">
+                    <button
+                      title="Add a section to this class"
+                      onClick={() => openAddSection(cls)}
+                      className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-600 transition-colors"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add Section
+                    </button>
+                    <button
+                      title="Delete class"
+                      onClick={() => setDeleteClassId(cls.id)}
+                      className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* ── Sections list ── */}
                 {cls.expanded && (
                   <div className="divide-y divide-slate-100">
                     {cls.sections.length === 0 ? (
-                      <p className="px-5 py-4 text-sm text-slate-400">No sections in this class</p>
+                      <div className="flex items-center justify-between px-5 py-4">
+                        <p className="text-sm text-slate-400">No sections in this class</p>
+                        <button
+                          onClick={() => openAddSection(cls)}
+                          className="text-sm font-medium text-brand-600 hover:text-brand-700"
+                        >
+                          + Add a section
+                        </button>
+                      </div>
                     ) : cls.sections.map((sec) => {
                       const sd = sectionData[sec.id];
                       const isSectionOpen = expandedSection[cls.id] === sec.id;
@@ -615,6 +700,63 @@ export default function AdminClasses() {
           >
             <Plus className="h-4 w-4" /> Add Another Class
           </button>
+        </div>
+      </Modal>
+
+      {/* ══ Add Section Modal ═════════════════════════════════════════════ */}
+      <Modal
+        open={!!addSecTarget}
+        onClose={() => setAddSecTarget(null)}
+        title="Add Section"
+        description={addSecTarget
+          ? `${addSecTarget.name} — existing: ${addSecTarget.sections.map((s) => s.name).join(', ') || 'none'}`
+          : undefined}
+        size="sm"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setAddSecTarget(null)}>Cancel</Button>
+            <Button onClick={handleAddSection} loading={savingSec} icon={<Plus className="h-4 w-4" />}>
+              Add Section
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div className="flex gap-3">
+            <Input
+              label="Section Name"
+              required
+              maxLength={4}
+              placeholder="e.g. B"
+              value={addSecName}
+              onChange={(e) => setAddSecName(e.target.value.toUpperCase())}
+            />
+            <div className="w-28 flex-shrink-0">
+              <Input
+                label="Capacity"
+                type="number"
+                min={1}
+                value={addSecCapacity}
+                onChange={(e) => setAddSecCapacity(e.target.value)}
+              />
+            </div>
+          </div>
+          {addSecTarget && classSubjectIds(addSecTarget).length > 0 && (
+            <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+              <input
+                type="checkbox"
+                checked={addSecCopySubjects}
+                onChange={(e) => setAddSecCopySubjects(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+              />
+              <span className="text-sm text-slate-700">
+                Add this class's {classSubjectIds(addSecTarget).length} subject(s) to the new section
+                <span className="block text-xs text-slate-400">
+                  You can change them later from Manage Subjects. Teachers still need to be assigned.
+                </span>
+              </span>
+            </label>
+          )}
         </div>
       </Modal>
 
