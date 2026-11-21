@@ -445,9 +445,10 @@ export async function updateStudent(id: string, updates: Partial<Student>) {
   return data as Student | null;
 }
 
+// Same as web: student + data + parent left with no other child (migration 057).
 export async function deleteStudent(id: string) {
-  const { error } = await supabase.from('students').delete().eq('id', id);
-  if (error) throw error;
+  const { error } = await supabase.rpc('admin_delete_student', { p_student_id: id });
+  if (error) throw new Error(error.message);
   invalidateCache('students:');
   invalidateCache('studentsBySection:');
 }

@@ -315,7 +315,7 @@ export default function AdminTeachers() {
       toast('Teacher deleted successfully', 'success');
       loadData();
     } catch (err) {
-      toast('Failed to delete teacher', 'error');
+      toast(err instanceof Error ? err.message : 'Failed to delete teacher', 'error');
       console.error(err);
     }
   }
@@ -628,7 +628,7 @@ export default function AdminTeachers() {
         onClose={() => setDeleteId(null)}
         onConfirm={handleDelete}
         title="Delete Teacher"
-        message="Are you sure you want to delete this teacher? This will remove their data but not their auth account."
+        message="This permanently deletes the teacher, their login, class/subject assignments and timetable. Marks and attendance they entered stay. This cannot be undone."
         confirmText="Delete"
         variant="danger"
       />

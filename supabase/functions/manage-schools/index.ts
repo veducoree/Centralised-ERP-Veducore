@@ -660,9 +660,23 @@ const ACTIONS: Record<string, { roles: Role[]; run: (ctx: Ctx) => Promise<unknow
         }));
       }
       const authUsersDeleted = userIds.length - failed.length;
+
+      // Files the school uploaded live under "<school_id>/" in storage
+      // (e.g. the report-card background). SQL can't delete storage files.
+      let filesDeleted = 0;
+      for (const bucket of ["report-cards"]) {
+        const { data: files } = await ctx.db.storage.from(bucket).list(schoolId, { limit: 1000 });
+        const paths = (files ?? []).map((f) => `${schoolId}/${f.name}`);
+        if (paths.length) {
+          const { error: e } = await ctx.db.storage.from(bucket).remove(paths);
+          if (!e) filesDeleted += paths.length;
+        }
+      }
+
       await audit(ctx, "school.deleted", schoolId, {
         school_name: school.name, logins_deleted: authUsersDeleted,
         logins_failed: failed, rows_deleted: result?.rows_deleted ?? 0,
+        files_deleted: filesDeleted,
       });
       return { success: true, authUsersDeleted, loginsFailed: failed.length };
     },

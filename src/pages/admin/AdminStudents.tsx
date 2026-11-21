@@ -216,11 +216,12 @@ export default function AdminStudents() {
   async function handleDelete() {
     if (!deleteId) return;
     try {
-      await deleteStudent(deleteId);
-      toast('Student deleted successfully', 'success');
+      const res = await deleteStudent(deleteId);
+      const n = res.parents_deleted ?? 0;
+      toast(n ? `Student and ${n} parent account${n > 1 ? 's' : ''} deleted` : 'Student deleted successfully', 'success');
       loadData();
     } catch (err) {
-      toast('Failed to delete student', 'error');
+      toast(err instanceof Error ? err.message : 'Failed to delete student', 'error');
       console.error(err);
     }
   }
@@ -500,7 +501,7 @@ export default function AdminStudents() {
         onClose={() => setDeleteId(null)}
         onConfirm={handleDelete}
         title="Delete Student"
-        message="Are you sure you want to delete this student? This action cannot be undone."
+        message="This permanently deletes the student with all their attendance, marks, fees and records. A parent with no other child in the school is deleted too, along with their app login. This cannot be undone."
         confirmText="Delete"
         variant="danger"
       />

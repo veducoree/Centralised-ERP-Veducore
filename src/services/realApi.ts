@@ -339,9 +339,26 @@ export async function resetUserPassword(params: {
   return result;
 }
 
+// Teacher + their login, in one DB transaction (migration 057).
+// Deletes one row and confirms the database really removed it. Under RLS a
+// blocked DELETE (no permission, past session, other school) affects 0 rows
+// without an error — without this check the UI would say "deleted".
+async function deleteRowById(table: string, id: string) {
+  const { data, error } = await supabase.from(table).delete().eq('id', id).select('id');
+  if (error) {
+    const msg = error.code === '23503'
+      ? 'This is still in use elsewhere (linked records) and cannot be deleted yet.'
+      : error.message;
+    throw Object.assign(new Error(msg), { code: error.code });
+  }
+  if (!data || data.length === 0) {
+    throw new Error('Not deleted — you may not have permission, or you are viewing a past session.');
+  }
+}
+
 export async function deleteTeacher(id: string) {
-  const { error } = await supabase.from('teachers').delete().eq('id', id);
-  if (error) throw error;
+  const { error } = await supabase.rpc('admin_delete_teacher', { p_teacher_id: id });
+  if (error) throw new Error(error.message);
   invalidateCache('teachers:');
   invalidateCache('teacherByUser:');
   invalidateCache('adminDashboard:');
@@ -404,9 +421,11 @@ export async function updateParent(id: string, updates: Partial<Parent>) {
   return data as Parent | null;
 }
 
+// Parent + their login; the children stay (migration 057).
 export async function deleteParent(id: string) {
-  const { error } = await supabase.from('parents').delete().eq('id', id);
-  if (error) throw error;
+  const { error } = await supabase.rpc('admin_delete_parent', { p_parent_id: id });
+  if (error) throw new Error(error.message);
+  invalidateCache('students:');
   invalidateCache('parents:');
   invalidateCache('parentByUser:');
   invalidateCache('adminDashboard:');
@@ -522,7 +541,10 @@ export async function fetchNextEmployeeId(): Promise<{ prefix: string; next: str
   return { prefix: r.prefix || '', next: r.next || null };
 }
 
-export async function createStudent(student: Partial<Student> & { school_id: string; admission_number: string; full_name: string }) {
+export async function createStudent(
+  student: Partial<Student> & { school_id: string; admission_number: string; full_name: string },
+  opts: { withParent?: boolean } = {},
+) {
   const { data, error } = await supabase.from('students').insert(student).select().maybeSingle();
   if (error) {
     if (error.code === '23505' && /admission_number/.test(`${error.message} ${error.details ?? ''}`)) {
@@ -536,7 +558,7 @@ export async function createStudent(student: Partial<Student> & { school_id: str
   invalidateCache('adminDashboard:');
   let parentResult: { parent: Parent | null; credentials: { username: string; password: string }; created: boolean } | null = null;
   let parentError: string | null = null;
-  if (data) {
+  if (data && opts.withParent !== false) {
     // Parent login (mobile number). The student is saved even if this fails;
     // the caller shows _parentError so the admin can fix it.
     try {
@@ -562,13 +584,18 @@ export async function updateStudent(id: string, updates: Partial<Student>) {
   return data as Student | null;
 }
 
+// Student + all their data + any parent left with no other child, with
+// that parent's login — one DB transaction (migration 057).
 export async function deleteStudent(id: string) {
-  const { error } = await supabase.from('students').delete().eq('id', id);
-  if (error) throw error;
+  const { data, error } = await supabase.rpc('admin_delete_student', { p_student_id: id });
+  if (error) throw new Error(error.message);
+  invalidateCache('parents:');
+  invalidateCache('parentByUser:');
   invalidateCache('students:');
   invalidateCache('studentsBySection:');
   invalidateCache('parentStudents:');
   invalidateCache('adminDashboard:');
+  return (data ?? {}) as { parents_deleted?: number; logins_deleted?: number };
 }
 
 export async function fetchClasses(schoolId: string) {
@@ -602,8 +629,7 @@ export async function updateClass(id: string, updates: Partial<Class>) {
 }
 
 export async function deleteClass(id: string) {
-  const { error } = await supabase.from('classes').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('classes', id);
   invalidateCache('classes:');
 }
 
@@ -632,8 +658,7 @@ export async function linkSubjectsToSection(schoolId: string, sectionId: string,
 }
 
 export async function deleteSection(id: string) {
-  const { error } = await supabase.from('sections').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('sections', id);
   invalidateCache('classes:');
 }
 
@@ -761,8 +786,7 @@ export async function setSubjectSections(schoolId: string, subjectId: string, se
 }
 
 export async function deleteSubject(id: string) {
-  const { error } = await supabase.from('subjects').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('subjects', id);
   invalidateCache('subjects:');
   invalidateCache('teacherAssignments:');
 }
@@ -871,8 +895,7 @@ export async function createClassAssignment(assignment: {
 }
 
 export async function deleteClassAssignment(id: string) {
-  const { error } = await supabase.from('class_assignments').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('class_assignments', id);
   invalidateCache('teacherAssignments:');
 }
 
@@ -931,8 +954,7 @@ export async function updateTeacherSchedule(id: string, updates: {
 }
 
 export async function deleteTeacherSchedule(id: string) {
-  const { error } = await supabase.from('teacher_schedules').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('teacher_schedules', id);
   invalidateTimetableCache();
 }
 
@@ -990,8 +1012,7 @@ export async function updateTimetablePeriod(
 }
 
 export async function deleteTimetablePeriod(schoolId: string, id: string) {
-  const { error } = await supabase.from('timetable_periods').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('timetable_periods', id);
   invalidateCache(`timetablePeriods:${schoolId}`);
   invalidateTimetableCache();
 }
@@ -1051,8 +1072,7 @@ export async function createSubstitution(sub: {
 }
 
 export async function deleteSubstitution(id: string) {
-  const { error } = await supabase.from('timetable_substitutions').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('timetable_substitutions', id);
 }
 
 // Teacher-specific: get their assigned sections
@@ -1174,8 +1194,7 @@ export async function createStudentRecord(record: {
 }
 
 export async function deleteStudentRecord(id: string) {
-  const { error } = await supabase.from('student_records').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('student_records', id);
 }
 
 /**
@@ -1242,8 +1261,7 @@ export async function createRemark(remark: {
 }
 
 export async function deleteRemark(id: string) {
-  const { error } = await supabase.from('remarks').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('remarks', id);
 }
 
 export async function fetchFeeTypes(schoolId: string) {
@@ -1359,8 +1377,7 @@ export async function recordFeePayment(feeId: string, payment: {
 }
 
 export async function deleteFee(id: string) {
-  const { error } = await supabase.from('fees').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('fees', id);
 }
 
 export async function fetchNotifications(userId?: string, schoolId?: string, limit = 200) {
@@ -1455,8 +1472,7 @@ export async function markNotificationRead(id: string) {
 }
 
 export async function deleteNotification(id: string) {
-  const { error } = await supabase.from('notifications').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('notifications', id);
 }
 
 export async function fetchAuditLogs(schoolId: string) {
@@ -1493,8 +1509,7 @@ export async function linkParentStudent(schoolId: string, parentId: string, stud
 }
 
 export async function unlinkParentStudent(id: string) {
-  const { error } = await supabase.from('parent_students').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('parent_students', id);
   invalidateCache('parentStudents:');
 }
 
@@ -1691,8 +1706,7 @@ export async function clearHolidayDates(schoolId: string, dates: string[]) {
 }
 
 export async function deleteHoliday(id: string) {
-  const { error } = await supabase.from('holidays').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('holidays', id);
 }
 
 // ============================================================
@@ -1731,8 +1745,7 @@ export async function createExamDef(examDef: {
 }
 
 export async function deleteExamDef(id: string) {
-  const { error } = await supabase.from('exam_defs').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('exam_defs', id);
 }
 
 // ============================================================
@@ -1780,8 +1793,7 @@ export async function updateFeeStructure(id: string, updates: Partial<FeeStructu
 }
 
 export async function deleteFeeStructure(id: string) {
-  const { error } = await supabase.from('fee_structures').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('fee_structures', id);
 }
 
 // ============================================================
@@ -2203,15 +2215,11 @@ export async function createAdmissionWithFees(params: {
     admission_date: params.admission_date,
     status: 'active',
     avatar_url: null,
-  });
+  }, { withParent: false });
 
   if (!createdRaw) throw new Error('Student creation returned no data');
-  const student = createdRaw as Student & {
-    _parentResult?: { credentials: { username: string; password: string } } | null; _parentError?: string | null;
-  };
+  const student = createdRaw as Student;
   const studentId = student.id;
-  const parentCredentials = student._parentResult?.credentials ?? null;
-  const parentError = student._parentError ?? null;
 
   // ── Step 2: Fees, payment and receipt — one transaction on the server ──
   // (discount is applied to the fee rows; receipt number is atomic; if this
@@ -2249,6 +2257,18 @@ export async function createAdmissionWithFees(params: {
   const r = (rpc || {}) as { receipt_id?: string; receipt_number?: string };
   const receiptNumber = r.receipt_number ?? '';
   const receiptId = r.receipt_id ?? null;
+
+  // ── Step 3: Parent login — only once the admission is really saved, so a
+  // failed fee step never leaves a stray login behind. A failure here keeps
+  // the admission; the admin sees why and can retry from the student page.
+  let parentCredentials: { username: string; password: string } | null = null;
+  let parentError: string | null = null;
+  try {
+    parentCredentials = (await ensureParentForStudent(student)).credentials;
+  } catch (parentErr) {
+    parentError = parentErr instanceof Error ? parentErr.message : 'Could not create the parent login';
+  }
+  invalidateCache('parents:');
 
   return { student, receiptNumber, receiptId, parentCredentials, parentError };
 }
@@ -2424,8 +2444,7 @@ export async function upsertTransportBus(bus: {
 
 export async function deleteTransportBus(id: string) {
   if (!supabase) return;
-  const { error } = await supabase.from('transport_buses').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('transport_buses', id);
 }
 
 // ── Stops ─────────────────────────────────────────────────────
@@ -2455,8 +2474,7 @@ export async function upsertTransportStop(stop: {
 
 export async function deleteTransportStop(id: string) {
   if (!supabase) return;
-  const { error } = await supabase.from('transport_stops').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('transport_stops', id);
 }
 
 // ── Assignments ───────────────────────────────────────────────
@@ -2810,8 +2828,7 @@ export async function saveTransportBus(
 export async function deleteTransportBusWithStops(busId: string): Promise<void> {
   if (!supabase) return;
   // Stops are ON DELETE CASCADE from bus, so just delete the bus
-  const { error } = await supabase.from('transport_buses').delete().eq('id', busId);
-  if (error) throw error;
+  await deleteRowById('transport_buses', busId);
 }
 
 // ============================================================
@@ -2927,8 +2944,7 @@ export async function setCurrentAcademicSession(id: string, schoolId: string) {
 }
 
 export async function deleteAcademicSession(id: string) {
-  const { error } = await supabase.from('academic_sessions').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('academic_sessions', id);
 }
 
 export async function countSessionEnrollments(sessionId: string) {
@@ -3083,8 +3099,7 @@ export async function saveExam(exam: {
 }
 
 export async function deleteExam(id: string) {
-  const { error } = await supabase.from('exams').delete().eq('id', id);
-  if (error) throw error;
+  await deleteRowById('exams', id);
 }
 
 export async function fetchExamSchedule(examId: string) {

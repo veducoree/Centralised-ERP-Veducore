@@ -110,8 +110,8 @@ function AdminParentsView() {
       await deleteParent(deleteId);
       toast('Parent deleted successfully', 'success');
       loadData();
-    } catch {
-      toast('Failed to delete parent', 'error');
+    } catch (err) {
+      toast(err instanceof Error ? err.message : 'Failed to delete parent', 'error');
     }
   }
 
@@ -466,7 +466,7 @@ function AdminParentsView() {
         onClose={() => setDeleteId(null)}
         onConfirm={handleDelete}
         title="Delete Parent"
-        message="Are you sure you want to delete this parent account?"
+        message="This permanently deletes the parent and their app login. Their children stay in the school. This cannot be undone."
         confirmText="Delete"
         variant="danger"
       />
