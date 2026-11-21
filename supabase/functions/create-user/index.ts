@@ -212,6 +212,67 @@ Deno.serve(async (req: Request) => {
       app_metadata: { role, school_id },
     });
 
+    // A parent login whose parents row was deleted earlier (student/parent
+    // removed) still exists in Auth. Re-admitting with the same mobile must
+    // reuse it instead of failing with "already registered".
+    if (createErr && role === "parent" && /already (been )?registered|already exists/i.test(createErr.message)) {
+      const { data: prof } = await adminClient
+        .from("profiles").select("id, role, school_id").ilike("email", email).maybeSingle();
+      if (prof?.id && (prof.role === "parent" || !prof.role)) {
+        const { data: owned } = await adminClient
+          .from("parents").select("id, school_id").eq("user_id", prof.id);
+        // Still belongs to another (existing) school → don't take it over.
+        const { data: otherSchool } = prof.school_id && prof.school_id !== school_id
+          ? await adminClient.from("schools").select("id").eq("id", prof.school_id).maybeSingle()
+          : { data: null };
+        if (otherSchool || (owned ?? []).some((p) => p.school_id !== school_id)) {
+          return new Response(
+            JSON.stringify({ error: "This mobile number is already a parent login in another school" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const { error: authUpdErr } = await adminClient.auth.admin.updateUserById(prof.id, {
+          password,
+          user_metadata: { full_name },
+          app_metadata: { role, school_id },
+        });
+        if (authUpdErr) {
+          return new Response(
+            JSON.stringify({ error: authUpdErr.message }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        await adminClient.from("profiles").update({
+          role, school_id, full_name, email, phone: phone || null, status: "active",
+        }).eq("id", prof.id);
+        const parentRow = {
+          user_id: prof.id, school_id, full_name, email, phone: phone || null,
+          occupation: extra?.occupation || null, address: extra?.address || null,
+          status: "active", password,
+        };
+        const { error: parentErr } = orphanParentId
+          ? await adminClient.from("parents").update(parentRow).eq("id", orphanParentId)
+          : await adminClient.from("parents").insert(parentRow);
+        if (parentErr) {
+          return new Response(
+            JSON.stringify({ error: "Could not save the parent: " + parentErr.message }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+        const { data: revived } = await adminClient
+          .from("parents").select("id").eq("user_id", prof.id).eq("school_id", school_id).maybeSingle();
+        if (revived) await linkStudent(revived.id);
+        await adminClient.from("audit_logs").insert({
+          school_id, user_id: userData.user.id, action: "parent_created",
+          entity_type: "user", entity_id: prof.id, metadata: { email, full_name, reused_login: true },
+        });
+        return new Response(
+          JSON.stringify({ id: prof.id, email, username: email, password, message: "parent account created successfully" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     if (createErr) {
       return new Response(
         JSON.stringify({ error: createErr.message }),
@@ -284,6 +345,12 @@ Deno.serve(async (req: Request) => {
         : await adminClient.from("parents").insert(parentRow);
       if (parentErr) {
         console.error("Parent insert error:", parentErr);
+        // Don't leave a login with no parent behind it.
+        if (!orphanParentId) await adminClient.auth.admin.deleteUser(newUserId).catch(() => {});
+        return new Response(
+          JSON.stringify({ error: "Could not save the parent: " + parentErr.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
       }
       const { data: newParent } = await adminClient
         .from("parents").select("id").eq("user_id", newUserId).maybeSingle();

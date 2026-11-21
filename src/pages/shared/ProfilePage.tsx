@@ -11,7 +11,7 @@ import { useAuth } from '@/auth/AuthContext';
 import { fetchTeacherByUserId, fetchSchool } from '@/services/api';
 import { supabase } from '@/lib/supabase';
 import { getInitials } from '@/lib/utils';
-import { generateTeacherUsername } from '@/lib/parentUtils';
+import { generateTeacherUsername, parentLoginId } from '@/lib/parentUtils';
 import type { Teacher, School } from '@/types';
 
 export default function ProfilePage() {
@@ -84,11 +84,12 @@ export default function ProfilePage() {
 
   /** Get the username/email to display */
   function getDisplayUsername(): string {
-    if (!school) return profile?.email ?? '';
+    if (!school) return parentLoginId(profile?.email);
     if (profile?.role === 'teacher') {
       return generateTeacherUsername(profile.full_name, school.name);
     }
-    return profile?.email ?? '';
+    // Parents: show the mobile number, not the internal …@parent.veducore address.
+    return parentLoginId(profile?.email);
   }
 
   if (!profile) return null;

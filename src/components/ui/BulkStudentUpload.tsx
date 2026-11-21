@@ -2,7 +2,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { Upload, Download, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { createStudent } from '@/services/api';
+import { createStudent, fetchStudents } from '@/services/api';
 import { normalizeMobile } from '@/lib/parentUtils';
 import type { Class, Section } from '@/types';
 
@@ -50,7 +50,9 @@ type Phase = 'upload' | 'preview' | 'importing' | 'done';
 // Pure CSV parser (no external libraries)
 // ---------------------------------------------------------------------------
 
-function parseCSV(text: string): string[][] {
+function parseCSV(input: string): string[][] {
+  // Excel's "CSV UTF-8" starts with a byte-order mark; it would break the first header.
+  const text = input.replace(/^\uFEFF/, '');
   const rows: string[][] = [];
   let row: string[] = [];
   let field = '';
@@ -111,6 +113,70 @@ function parseCSV(text: string): string[][] {
 }
 
 // ---------------------------------------------------------------------------
+// Cleaning helpers — CSVs come from Excel / Google Sheets in many shapes
+// ---------------------------------------------------------------------------
+
+/** "Admission No." / "admission-number" / "\uFEFFadmission_number" → "admission_no" style key. */
+function headerKey(h: string): string {
+  return h.replace(/^\uFEFF/, '').trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
+const HEADER_ALIASES: Record<string, string[]> = {
+  admission_number: ['admission_number', 'admission_no', 'adm_no', 'admission', 'adm_number', 'sr_no', 'scholar_no'],
+  full_name: ['full_name', 'student_name', 'name', 'student'],
+  father_name: ['father_name', 'father', 'fathers_name'],
+  mother_name: ['mother_name', 'mother', 'mothers_name'],
+  parent_email: ['parent_email', 'email', 'email_id'],
+  phone_number: ['phone_number', 'phone', 'parent_phone', 'parent_mobile', 'mobile', 'mobile_number', 'mobile_no', 'contact', 'contact_number', 'emergency_contact'],
+  date_of_birth: ['date_of_birth', 'dob', 'birth_date'],
+  gender: ['gender', 'sex'],
+  class_name: ['class_name', 'class', 'grade', 'standard', 'std'],
+  section_name: ['section_name', 'section', 'sec'],
+  address: ['address', 'full_address'],
+  admission_date: ['admission_date', 'date_of_admission', 'doa'],
+};
+
+/** male | female | other, or null if it can't be read. Empty → male (old behaviour). */
+function normalizeGender(raw: string): 'male' | 'female' | 'other' | null {
+  const g = raw.trim().toLowerCase();
+  if (!g) return 'male';
+  if (['m', 'male', 'boy', 'b'].includes(g)) return 'male';
+  if (['f', 'female', 'girl', 'g'].includes(g)) return 'female';
+  if (['o', 'other', 'others', 'transgender', 't'].includes(g)) return 'other';
+  return null;
+}
+
+/** Accepts 2010-05-15, 15/05/2010, 15-05-2010, 15.05.2010 (day first, as in India) → "2010-05-15".
+ *  Returns '' for empty and null when it isn't a real date. */
+function normalizeDate(raw: string): string | null {
+  const v = raw.trim();
+  if (!v) return '';
+  let y: number, m: number, d: number;
+  let match = v.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+  if (match) {
+    [y, m, d] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  } else if ((match = v.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2}|\d{4})$/))) {
+    [d, m, y] = [Number(match[1]), Number(match[2]), Number(match[3])];
+    if (y < 100) y += y > (new Date().getFullYear() % 100) ? 1900 : 2000;
+  } else {
+    return null;
+  }
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
+  if (y < 1950 || dt.getTime() > Date.now() + 366 * 86400000) return null;
+  return `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
+
+/** "Class 6", "class-6", "6", "VI", "6th", "Std 6" all compare equal. */
+const ROMAN: Record<string, string> = { i: '1', ii: '2', iii: '3', iv: '4', v: '5', vi: '6', vii: '7', viii: '8', ix: '9', x: '10', xi: '11', xii: '12' };
+function classKey(name: string): string {
+  let k = name.trim().toLowerCase().replace(/\b(class|std|standard|grade)\b/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  k = k.replace(/^(\d+)(st|nd|rd|th)$/, '$1');
+  if (ROMAN[k]) k = ROMAN[k];
+  return k.replace(/\s+/g, '');
+}
+
+// ---------------------------------------------------------------------------
 // Sample CSV content
 // ---------------------------------------------------------------------------
 
@@ -140,6 +206,7 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
   // Parent logins actually created (or reused for siblings) during the import.
   const [createdCreds, setCreatedCreds] = useState<
     Array<{ admission_number: string; full_name: string; parent: string; login: string; password: string; note: string }>
@@ -158,6 +225,8 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
       setImporting(false);
       setImportResult(null);
       setDragOver(false);
+      setFileError(null);
+      setCreatedCreds([]);
     }
   }, [open]);
 
@@ -172,6 +241,8 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
     setPhase('upload');
     setParsedRows([]);
     setImportResult(null);
+    setFileError(null);
+    setCreatedCreds([]);
   }
 
   function handleClose() {
@@ -183,28 +254,69 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
 
   const processFile = useCallback(
     (file: File) => {
-      if (!file.name.toLowerCase().endsWith('.csv')) return;
+      setFileError(null);
+      const lower = file.name.toLowerCase();
+      if (lower.endsWith('.xlsx') || lower.endsWith('.xls')) {
+        setFileError('This is an Excel file. In Excel choose File → Save As → "CSV UTF-8 (Comma delimited)", then upload that .csv file.');
+        return;
+      }
+      if (!lower.endsWith('.csv')) {
+        setFileError('Please upload a .csv file.');
+        return;
+      }
       const reader = new FileReader();
-      reader.onload = (e) => {
+      reader.onerror = () => setFileError('Could not read the file. Please try again.');
+      reader.onload = async (e) => {
         const text = (e.target?.result as string) ?? '';
         const rows = parseCSV(text);
-        if (rows.length < 2) return; // no data rows
+        if (rows.length < 2) {
+          setFileError('The file has no student rows. Keep the header row and add one student per row below it.');
+          return;
+        }
 
-        const headerRow = rows[0].map((h) => h.toLowerCase().trim());
-        const col = (name: string) => headerRow.indexOf(name);
+        const headerRow = rows[0].map(headerKey);
+        const col = (field: string) => {
+          for (const alias of HEADER_ALIASES[field] ?? [field]) {
+            const i = headerRow.indexOf(alias);
+            if (i >= 0) return i;
+          }
+          return -1;
+        };
 
         const iAdm = col('admission_number');
         const iName = col('full_name');
         const iFather = col('father_name');
         const iMother = col('mother_name');
         const iParentEmail = col('parent_email');
-        const iPhone = col('phone_number') >= 0 ? col('phone_number') : col('phone') >= 0 ? col('phone') : col('parent_phone') >= 0 ? col('parent_phone') : col('emergency_contact');
+        const iPhone = col('phone_number');
         const iDob = col('date_of_birth');
         const iGender = col('gender');
         const iClass = col('class_name');
         const iSection = col('section_name');
         const iAddress = col('address');
         const iAdmDate = col('admission_date');
+
+        const missing = [
+          iAdm < 0 && 'admission_number',
+          iName < 0 && 'full_name',
+          iPhone < 0 && 'phone_number',
+          iClass < 0 && 'class_name',
+          iSection < 0 && 'section_name',
+        ].filter(Boolean);
+        if (missing.length) {
+          setFileError(`Missing column(s): ${missing.join(', ')}. Download the sample CSV to see the expected headers.`);
+          return;
+        }
+
+        // Admission numbers already used in this school (case-insensitive).
+        let existing = new Set<string>();
+        try {
+          const students = await fetchStudents(schoolId);
+          existing = new Set(students.map((st) => (st.admission_number ?? '').trim().toLowerCase()));
+        } catch {
+          // the database still rejects duplicates at import time
+        }
+        const seen = new Map<string, number>();
 
         const parsed: ParsedRow[] = [];
 
@@ -215,27 +327,40 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
 
           const get = (idx: number) => (idx >= 0 ? (r[idx] ?? '').trim() : '');
 
-          const admission_number = get(iAdm);
-          const full_name = get(iName);
-          const father_name = get(iFather);
-          const mother_name = get(iMother);
-          const parent_email = get(iParentEmail);
+          const admission_number = get(iAdm).replace(/\s+/g, '');
+          const full_name = get(iName).replace(/\s+/g, ' ');
+          const father_name = get(iFather).replace(/\s+/g, ' ');
+          const mother_name = get(iMother).replace(/\s+/g, ' ');
+          const parent_email = get(iParentEmail).toLowerCase();
           const phoneRaw = get(iPhone);
           const phone_number = normalizeMobile(phoneRaw) ?? '';
-          const date_of_birth = get(iDob);
-          const gender = get(iGender) || 'male';
+          const dobRaw = get(iDob);
+          const date_of_birth = normalizeDate(dobRaw);
+          const genderRaw = get(iGender);
+          const gender = normalizeGender(genderRaw);
           const class_name = get(iClass);
           const section_name = get(iSection);
           const address = get(iAddress);
-          const admission_date = get(iAdmDate);
+          const admDateRaw = get(iAdmDate);
+          const admission_date = normalizeDate(admDateRaw);
 
           const errors: string[] = [];
 
+          const admKey = admission_number.toLowerCase();
           if (!admission_number) errors.push('Admission number required');
+          else if (existing.has(admKey)) errors.push(`Admission number ${admission_number} already exists in this school`);
+          else if (seen.has(admKey)) errors.push(`Admission number ${admission_number} repeated (also row ${seen.get(admKey)})`);
+          if (admission_number && !seen.has(admKey)) seen.set(admKey, parsed.length + 1);
+
           if (!full_name) errors.push('Full name required');
           // Parent logs in with this number.
           if (!phoneRaw) errors.push('Parent mobile number required');
-          else if (!phone_number) errors.push('Parent mobile must be a valid 10-digit number');
+          else if (/e\+/i.test(phoneRaw)) errors.push('Mobile number was changed by Excel (looks like 9.87E+09). Format the column as Text and type it again');
+          else if (!phone_number) errors.push(`Mobile "${phoneRaw}" is not a valid 10-digit number`);
+          if (parent_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(parent_email)) errors.push(`Email "${parent_email}" is not valid`);
+          if (date_of_birth === null) errors.push(`Date of birth "${dobRaw}" not understood (use DD/MM/YYYY or YYYY-MM-DD)`);
+          if (admission_date === null) errors.push(`Admission date "${admDateRaw}" not understood (use DD/MM/YYYY or YYYY-MM-DD)`);
+          if (gender === null) errors.push(`Gender "${genderRaw}" not understood (use Male / Female / Other)`);
 
           let class_id = '';
           let section_id = '';
@@ -243,9 +368,10 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
           if (!class_name) {
             errors.push('Class name required');
           } else {
-            const matchedClass = classes.find(
-              (c) => c.name.toLowerCase() === class_name.toLowerCase()
-            );
+            const wanted = classKey(class_name);
+            const matchedClass =
+              classes.find((c) => c.name.trim().toLowerCase() === class_name.toLowerCase()) ??
+              classes.find((c) => classKey(c.name) === wanted);
             if (!matchedClass) {
               errors.push(`Class "${class_name}" not found`);
             } else {
@@ -253,11 +379,12 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
               if (!section_name) {
                 errors.push('Section name required');
               } else {
+                const secKey = section_name.trim().toLowerCase().replace(/^(section|sec)\s*/, '');
                 const matchedSection = matchedClass.sections.find(
-                  (s) => s.name.toLowerCase() === section_name.toLowerCase()
+                  (sec) => sec.name.trim().toLowerCase() === secKey || sec.name.trim().toLowerCase() === section_name.trim().toLowerCase()
                 );
                 if (!matchedSection) {
-                  errors.push(`Section "${section_name}" not found in ${class_name}`);
+                  errors.push(`Section "${section_name}" not found in ${matchedClass.name}`);
                 } else {
                   section_id = matchedSection.id;
                 }
@@ -272,24 +399,28 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
             mother_name,
             parent_email,
             phone_number,
-            date_of_birth,
-            gender,
+            date_of_birth: date_of_birth ?? '',
+            gender: gender ?? 'male',
             class_id,
             section_id,
             address,
-            admission_date,
+            admission_date: admission_date ?? '',
             class_name,
             section_name,
             errors,
           });
         }
 
+        if (!parsed.length) {
+          setFileError('The file has no student rows.');
+          return;
+        }
         setParsedRows(parsed);
         setPhase('preview');
       };
       reader.readAsText(file);
     },
-    [classes]
+    [classes, schoolId]
   );
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -405,7 +536,7 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
         >
           <Upload className="h-10 w-10 text-slate-400 mb-3" />
           <p className="font-medium text-slate-600 text-sm">Drag &amp; drop a CSV file here, or click to browse</p>
-          <p className="mt-1 text-xs text-slate-400">Only .csv files are accepted</p>
+          <p className="mt-1 text-xs text-slate-400">Only .csv files (Excel: Save As → CSV UTF-8)</p>
         </div>
 
         <input
@@ -415,6 +546,13 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
           className="hidden"
           onChange={handleFileChange}
         />
+
+        {fileError && (
+          <div className="mt-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            <XCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{fileError}</span>
+          </div>
+        )}
 
         {/* Sample download */}
         <div className="mt-4 flex justify-center">
@@ -429,7 +567,7 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
           <p className="text-xs text-slate-400 font-mono break-all">
             admission_number, full_name, father_name, mother_name, parent_email, phone_number, date_of_birth, gender, class_name, section_name, address, admission_date
           </p>
-          <p className="mt-1 text-xs text-slate-400">Required: admission_number, full_name, phone_number (parent mobile — used for parent login), class_name, section_name</p>
+          <p className="mt-1 text-xs text-slate-400">Required: admission_number, full_name, phone_number (parent mobile — used for parent login), class_name, section_name. Dates as DD/MM/YYYY or YYYY-MM-DD; gender Male / Female / Other.</p>
         </div>
       </>
     );

@@ -41,7 +41,7 @@ export default function LoginScreen() {
   const friendlyError = (msg: string) => {
     const m = msg.toLowerCase();
     if (m.includes('invalid') || m.includes('credential') || m.includes('password') || m.includes('not found'))
-      return 'Incorrect email or password. Please try again.';
+      return 'Incorrect login ID or password. Please try again.';
     if (m.includes('network') || m.includes('fetch') || m.includes('timeout'))
       return 'No internet connection. Check your network and try again.';
     return msg;
@@ -54,9 +54,9 @@ export default function LoginScreen() {
       setFieldError({ email: missingEmail, password: missingPass });
       setError(
         missingEmail && missingPass
-          ? 'Please enter your email and password.'
+          ? 'Please enter your login ID and password.'
           : missingEmail
-            ? 'Please enter your email address.'
+            ? 'Please enter your email, username or mobile number.'
             : 'Please enter your password.'
       );
       return;
@@ -71,11 +71,6 @@ export default function LoginScreen() {
         setError(msg);
         if (msg.startsWith('Incorrect')) setFieldError({ email: true, password: true });
       } else {
-        const adminEmail = 'iamaryan721@gmail.com';
-        if (email.trim().toLowerCase() === adminEmail.toLowerCase()) {
-          setError('Admin dashboard is available on the web portal only. This app is for Teachers and Parents.');
-          return;
-        }
         router.replace('/');
       }
     } finally {

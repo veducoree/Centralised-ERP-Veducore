@@ -231,18 +231,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (identifier: string, password: string): Promise<{ error?: string }> => {
       const raw = identifier.trim().toLowerCase();
       const pw = password.trim();
-      const emailsToTry = [raw];
-      if (!raw.includes('@')) {
-        // A mobile number is a parent login: <10 digits>@parent.veducore.
-        let digits = raw.replace(/[^0-9]/g, '');
-        if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
-        if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
-        if (/^[6-9][0-9]{9}$/.test(digits) && /^[0-9+\s-]+$/.test(raw)) {
-          emailsToTry.splice(0, 1, `${digits}@parent.veducore`);
-        } else {
-          emailsToTry.push(`${raw}@veducore.internal`);
-        }
-      }
+      // Same rules as the web login:
+      //  • an email → as typed
+      //  • a mobile number → parent login <10 digits>@parent.veducore
+      //    (then a numeric staff username, just in case)
+      //  • anything else → username@veducore.internal
+      let digits = raw.replace(/[^0-9]/g, '');
+      if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
+      if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+      const isMobile = /^[0-9+\s-]+$/.test(raw) && /^[6-9][0-9]{9}$/.test(digits);
+      const emailsToTry = raw.includes('@')
+        ? [raw]
+        : isMobile
+          ? [`${digits}@parent.veducore`, `${raw.replace(/\s+/g, '')}@veducore.internal`]
+          : [`${raw.replace(/\s+/g, '')}@veducore.internal`];
 
       let lastError: string | null = null;
       for (const email of emailsToTry) {
@@ -263,21 +265,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
             currentUserIdRef.current = data.user.id;
             const { profile, school } = await fetchProfileAndSchool(data.user.id, data.user.email, true);
+            // The app is for teachers and parents only; anything else would
+            // land back on the login screen with no explanation.
+            if (!profile || (profile.role !== 'teacher' && profile.role !== 'parent')) {
+              currentUserIdRef.current = null;
+              await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+              return {
+                error: !profile
+                  ? 'Your login is not set up yet. Please contact your school admin.'
+                  : 'This app is for teachers and parents. Admins please use the web portal.',
+              };
+            }
             setState({
               session: data.session,
               user: data.user,
               profile,
               school,
               isLoading: false,
-              isAuthenticated: !!profile,
+              isAuthenticated: true,
             });
             return {};
           }
           if (error) {
             lastError = error.message;
+            // Only a wrong-credentials answer is worth trying the next form.
+            if (!/invalid|credential/i.test(error.message)) break;
           }
         } catch (err: any) {
           lastError = err?.message || 'Network connection to Supabase failed';
+          break;
         }
       }
 

@@ -1,3 +1,4 @@
+import { parentLoginId, PARENT_LOGIN_DOMAIN } from '@/lib/parentUtils';
 import { useEffect, useState, useCallback } from 'react';
 import {
   IndianRupee,
@@ -310,7 +311,12 @@ export default function ParentFees() {
       });
       const r = await payWithCheckout(created, {
         name: school?.name || 'School Fees',
-        prefill: { name: parent?.full_name, email: parent?.email, contact: parent?.phone ?? '' },
+        prefill: {
+          name: parent?.full_name,
+          // Mobile logins have a placeholder address; give Razorpay only a real email.
+          email: parent?.email && !parent.email.toLowerCase().endsWith(`@${PARENT_LOGIN_DOMAIN}`) ? parent.email : undefined,
+          contact: parent?.phone ?? '',
+        },
       });
       onOnlinePaid(fee, plan, r.receipt_number);
     } catch (e) {
@@ -806,7 +812,7 @@ export default function ParentFees() {
               <div>
                 <p className="text-xs text-slate-500 mb-1">Parent / Guardian</p>
                 <p className="font-medium text-slate-900">{parent?.full_name || '—'}</p>
-                {parent?.email && <p className="text-xs text-slate-500">{parent.email}</p>}
+                {parent?.email && <p className="text-xs text-slate-500">{parentLoginId(parent.email)}</p>}
               </div>
             </div>
 

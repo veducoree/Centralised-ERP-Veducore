@@ -10,5 +10,5 @@ export interface SchoolIcon {
 }
 
 export const SCHOOL_ICONS: SchoolIcon[] = [
-  { name: "School639d8c8dd686", schoolId: "639d8c8d-d686-4016-a828-6f1e80902fce", schoolName: "Green Valley Convent School", city: null, thumb: require('../../assets/school-icons/School639d8c8dd686/thumb.png') },
+  { name: "School0e076c8b2b8b", schoolId: "0e076c8b-2b8b-450f-a143-a53d492ed07d", schoolName: "Lalbagh Isabella Thoburn School Lucknow", city: "Lucknow", thumb: require('../../assets/school-icons/School0e076c8b2b8b/thumb.png') },
 ];

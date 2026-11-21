@@ -89,7 +89,7 @@ export default function ParentProfile() {
             <>
               <FadeUp>
                 <ProfileHero
-                  name={parent?.full_name ?? user?.email ?? 'Parent'}
+                  name={parent?.full_name ?? 'Parent'}
                   photo={parent?.avatar_url}
                   role="Parent"
                   schoolName={school?.name}
