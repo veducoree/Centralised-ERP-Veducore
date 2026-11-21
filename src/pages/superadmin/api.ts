@@ -108,8 +108,6 @@ export interface SchoolRecord {
   contactNumber: string;
   email: string;
   academicYear: string;
-  /** Fixed start of every admission number, e.g. "STUD". Empty = none. */
-  admissionPrefix: string;
   /** Fixed start of every teacher employee ID, e.g. "EMP". Empty = none. */
   employeePrefix: string;
   /** Short code used in parent passwords, e.g. "gvps" → ramesh@gvps. */

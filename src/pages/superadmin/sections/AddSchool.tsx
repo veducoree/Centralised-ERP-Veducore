@@ -5,7 +5,7 @@ import { callManageSchools, errMsg, generatePassword } from '../api';
 import { Button, Card, ErrorBanner, Field, cx, inputCls, toast } from '../ui';
 
 const EMPTY = {
-  name: '', address: '', city: '', contact_number: '', academic_year: '2026-27', admission_prefix: '', employee_prefix: '', short_name: '',
+  name: '', address: '', city: '', contact_number: '', academic_year: '2026-27', employee_prefix: '', short_name: '',
   admin_name: '', email: '', admin_password: '',
   sub_status: 'trial', trial_days: '30', billing_cycle: 'yearly', price: '',
 };
@@ -25,9 +25,6 @@ export default function AddSchoolSection({ onCreated }: { onCreated: (schoolId: 
     const e: Record<string, string> = {};
     if (!f.name.trim()) e.name = 'Required';
     if (!/^[A-Za-z0-9]{2,12}$/.test(f.short_name.trim())) e.short_name = '2–12 letters or numbers, e.g. GVPS';
-    if (f.admission_prefix.trim() && !/^[A-Za-z0-9/-]{1,12}$/.test(f.admission_prefix.trim())) {
-      e.admission_prefix = 'Only letters, numbers, / or - (max 12)';
-    }
     if (f.employee_prefix.trim() && !/^[A-Za-z0-9/-]{1,12}$/.test(f.employee_prefix.trim())) {
       e.employee_prefix = 'Only letters, numbers, / or - (max 12)';
     }
@@ -105,13 +102,6 @@ export default function AddSchoolSection({ onCreated }: { onCreated: (schoolId: 
           <Field label="City"><input className={inputCls} value={f.city} onChange={set('city')} placeholder="e.g. Jaipur" /></Field>
           <Field label="Phone"><input className={inputCls} value={f.contact_number} onChange={set('contact_number')} placeholder="+91 98765 43210" /></Field>
           <Field label="Academic year"><input className={inputCls} value={f.academic_year} onChange={set('academic_year')} /></Field>
-          <Field label="Admission number prefix" error={errors.admission_prefix}
-            hint={f.admission_prefix.trim()
-              ? `Students will be numbered like ${f.admission_prefix.trim().toUpperCase()}001`
-              : 'Optional. Given by the school, e.g. STUD. Leave blank for plain numbers.'}>
-            <input className={cx(inputCls, 'font-mono uppercase')} value={f.admission_prefix} maxLength={12}
-              onChange={(e) => setF({ ...f, admission_prefix: e.target.value.toUpperCase().replace(/\s/g, '') })} placeholder="e.g. STUD" />
-          </Field>
           <Field label="Employee ID prefix" error={errors.employee_prefix}
             hint={f.employee_prefix.trim()
               ? `Teachers will be numbered like ${f.employee_prefix.trim().toUpperCase()}001`

@@ -56,8 +56,8 @@ function str(v: unknown): string | null {
   return t === "" ? null : t;
 }
 
-/** Admission number / employee ID prefix: optional, letters/digits/'/'/'-', max 12, stored upper-case. */
-function codePrefix(v: unknown, label = "Admission prefix"): string | null {
+/** Employee ID prefix: optional, letters/digits/'/'/'-', max 12, stored upper-case. */
+function codePrefix(v: unknown, label = "Employee ID prefix"): string | null {
   const t = str(v);
   if (t === null) return null;
   if (!/^[A-Za-z0-9/-]{1,12}$/.test(t)) {
@@ -240,7 +240,6 @@ async function loadSchoolsFull(ctx: Ctx) {
       contactNumber: s.contact_number ?? "",
       email: s.email ?? "",
       academicYear: s.academic_year ?? "",
-      admissionPrefix: s.admission_prefix ?? "",
       employeePrefix: s.employee_prefix ?? "",
       shortName: s.short_name ?? "",
       logoUrl: s.logo_url ?? null,
@@ -473,7 +472,6 @@ const ACTIONS: Record<string, { roles: Role[]; run: (ctx: Ctx) => Promise<unknow
         contact_number: str(b.contact_number),
         email,
         academic_year: str(b.academic_year) ?? "2026-27",
-        admission_prefix: codePrefix(b.admission_prefix),
         employee_prefix: codePrefix(b.employee_prefix, "Employee ID prefix"),
         short_name: shortName(b.short_name, true),
         timezone: "Asia/Kolkata",
@@ -542,7 +540,6 @@ const ACTIONS: Record<string, { roles: Role[]; run: (ctx: Ctx) => Promise<unknow
         ["email", "email"], ["academicYear", "academic_year"]] as const) {
         if (k in f) update[col] = str(f[k]);
       }
-      if ("admissionPrefix" in f) update.admission_prefix = codePrefix(f.admissionPrefix);
       if ("employeePrefix" in f) update.employee_prefix = codePrefix(f.employeePrefix, "Employee ID prefix");
       if ("shortName" in f) update.short_name = shortName(f.shortName);
       if (!Object.keys(update).length) throw new HttpError(400, "Nothing to update");

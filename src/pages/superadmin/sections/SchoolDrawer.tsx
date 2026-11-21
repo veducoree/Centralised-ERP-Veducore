@@ -219,16 +219,16 @@ function OverviewTab({ d }: { d: Detail }) {
 function ProfileTab({ s, canManage, onSaved }: { s: SchoolRecord; canManage: boolean; onSaved: () => void }) {
   const [f, setF] = useState({
     name: s.name, address: s.address, city: s.city, contactNumber: s.contactNumber, email: s.email, academicYear: s.academicYear,
-    admissionPrefix: s.admissionPrefix ?? '', employeePrefix: s.employeePrefix ?? '', shortName: s.shortName ?? '',
+    employeePrefix: s.employeePrefix ?? '', shortName: s.shortName ?? '',
   });
   const [saving, setSaving] = useState(false);
   const dirty = JSON.stringify(f) !== JSON.stringify({
     name: s.name, address: s.address, city: s.city, contactNumber: s.contactNumber, email: s.email, academicYear: s.academicYear,
-    admissionPrefix: s.admissionPrefix ?? '', employeePrefix: s.employeePrefix ?? '', shortName: s.shortName ?? '',
+    employeePrefix: s.employeePrefix ?? '', shortName: s.shortName ?? '',
   });
   const badShort = !!f.shortName.trim() && !/^[A-Za-z0-9]{2,12}$/.test(f.shortName.trim());
   const badPrefix = (v: string) => !!v.trim() && !/^[A-Za-z0-9/-]{1,12}$/.test(v.trim());
-  const prefixInvalid = badPrefix(f.admissionPrefix) || badPrefix(f.employeePrefix) || badShort;
+  const prefixInvalid = badPrefix(f.employeePrefix) || badShort;
 
   async function save() {
     setSaving(true);
@@ -265,11 +265,6 @@ function ProfileTab({ s, canManage, onSaved }: { s: SchoolRecord; canManage: boo
           <input className={inputCls} type="email" value={f.email} onChange={set('email')} disabled={!canManage} />
         </Field>
         <Field label="Academic year label"><input className={inputCls} value={f.academicYear} onChange={set('academicYear')} disabled={!canManage} /></Field>
-        <Field label="Admission number prefix" error={badPrefix(f.admissionPrefix) ? 'Only letters, numbers, / or - (max 12)' : undefined}
-          hint="Changing it only affects new students; existing admission numbers stay as they are.">
-          <input className={cx(inputCls, 'font-mono uppercase')} value={f.admissionPrefix} maxLength={12} disabled={!canManage} placeholder="e.g. STUD"
-            onChange={(e) => setF({ ...f, admissionPrefix: e.target.value.toUpperCase().replace(/\s/g, '') })} />
-        </Field>
         <Field label="Employee ID prefix" error={badPrefix(f.employeePrefix) ? 'Only letters, numbers, / or - (max 12)' : undefined}
           hint="For teacher employee IDs. Changing it only affects new teachers.">
           <input className={cx(inputCls, 'font-mono uppercase')} value={f.employeePrefix} maxLength={12} disabled={!canManage} placeholder="e.g. EMP"

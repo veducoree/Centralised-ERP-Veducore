@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { fetchNextAdmissionNumber, fetchNextEmployeeId } from '@/services/api';
+import { fetchNextEmployeeId } from '@/services/api';
 
 type NextFetcher = () => Promise<{ prefix: string; next: string | null }>;
 
@@ -82,11 +82,6 @@ export function PrefixedNumberInput({
 }
 
 type WrapperProps = { value: string; onChange: (full: string) => void; error?: string; autoFill?: boolean };
-
-/** Admission number for a new student (prefix e.g. "STUD"). */
-export function AdmissionNumberInput(props: WrapperProps) {
-  return <PrefixedNumberInput {...props} label="Admission Number" fetchNext={fetchNextAdmissionNumber} />;
-}
 
 /** Employee ID for a new teacher (prefix e.g. "EMP"). */
 export function EmployeeIdInput(props: WrapperProps) {

@@ -2,9 +2,8 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { Upload, Download, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { createStudent, fetchSchool } from '@/services/api';
+import { createStudent } from '@/services/api';
 import { normalizeMobile } from '@/lib/parentUtils';
-import { withAdmissionPrefix } from '@/lib/admissionNumber';
 import type { Class, Section } from '@/types';
 
 // ---------------------------------------------------------------------------
@@ -141,20 +140,11 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [admissionPrefix, setAdmissionPrefix] = useState('');
   // Parent logins actually created (or reused for siblings) during the import.
   const [createdCreds, setCreatedCreds] = useState<
     Array<{ admission_number: string; full_name: string; parent: string; login: string; password: string; note: string }>
   >([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (schoolId) {
-      fetchSchool(schoolId).then((s) => {
-        setAdmissionPrefix(s?.admission_prefix || '');
-      }).catch(() => {});
-    }
-  }, [schoolId]);
 
   // Keep a ref to the latest onSuccess so the effect below never goes stale
   const onSuccessRef = useRef(onSuccess);
@@ -225,8 +215,7 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
 
           const get = (idx: number) => (idx >= 0 ? (r[idx] ?? '').trim() : '');
 
-          // A bare number gets the school's prefix: "45" → "STUD45"
-          const admission_number = withAdmissionPrefix(admissionPrefix, get(iAdm));
+          const admission_number = get(iAdm);
           const full_name = get(iName);
           const father_name = get(iFather);
           const mother_name = get(iMother);
@@ -300,7 +289,7 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
       };
       reader.readAsText(file);
     },
-    [classes, admissionPrefix]
+    [classes]
   );
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -441,11 +430,6 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
             admission_number, full_name, father_name, mother_name, parent_email, phone_number, date_of_birth, gender, class_name, section_name, address, admission_date
           </p>
           <p className="mt-1 text-xs text-slate-400">Required: admission_number, full_name, phone_number (parent mobile — used for parent login), class_name, section_name</p>
-          {admissionPrefix && (
-            <p className="mt-1 text-xs text-slate-500">
-              Your admission numbers start with <span className="font-mono font-semibold">{admissionPrefix}</span>. You can write just the number (e.g. 45) and it is saved as {admissionPrefix}45.
-            </p>
-          )}
         </div>
       </>
     );

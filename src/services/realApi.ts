@@ -511,18 +511,10 @@ export async function ensureParentForStudent(
 }
 
 /**
- * The school's admission prefix (set by Veducore) and the number the next
- * student should get — highest existing prefix+digits number plus one.
- * `next` is null when the school has no such student yet.
+ * The school's employee ID prefix (set by Veducore, e.g. "EMP") and the ID
+ * the next teacher should get — highest existing prefix+digits ID plus one.
+ * `next` is null when the school has no such teacher yet.
  */
-export async function fetchNextAdmissionNumber(): Promise<{ prefix: string; next: string | null }> {
-  const { data, error } = await supabase.rpc('next_admission_number');
-  if (error) throw error;
-  const r = (data || {}) as { prefix?: string | null; next?: string | null };
-  return { prefix: r.prefix || '', next: r.next || null };
-}
-
-/** Same as fetchNextAdmissionNumber, for teacher employee IDs (prefix e.g. "EMP"). */
 export async function fetchNextEmployeeId(): Promise<{ prefix: string; next: string | null }> {
   const { data, error } = await supabase.rpc('next_employee_id');
   if (error) throw error;
@@ -2081,11 +2073,8 @@ export async function fetchFeeStructuresForClass(
           s.academic_year === academicYear &&
           (s.class_id === classId || s.class_id === null || s.class_id === '')
       );
-      if (forClass.length > 0) return forClass;
-
-      // Last resort: return all active structures regardless of AY
-      const active = all.filter((s) => s.is_active);
-      return active;
+      // Only this class / school-wide for this year — never another class's fees.
+      return forClass;
     }
   } catch {
     // ignore
@@ -2224,126 +2213,42 @@ export async function createAdmissionWithFees(params: {
   const parentCredentials = student._parentResult?.credentials ?? null;
   const parentError = student._parentError ?? null;
 
-  // ── Step 2: Generate receipt number ────────────────────────
-  const receiptNumber = await generateAdmissionReceiptNumber(
-    params.school_id,
-    params.academic_year
-  );
-
-  // ── Step 3: Create fee rows ─────────────────────────────────
-  const includedLines = params.fee_lines.filter((l) => l.include && l.amount > 0);
-  const today = params.admission_date;
-
-  let createdFeeIds: string[] = [];
-  try {
-    const feeResults = await Promise.all(
-      includedLines.map((line) =>
-        createFee({
-          school_id: params.school_id,
-          student_id: studentId,
-          fee_type: line.fee_type,
-          amount: line.amount,
-          due_date: today,
-          status: 'pending',
-        })
-      )
-    );
-    createdFeeIds = feeResults.filter(Boolean).map((f) => (f as Fee).id);
-  } catch (feeErr) {
-    // Fee creation failed — roll back student
-    console.error('Fee creation failed, rolling back student:', feeErr);
+  // ── Step 2: Fees, payment and receipt — one transaction on the server ──
+  // (discount is applied to the fee rows; receipt number is atomic; if this
+  // fails the new student is removed so nothing half-done is left)
+  const { data: rpc, error: rpcErr } = await supabase.rpc('admission_fees_and_receipt', {
+    p_student: studentId,
+    p: {
+      academic_year: params.academic_year,
+      admission_number: params.admission_number,
+      due_date: params.admission_date,
+      fee_lines: params.fee_lines,
+      discount: params.discount,
+      payment_option: params.payment_option,
+      amount_paying: params.payment_option === 'later' ? 0 : params.amount_paying,
+      payment_mode: params.payment_mode,
+      transaction_ref: params.transaction_ref,
+      payment_date: params.payment_date,
+      remarks: params.remarks,
+      collected_by_name: params.collected_by_name,
+      idempotency_key: params.idempotency_key,
+    },
+  });
+  if (rpcErr) {
+    console.error('Admission fees failed, rolling back student:', rpcErr);
     try {
       await supabase.from('students').delete().eq('id', studentId);
       invalidateCacheForAdmission(params.school_id);
     } catch {
       // ignore rollback errors
     }
-    throw new Error(
-      `Admission rolled back: failed to create fee records. ${feeErr instanceof Error ? feeErr.message : ''}`
-    );
+    throw new Error(`Admission not saved: ${rpcErr.message}`);
   }
-
-  // ── Step 4: Record payment if paying now ────────────────────
-  if (
-    params.payment_option !== 'later' &&
-    params.amount_paying > 0 &&
-    createdFeeIds.length > 0
-  ) {
-    // Distribute payment proportionally across fee rows
-    const totalIncluded = includedLines.reduce((s, l) => s + l.amount, 0);
-    let remaining = params.amount_paying;
-
-    for (let i = 0; i < createdFeeIds.length && remaining > 0; i++) {
-      const line = includedLines[i];
-      const share =
-        totalIncluded > 0
-          ? Math.min(remaining, Math.round((line.amount / totalIncluded) * params.amount_paying * 100) / 100)
-          : Math.min(remaining, line.amount);
-      remaining -= share;
-      if (share <= 0) continue;
-
-      try {
-        await recordFeePayment(createdFeeIds[i], {
-          school_id: params.school_id,
-          student_id: studentId,
-          amount: share,
-          payment_date: params.payment_date || today,
-          payment_method: params.payment_mode,
-          receipt_number: receiptNumber,
-          recorded_by: params.collected_by,
-        });
-      } catch (payErr) {
-        console.warn('Payment recording warning (non-fatal):', payErr);
-      }
-    }
-  }
-
-  // ── Step 5: Calculate totals ────────────────────────────────
-  const totalFees = includedLines.reduce((s, l) => s + l.amount, 0);
-  const discountAmount =
-    params.discount.type === 'percent'
-      ? Math.round((totalFees * params.discount.value) / 100 * 100) / 100
-      : params.discount.value;
-  const netPayable = Math.max(0, totalFees - discountAmount);
-  const paidNow = params.payment_option === 'later' ? 0 : params.amount_paying;
-  const balanceDue = Math.max(0, netPayable - paidNow);
-
-  // ── Step 6: Insert admission receipt ───────────────────────
-  let receiptId: string | null = null;
-  try {
-    const { data: receiptRow } = await supabase
-      .from('admission_receipts')
-      .insert({
-        school_id: params.school_id,
-        student_id: studentId,
-        admission_number: params.admission_number,
-        receipt_number: receiptNumber,
-        academic_year: params.academic_year,
-        fee_lines: params.fee_lines,
-        discount_amount: discountAmount,
-        discount_type: params.discount.value > 0 ? params.discount.type : null,
-        discount_reason: params.discount.value > 0 ? params.discount.reason : null,
-        discount_note: params.discount.reason_note || null,
-        total_fees: totalFees,
-        net_payable: netPayable,
-        paid_now: paidNow,
-        balance_due: balanceDue,
-        payment_option: params.payment_option,
-        payment_mode: params.payment_option !== 'later' ? params.payment_mode : null,
-        transaction_ref: params.transaction_ref || null,
-        payment_date: params.payment_option !== 'later' ? params.payment_date : null,
-        remarks: params.remarks || null,
-        collected_by: params.collected_by || null,
-        collected_by_name: params.collected_by_name || null,
-        idempotency_key: params.idempotency_key,
-      })
-      .select('id')
-      .maybeSingle();
-    receiptId = receiptRow?.id ?? null;
-  } catch (receiptErr) {
-    // Receipt table may not exist yet (migration pending) — non-fatal
-    console.warn('Receipt insert warning (non-fatal):', receiptErr);
-  }
+  invalidateCache('fees:');
+  invalidateCache(`adminDashboard:${params.school_id}`);
+  const r = (rpc || {}) as { receipt_id?: string; receipt_number?: string };
+  const receiptNumber = r.receipt_number ?? '';
+  const receiptId = r.receipt_id ?? null;
 
   return { student, receiptNumber, receiptId, parentCredentials, parentError };
 }

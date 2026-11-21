@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Form';
 import { Modal, ConfirmDialog } from '@/components/ui/Modal';
 import { BulkStudentUpload } from '@/components/ui/BulkStudentUpload';
-import { AdmissionNumberInput } from '@/components/ui/AdmissionNumberInput';
 import { SearchInput, PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
@@ -354,11 +353,7 @@ export default function AdminStudents() {
         }
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {editing ? (
-            <Input label="Admission Number" required value={form.admission_number} onChange={(e) => setForm({ ...form, admission_number: e.target.value })} error={errors.admission_number} />
-          ) : (
-            <AdmissionNumberInput value={form.admission_number} onChange={(v) => setForm((f) => ({ ...f, admission_number: v }))} error={errors.admission_number} />
-          )}
+          <Input label="Admission Number" required value={form.admission_number} onChange={(e) => setForm({ ...form, admission_number: e.target.value })} error={errors.admission_number} placeholder="e.g. 2026051" />
           <Input label="Full Name" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} error={errors.full_name} />
           <Input label="Father's Name" value={form.father_name} onChange={(e) => setForm({ ...form, father_name: e.target.value })} placeholder="Father's full name" />
           <Input label="Mother's Name" value={form.mother_name} onChange={(e) => setForm({ ...form, mother_name: e.target.value })} placeholder="Mother's full name" />
