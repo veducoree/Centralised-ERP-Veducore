@@ -240,7 +240,7 @@ export default function LoginPage() {
                 type="text"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
-                placeholder="Enter your username or email"
+                placeholder="Username, email or parent mobile number"
                 autoComplete="username"
                 autoCapitalize="none"
                 autoCorrect="off"

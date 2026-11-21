@@ -2,7 +2,9 @@ import { supabase } from '@/lib/supabase';
 import { parseTemplate as parseReportCardTemplate } from '@/lib/reportCard/template';
 export { generateSubjectCode } from '@/lib/subjectUtils';
 import { generateSubjectCode } from '@/lib/subjectUtils';
-import { generateParentCredentials } from '@/lib/parentUtils';
+import {
+  generateParentCredentials, normalizeMobile, parentFromStudent, parentLoginId, schoolShortName,
+} from '@/lib/parentUtils';
 import type {
   Teacher, Parent, Student, Class, Section, Subject,
   ClassAssignment, TeacherSchedule, Attendance, StudentRecord,
@@ -256,6 +258,9 @@ export async function createParentAccount(params: {
   phone?: string;
   occupation?: string;
   address?: string;
+  /** Link the new (or existing, for siblings) parent login to this student. */
+  student_id?: string;
+  relationship?: string;
 }) {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) throw new Error('Not authenticated');
@@ -278,6 +283,8 @@ export async function createParentAccount(params: {
         extra: {
           occupation: params.occupation,
           address: params.address,
+          student_id: params.student_id,
+          relationship: params.relationship,
         },
       }),
     }
@@ -285,7 +292,8 @@ export async function createParentAccount(params: {
 
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || 'Failed to create parent account');
-  if (params.password) {
+  // A sibling's existing login keeps its own password — don't overwrite the stored copy.
+  if (params.password && !result.existing) {
     try {
       await supabase
         .from('parents')
@@ -439,173 +447,117 @@ export async function fetchStudentById(id: string) {
   return data as Student | null;
 }
 
+/**
+ * Makes sure the student has a parent login. The login is the parent's mobile
+ * number (students.emergency_contact); siblings with the same number share one
+ * login. Default password: parentfirstname@schoolshortname.
+ * Throws with a readable message when it can't (no / bad mobile, number
+ * already used by a parent in another school, …).
+ */
 export async function ensureParentForStudent(
   student: Student,
-  schoolName = 'school'
 ): Promise<{ parent: Parent | null; credentials: { username: string; password: string }; created: boolean }> {
-  try {
-    // 1. Check if this student is already linked to a parent
-    const { data: existingLinks } = await supabase
-      .from('parent_students')
-      .select('*, parent:parents(*)')
-      .eq('student_id', student.id);
-
-    if (existingLinks && existingLinks.length > 0 && existingLinks[0].parent) {
-      const p = existingLinks[0].parent as Parent;
-      return {
-        parent: p,
-        credentials: { username: p.email, password: (p as any).password || '******' },
-        created: false,
-      };
-    }
-
-    // 2. Generate credentials & determine fields
-    let activeSchoolName = schoolName;
-    if ((!activeSchoolName || activeSchoolName === 'school') && student.school_id) {
-      try {
-        const { data: sch } = await supabase.from('schools').select('name').eq('id', student.school_id).maybeSingle();
-        if (sch?.name) activeSchoolName = sch.name;
-      } catch {
-        // fallback
-      }
-    }
-    const creds = generateParentCredentials(student.full_name, student.admission_number || 'ADM', activeSchoolName, student.date_of_birth);
-    const parentEmail = creds.username.toLowerCase();
-
-    const parentFullName = (student.father_name && student.father_name.trim())
-      ? student.father_name.trim()
-      : (student.mother_name && student.mother_name.trim())
-      ? student.mother_name.trim()
-      : `${student.full_name}'s Parent`;
-
-    const relationship = (student.father_name && student.father_name.trim())
-      ? 'Father'
-      : (student.mother_name && student.mother_name.trim())
-      ? 'Mother'
-      : 'Guardian';
-
-    const phone = (student as any).emergency_contact || null;
-    const address = student.address || null;
-
-    // 3. Check if parent already exists with this email in the school
-    const { data: existingParent } = await supabase
-      .from('parents')
-      .select('*')
-      .eq('school_id', student.school_id)
-      .eq('email', parentEmail)
-      .maybeSingle();
-
-    let parentId = existingParent?.id;
-    let created = false;
-
-    if (!parentId) {
-      // Attempt edge function to create auth user + profile + parent
-      try {
-        await createParentAccount({
-          email: parentEmail,
-          password: creds.password,
-          full_name: parentFullName,
-          school_id: student.school_id,
-          phone: phone || undefined,
-          address: address || undefined,
-        });
-        created = true;
-      } catch (authErr) {
-        // Fallback: direct insert into parents table
-        console.warn('createParentAccount auth fallback, creating direct parent record:', authErr);
-      }
-
-      // Check or fetch parent record
-      const { data: createdParent } = await supabase
-        .from('parents')
-        .select('*')
-        .eq('school_id', student.school_id)
-        .eq('email', parentEmail)
-        .maybeSingle();
-
-      if (createdParent) {
-        parentId = createdParent.id;
-        created = true;
-      } else {
-        // Direct insert into parents table if edge function couldn't create it
-        const { data: directParent, error: directErr } = await supabase
-          .from('parents')
-          .insert({
-            school_id: student.school_id,
-            full_name: parentFullName,
-            email: parentEmail,
-            password: creds.password,
-            phone,
-            address,
-            status: 'active',
-          })
-          .select()
-          .maybeSingle();
-
-        if (directErr) {
-          console.error('Direct parent insert error:', directErr);
-        } else if (directParent) {
-          parentId = directParent.id;
-          created = true;
-        }
-      }
-    }
-
-    // 4. Link parent to student in parent_students table
-    if (parentId) {
-      const { error: linkErr } = await supabase
-        .from('parent_students')
-        .insert({
-          school_id: student.school_id,
-          parent_id: parentId,
-          student_id: student.id,
-          relationship,
-        });
-
-      if (linkErr && linkErr.code !== '23505') {
-        console.error('Failed to link parent to student:', linkErr);
-      }
-    }
-
-    const { data: finalParent } = parentId
-      ? await supabase.from('parents').select('*').eq('id', parentId).maybeSingle()
-      : { data: null };
-
+  // 1. Already linked to a parent that has a login → just return it.
+  const { data: existingLinks } = await supabase
+    .from('parent_students')
+    .select('*, parent:parents(*)')
+    .eq('student_id', student.id);
+  const linked = (existingLinks || []).map((l) => l.parent as Parent | null).find((p) => p?.user_id);
+  if (linked) {
     return {
-      parent: (finalParent as Parent) || null,
-      credentials: { username: parentEmail, password: creds.password },
-      created,
-    };
-  } catch (err) {
-    console.error('ensureParentForStudent error:', err);
-    return {
-      parent: null,
-      credentials: generateParentCredentials(student.full_name, student.admission_number || 'ADM', schoolName, student.date_of_birth),
+      parent: linked,
+      credentials: { username: parentLoginId(linked.email), password: (linked as Parent & { password?: string }).password || '******' },
       created: false,
     };
   }
+
+  // 2. Work out the login.
+  const mobile = normalizeMobile((student as Student & { emergency_contact?: string | null }).emergency_contact);
+  if (!mobile) throw new Error("Add the parent's 10-digit mobile number to create their login");
+
+  const { data: sch } = await supabase.from('schools').select('name, short_name').eq('id', student.school_id).maybeSingle();
+  const { name: parentName, relationship } = parentFromStudent(student);
+  const creds = generateParentCredentials({ mobile, parentName, shortName: schoolShortName(sch) });
+
+  // 3. Create it (or link to the sibling's existing login) on the server.
+  let result: { existing?: boolean };
+  try {
+    result = await createParentAccount({
+      email: creds.email,
+      password: creds.password,
+      full_name: parentName,
+      school_id: student.school_id,
+      phone: mobile,
+      address: student.address || undefined,
+      student_id: student.id,
+      relationship,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (/already (been )?registered|already exists/i.test(msg)) {
+      throw new Error(`Mobile ${mobile} is already a parent login in another school`);
+    }
+    throw err;
+  }
+
+  const { data: parent } = await supabase
+    .from('parents').select('*').eq('school_id', student.school_id).ilike('email', creds.email).maybeSingle();
+  const password = result?.existing ? ((parent as (Parent & { password?: string }) | null)?.password || creds.password) : creds.password;
+  return {
+    parent: (parent as Parent) || null,
+    credentials: { username: mobile, password },
+    created: !result?.existing,
+  };
+}
+
+/**
+ * The school's admission prefix (set by Veducore) and the number the next
+ * student should get — highest existing prefix+digits number plus one.
+ * `next` is null when the school has no such student yet.
+ */
+export async function fetchNextAdmissionNumber(): Promise<{ prefix: string; next: string | null }> {
+  const { data, error } = await supabase.rpc('next_admission_number');
+  if (error) throw error;
+  const r = (data || {}) as { prefix?: string | null; next?: string | null };
+  return { prefix: r.prefix || '', next: r.next || null };
+}
+
+/** Same as fetchNextAdmissionNumber, for teacher employee IDs (prefix e.g. "EMP"). */
+export async function fetchNextEmployeeId(): Promise<{ prefix: string; next: string | null }> {
+  const { data, error } = await supabase.rpc('next_employee_id');
+  if (error) throw error;
+  const r = (data || {}) as { prefix?: string | null; next?: string | null };
+  return { prefix: r.prefix || '', next: r.next || null };
 }
 
 export async function createStudent(student: Partial<Student> & { school_id: string; admission_number: string; full_name: string }) {
   const { data, error } = await supabase.from('students').insert(student).select().maybeSingle();
-  if (error) throw error;
+  if (error) {
+    if (error.code === '23505' && /admission_number/.test(`${error.message} ${error.details ?? ''}`)) {
+      throw new Error(`Admission number ${student.admission_number} is already used by another student`);
+    }
+    throw error;
+  }
   invalidateCache('students:');
   invalidateCache('studentsBySection:');
   invalidateCache('parents:');
   invalidateCache('adminDashboard:');
   let parentResult: { parent: Parent | null; credentials: { username: string; password: string }; created: boolean } | null = null;
+  let parentError: string | null = null;
   if (data) {
-    // Automatically ensure parent account exists and is linked
+    // Parent login (mobile number). The student is saved even if this fails;
+    // the caller shows _parentError so the admin can fix it.
     try {
       parentResult = await ensureParentForStudent(data as Student);
     } catch (parentErr) {
+      parentError = parentErr instanceof Error ? parentErr.message : 'Could not create the parent login';
       console.warn('Auto-parent creation warning:', parentErr);
     }
   }
-  if (data && parentResult) {
-    return { ...(data as Student), _parentResult: parentResult } as Student & { _parentResult?: typeof parentResult };
-  }
-  return data as Student | null;
+  if (!data) return null;
+  return { ...(data as Student), _parentResult: parentResult, _parentError: parentError } as Student & {
+    _parentResult?: typeof parentResult; _parentError?: string | null;
+  };
 }
 
 export async function updateStudent(id: string, updates: Partial<Student>) {
@@ -2236,6 +2188,8 @@ export async function createAdmissionWithFees(params: {
   receiptNumber: string;
   receiptId: string | null;
   parentCredentials: { username: string; password: string } | null;
+  /** Why the parent login couldn't be made (the admission itself is saved). */
+  parentError: string | null;
 }> {
   // ── Step 1: Create student ──────────────────────────────────
   const createdRaw = await createStudent({
@@ -2263,9 +2217,12 @@ export async function createAdmissionWithFees(params: {
   });
 
   if (!createdRaw) throw new Error('Student creation returned no data');
-  const student = createdRaw as Student & { _parentResult?: { credentials: { username: string; password: string } } };
+  const student = createdRaw as Student & {
+    _parentResult?: { credentials: { username: string; password: string } } | null; _parentError?: string | null;
+  };
   const studentId = student.id;
   const parentCredentials = student._parentResult?.credentials ?? null;
+  const parentError = student._parentError ?? null;
 
   // ── Step 2: Generate receipt number ────────────────────────
   const receiptNumber = await generateAdmissionReceiptNumber(
@@ -2388,7 +2345,7 @@ export async function createAdmissionWithFees(params: {
     console.warn('Receipt insert warning (non-fatal):', receiptErr);
   }
 
-  return { student, receiptNumber, receiptId, parentCredentials };
+  return { student, receiptNumber, receiptId, parentCredentials, parentError };
 }
 
 // Internal helper — invalidates all caches touched by admission

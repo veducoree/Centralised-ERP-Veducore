@@ -15,13 +15,9 @@ export default function SchoolsSection({
   const [q, setQ] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
   const [health, setHealth] = useState<SchoolHealth | 'all'>('all');
-  const [plan, setPlan] = useState('all');
+  const [subStatus, setSubStatus] = useState('all');
   const [sort, setSort] = useState<SortKey>('newest');
 
-  const plans = useMemo(
-    () => Array.from(new Set(schools.map((s) => s.subscription?.planName ?? 'No plan'))).sort(),
-    [schools],
-  );
 
   const endOf = (s: SchoolRecord) =>
     s.subscription?.status === 'trial' ? s.subscription.trialEndsAt : s.subscription?.currentPeriodEnd ?? null;
@@ -39,7 +35,7 @@ export default function SchoolsSection({
         if (d === null || d > 30) return false;
       }
       if (health !== 'all' && s.health !== health) return false;
-      if (plan !== 'all' && (s.subscription?.planName ?? 'No plan') !== plan) return false;
+      if (subStatus !== 'all' && s.subscription?.status !== subStatus) return false;
       return true;
     });
     return list.sort((a, b) => {
@@ -48,7 +44,7 @@ export default function SchoolsSection({
       if (sort === 'renewal') return String(endOf(a) ?? '9999').localeCompare(String(endOf(b) ?? '9999'));
       return String(b.createdAt).localeCompare(String(a.createdAt));
     });
-  }, [schools, q, status, health, plan, sort]);
+  }, [schools, q, status, health, subStatus, sort]);
 
   const counts = {
     all: schools.length,
@@ -60,10 +56,10 @@ export default function SchoolsSection({
 
   function exportCsv() {
     const rows = [
-      ['School', 'City', 'Status', 'Plan', 'Subscription', 'Renews/ends', 'Students', 'Teachers', 'Parents',
+      ['School', 'City', 'Status', 'Billing cycle', 'Subscription', 'Renews/ends', 'Students', 'Teachers', 'Parents',
         'Admin', 'Admin email', 'Phone', 'Health', 'Last attendance', 'Joined'],
       ...filtered.map((s) => [
-        s.name, s.city || s.address, s.status, s.subscription?.planName ?? '', s.subscription?.status ?? '',
+        s.name, s.city || s.address, s.status, s.subscription?.billingCycle ?? '', s.subscription?.status ?? '',
         endOf(s) ?? '', s.students, s.teachers, s.parents, s.adminName, s.adminEmail, s.contactNumber,
         s.health ? HEALTH[s.health].label : '', s.lastAttendance ?? '', s.createdAt?.slice(0, 10) ?? '',
       ]),
@@ -110,9 +106,9 @@ export default function SchoolsSection({
               <option value="all">Any health</option>
               {Object.entries(HEALTH).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
-            <select value={plan} onChange={(e) => setPlan(e.target.value)} className={inputCls}>
-              <option value="all">Any plan</option>
-              {plans.map((p) => <option key={p}>{p}</option>)}
+            <select value={subStatus} onChange={(e) => setSubStatus(e.target.value)} className={inputCls}>
+              <option value="all">Any subscription</option>
+              {Object.entries(SUB_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
             <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className={inputCls}>
               <option value="newest">Newest first</option>
@@ -138,7 +134,7 @@ export default function SchoolsSection({
                 <thead>
                   <tr className="border-b border-slate-100 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                     <th className="px-5 py-3">School</th>
-                    <th className="px-3 py-3">Plan</th>
+                    <th className="px-3 py-3">Subscription</th>
                     <th className="px-3 py-3 text-right">Students</th>
                     <th className="px-3 py-3 text-right">Teachers</th>
                     <th className="px-3 py-3">Health</th>
@@ -166,7 +162,6 @@ export default function SchoolsSection({
                           </div>
                         </td>
                         <td className="px-3 py-3">
-                          <p className="font-medium text-slate-700">{s.subscription?.planName ?? <span className="text-slate-400">No plan</span>}</p>
                           {s.subscription && <Badge tone={SUB_STATUS[s.subscription.status].tone}>{SUB_STATUS[s.subscription.status].label}</Badge>}
                         </td>
                         <td className="px-3 py-3 text-right font-semibold text-slate-800">{s.students.toLocaleString('en-IN')}</td>
@@ -201,7 +196,7 @@ export default function SchoolsSection({
                     <SchoolAvatar school={s} />
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-semibold text-slate-900">{s.name}</p>
-                      <p className="truncate text-xs text-slate-500">{s.students} students · {s.subscription?.planName ?? 'No plan'}</p>
+                      <p className="truncate text-xs text-slate-500">{s.students} students{s.subscription ? ` · ${SUB_STATUS[s.subscription.status].label}` : ''}</p>
                       <div className="mt-1 flex gap-1.5">
                         {s.status === 'Suspended' && <Badge tone="red">Suspended</Badge>}
                         {s.health && <Badge tone={HEALTH[s.health].tone}>{HEALTH[s.health].label}</Badge>}

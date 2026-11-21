@@ -19,9 +19,9 @@ interface DashboardData {
   growth: { month: string; newSchools: number; newStudents: number; onlineVolume: number }[];
   health: Record<string, number>;
   atRisk: { id: string; name: string; students: number; lastAttendance: string | null; health: 'at_risk' | 'inactive' }[];
-  renewals: { id: string; name: string; planName: string | null; status: keyof typeof SUB_STATUS; endsOn: string; amount: number }[];
-  planMix: Record<string, number>;
-  topSchools: { id: string; name: string; students: number; teachers: number; planName: string | null }[];
+  renewals: { id: string; name: string; billingCycle: string | null; status: keyof typeof SUB_STATUS; endsOn: string; amount: number }[];
+  subscriptionMix: Record<string, number>;
+  topSchools: { id: string; name: string; students: number; teachers: number }[];
   recentActivity: AuditEntry[];
 }
 
@@ -165,7 +165,7 @@ export default function DashboardSection({
                           <div className="min-w-0">
                             <p className="truncate text-sm font-semibold text-slate-800">{r.name}</p>
                             <p className="text-xs text-slate-500">
-                              {r.planName ?? 'No plan'} · <Badge tone={SUB_STATUS[r.status]?.tone ?? 'gray'}>{SUB_STATUS[r.status]?.label ?? r.status}</Badge>
+                              {r.billingCycle ? <span className="capitalize">{r.billingCycle} · </span> : null}<Badge tone={SUB_STATUS[r.status]?.tone ?? 'gray'}>{SUB_STATUS[r.status]?.label ?? r.status}</Badge>
                             </p>
                           </div>
                           <div className="text-right">
@@ -203,14 +203,14 @@ export default function DashboardSection({
               )}
             </Card>
 
-            <Card title="Plan mix" icon={<Wallet className="h-4 w-4" />} subtitle="Schools on each plan">
+            <Card title="Subscription mix" icon={<Wallet className="h-4 w-4" />} subtitle="Schools by subscription status">
               <div className="space-y-3">
-                {Object.entries(data.planMix).sort((a, b) => b[1] - a[1]).map(([plan, count]) => {
+                {Object.entries(data.subscriptionMix ?? {}).sort((a, b) => b[1] - a[1]).map(([key, count]) => {
                   const pct = s.totalSchools ? Math.round((count / s.totalSchools) * 100) : 0;
                   return (
-                    <div key={plan}>
+                    <div key={key}>
                       <div className="mb-1 flex justify-between text-xs">
-                        <span className="font-medium text-slate-700">{plan}</span>
+                        <span className="font-medium text-slate-700">{SUB_STATUS[key as keyof typeof SUB_STATUS]?.label ?? 'No subscription'}</span>
                         <span className="text-slate-500">{count} · {pct}%</span>
                       </div>
                       <div className="h-2 overflow-hidden rounded-full bg-slate-100">

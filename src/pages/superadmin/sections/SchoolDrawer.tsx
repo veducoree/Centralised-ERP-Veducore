@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import {
   SCHOOL_MODULES, actionLabel, callManageSchools, daysUntil, errMsg, fmtDate, generatePassword,
-  rupees, rupeesFromDecimal, timeAgo, type AuditEntry, type Invoice, type Me, type Plan, type SchoolRecord,
+  rupees, rupeesFromDecimal, timeAgo, type AuditEntry, type Invoice, type Me, type SchoolRecord,
 } from '../api';
 import {
   Badge, Button, Card, Drawer, ErrorBanner, Field, HEALTH, KV, LoadingBlock, Modal, SUB_STATUS, Tabs,
@@ -82,7 +82,7 @@ export default function SchoolDrawer({
                 {s.health && <Badge tone={HEALTH[s.health].tone}>{HEALTH[s.health].label}</Badge>}
                 {s.subscription && (
                   <Badge tone={SUB_STATUS[s.subscription.status].tone}>
-                    {s.subscription.planName ?? 'No plan'} · {SUB_STATUS[s.subscription.status].label}
+                    {SUB_STATUS[s.subscription.status].label} · {s.subscription.billingCycle}
                   </Badge>
                 )}
               </div>
@@ -219,11 +219,16 @@ function OverviewTab({ d }: { d: Detail }) {
 function ProfileTab({ s, canManage, onSaved }: { s: SchoolRecord; canManage: boolean; onSaved: () => void }) {
   const [f, setF] = useState({
     name: s.name, address: s.address, city: s.city, contactNumber: s.contactNumber, email: s.email, academicYear: s.academicYear,
+    admissionPrefix: s.admissionPrefix ?? '', employeePrefix: s.employeePrefix ?? '', shortName: s.shortName ?? '',
   });
   const [saving, setSaving] = useState(false);
   const dirty = JSON.stringify(f) !== JSON.stringify({
     name: s.name, address: s.address, city: s.city, contactNumber: s.contactNumber, email: s.email, academicYear: s.academicYear,
+    admissionPrefix: s.admissionPrefix ?? '', employeePrefix: s.employeePrefix ?? '', shortName: s.shortName ?? '',
   });
+  const badShort = !!f.shortName.trim() && !/^[A-Za-z0-9]{2,12}$/.test(f.shortName.trim());
+  const badPrefix = (v: string) => !!v.trim() && !/^[A-Za-z0-9/-]{1,12}$/.test(v.trim());
+  const prefixInvalid = badPrefix(f.admissionPrefix) || badPrefix(f.employeePrefix) || badShort;
 
   async function save() {
     setSaving(true);
@@ -241,10 +246,15 @@ function ProfileTab({ s, canManage, onSaved }: { s: SchoolRecord; canManage: boo
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
   return (
-    <Card title="School profile" subtitle="Shown across the school's admin panel, app and documents">
+    <Card title="School profile" subtitle="Shown across the school's admin panel, app and documents. Locked for the school admin — only Veducore can change these.">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="School name" required className="sm:col-span-2">
           <input className={inputCls} value={f.name} onChange={set('name')} disabled={!canManage} />
+        </Field>
+        <Field label="School short name" error={badShort ? '2–12 letters or numbers' : undefined}
+          hint="Used in default parent passwords (parentname@shortname). Changing it doesn't change existing parents' passwords.">
+          <input className={cx(inputCls, 'font-mono')} value={f.shortName} maxLength={12} disabled={!canManage} placeholder="e.g. GVPS"
+            onChange={(e) => setF({ ...f, shortName: e.target.value.replace(/[^A-Za-z0-9]/g, '') })} />
         </Field>
         <Field label="Address" className="sm:col-span-2">
           <input className={inputCls} value={f.address} onChange={set('address')} disabled={!canManage} />
@@ -255,10 +265,20 @@ function ProfileTab({ s, canManage, onSaved }: { s: SchoolRecord; canManage: boo
           <input className={inputCls} type="email" value={f.email} onChange={set('email')} disabled={!canManage} />
         </Field>
         <Field label="Academic year label"><input className={inputCls} value={f.academicYear} onChange={set('academicYear')} disabled={!canManage} /></Field>
+        <Field label="Admission number prefix" error={badPrefix(f.admissionPrefix) ? 'Only letters, numbers, / or - (max 12)' : undefined}
+          hint="Changing it only affects new students; existing admission numbers stay as they are.">
+          <input className={cx(inputCls, 'font-mono uppercase')} value={f.admissionPrefix} maxLength={12} disabled={!canManage} placeholder="e.g. STUD"
+            onChange={(e) => setF({ ...f, admissionPrefix: e.target.value.toUpperCase().replace(/\s/g, '') })} />
+        </Field>
+        <Field label="Employee ID prefix" error={badPrefix(f.employeePrefix) ? 'Only letters, numbers, / or - (max 12)' : undefined}
+          hint="For teacher employee IDs. Changing it only affects new teachers.">
+          <input className={cx(inputCls, 'font-mono uppercase')} value={f.employeePrefix} maxLength={12} disabled={!canManage} placeholder="e.g. EMP"
+            onChange={(e) => setF({ ...f, employeePrefix: e.target.value.toUpperCase().replace(/\s/g, '') })} />
+        </Field>
       </div>
       {canManage && (
         <div className="mt-5 flex justify-end">
-          <Button onClick={save} loading={saving} disabled={!dirty || !f.name.trim()} icon={<Save className="h-4 w-4" />}>Save changes</Button>
+          <Button onClick={save} loading={saving} disabled={!dirty || !f.name.trim() || prefixInvalid} icon={<Save className="h-4 w-4" />}>Save changes</Button>
         </div>
       )}
     </Card>
@@ -270,13 +290,14 @@ function ProfileTab({ s, canManage, onSaved }: { s: SchoolRecord; canManage: boo
 function SubscriptionTab({ s, invoices, canManage, onSaved }: {
   s: SchoolRecord; invoices: Invoice[]; canManage: boolean; onSaved: () => void;
 }) {
-  const [plans, setPlans] = useState<Plan[]>([]);
   const sub = s.subscription;
+  // Price is set per school (no plans). Older schools on a plan start from
+  // what they were billed, so saving doesn't drop their price to zero.
+  const startPrice = sub?.priceOverride ?? (sub?.amount ? sub.amount : null);
   const [f, setF] = useState({
-    plan_id: sub?.planId ?? '',
     status: sub?.status ?? 'active',
     billing_cycle: sub?.billingCycle ?? 'yearly',
-    price_override: sub?.priceOverride != null ? String(sub.priceOverride / 100) : '',
+    price_override: startPrice != null ? String(startPrice / 100) : '',
     student_limit: sub?.studentLimit ? String(sub.studentLimit) : '',
     trial_ends_at: sub?.trialEndsAt ?? '',
     current_period_start: sub?.currentPeriodStart ?? '',
@@ -285,26 +306,9 @@ function SubscriptionTab({ s, invoices, canManage, onSaved }: {
   });
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    callManageSchools<{ plans: Plan[] }>({ action: 'plans-list' }).then((r) => setPlans(r.plans)).catch(() => {});
-  }, []);
-
-  const plan = plans.find((p) => p.id === f.plan_id);
-  const computed = plan ? plan.base_price + plan.price_per_student * s.students : 0;
-  const effective = f.price_override !== '' ? Math.round(Number(f.price_override) * 100) : computed;
-  const limit = Number(f.student_limit) || plan?.max_students || null;
+  const effective = f.price_override !== '' ? Math.round(Number(f.price_override) * 100) : 0;
+  const limit = Number(f.student_limit) || null;
   const overLimit = limit !== null && s.students > limit;
-
-  function pickPlan(id: string) {
-    const p = plans.find((x) => x.id === id);
-    setF((cur) => ({
-      ...cur,
-      plan_id: id,
-      billing_cycle: p?.billing_cycle ?? cur.billing_cycle,
-      student_limit: p?.max_students ? String(p.max_students) : '',
-      status: p?.code === 'trial' ? 'trial' : cur.status === 'trial' ? 'active' : cur.status,
-    }));
-  }
 
   function setPeriodFromToday() {
     const start = new Date();
@@ -337,7 +341,7 @@ function SubscriptionTab({ s, invoices, canManage, onSaved }: {
     <>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <Metric icon={<CreditCard className="h-3.5 w-3.5" />} label="Billing per cycle" value={rupees(effective)}
-          sub={f.price_override !== '' ? 'custom price' : plan ? `${rupees(plan.base_price)} + ${rupees(plan.price_per_student)} × ${s.students}` : 'pick a plan'} />
+          sub={f.price_override !== '' ? `${f.billing_cycle} price` : 'not set'} />
         <Metric icon={<CalendarDays className="h-3.5 w-3.5" />} label={f.status === 'trial' ? 'Trial ends' : 'Period ends'}
           value={fmtDate(endDate || null)} sub={d === null ? 'not set' : d < 0 ? `${-d} days ago` : `in ${d} days`} />
         <Metric icon={<Users className="h-3.5 w-3.5" />} label="Student limit" value={limit ?? 'Unlimited'}
@@ -345,18 +349,12 @@ function SubscriptionTab({ s, invoices, canManage, onSaved }: {
       </div>
       {overLimit && (
         <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          <AlertTriangle className="h-4 w-4" /> This school has more students than its plan allows. Upgrade the plan or raise the limit.
+          <AlertTriangle className="h-4 w-4" /> This school has more students than its limit allows. Raise the limit if they are paying for more.
         </div>
       )}
 
-      <Card title="Plan & billing" subtitle="Changes apply immediately; create an invoice from Billing to charge for them">
+      <Card title="Subscription & billing" subtitle="Changes apply immediately; create an invoice from Billing to charge for them">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Plan">
-            <select className={inputCls} value={f.plan_id} onChange={(e) => pickPlan(e.target.value)} disabled={!canManage}>
-              <option value="">No plan</option>
-              {plans.filter((p) => p.is_active || p.id === f.plan_id).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </Field>
           <Field label="Status">
             <select className={inputCls} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value as typeof f.status })} disabled={!canManage}>
               {Object.entries(SUB_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -367,10 +365,10 @@ function SubscriptionTab({ s, invoices, canManage, onSaved }: {
               <option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option>
             </select>
           </Field>
-          <Field label="Custom price per cycle (₹)" hint="Leave empty to use the plan price">
+          <Field label="Price per cycle (₹)" hint="What the school pays each billing cycle">
             <input className={inputCls} type="number" min={0} value={f.price_override} onChange={(e) => setF({ ...f, price_override: e.target.value })} disabled={!canManage} />
           </Field>
-          <Field label="Student limit" hint="Empty = plan default">
+          <Field label="Student limit" hint="Empty = unlimited">
             <input className={inputCls} type="number" min={1} value={f.student_limit} onChange={(e) => setF({ ...f, student_limit: e.target.value })} disabled={!canManage} />
           </Field>
           {f.status === 'trial' ? (

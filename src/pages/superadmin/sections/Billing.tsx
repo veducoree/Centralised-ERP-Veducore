@@ -1,13 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, FileText, Pencil, Plus, Printer, RefreshCw, Search, Wallet, XCircle } from 'lucide-react';
+import { CheckCircle2, FileText, Plus, Printer, RefreshCw, Search, Wallet, XCircle } from 'lucide-react';
 import {
-  callManageSchools, daysUntil, errMsg, fmtDate, rupees, type Invoice, type Me, type Plan, type SchoolRecord,
+  callManageSchools, daysUntil, errMsg, fmtDate, rupees, type Invoice, type Me, type SchoolRecord,
 } from '../api';
 import {
   Badge, Button, Card, EmptyState, ErrorBanner, Field, LoadingBlock, Modal, Stat, SUB_STATUS, Tabs, cx, inputCls, toast,
 } from '../ui';
 
-type Tab = 'subscriptions' | 'invoices' | 'plans';
+type Tab = 'subscriptions' | 'invoices';
 
 export default function BillingSection({
   me, schools, onOpenSchool, onSchoolsChanged,
@@ -34,12 +34,10 @@ export default function BillingSection({
       <Tabs tabs={[
         { id: 'subscriptions', label: 'Subscriptions' },
         { id: 'invoices', label: 'Invoices' },
-        { id: 'plans', label: 'Plans & pricing' },
       ]} value={tab} onChange={setTab} />
 
       {tab === 'subscriptions' && <SubscriptionsTab schools={schools} onOpenSchool={onOpenSchool} />}
       {tab === 'invoices' && <InvoicesTab schools={schools} canManage={canManage} onChanged={onSchoolsChanged} />}
-      {tab === 'plans' && <PlansTab canManage={canManage} onChanged={onSchoolsChanged} />}
     </div>
   );
 }
@@ -51,7 +49,7 @@ function SubscriptionsTab({ schools, onOpenSchool }: { schools: SchoolRecord[]; 
   const [status, setStatus] = useState('all');
   const rows = useMemo(() => schools
     .filter((s) => !q || s.name.toLowerCase().includes(q.toLowerCase()))
-    .filter((s) => status === 'all' || (status === 'none' ? !s.subscription?.planId : s.subscription?.status === status))
+    .filter((s) => status === 'all' || s.subscription?.status === status)
     .sort((a, b) => {
       const ea = a.subscription?.status === 'trial' ? a.subscription.trialEndsAt : a.subscription?.currentPeriodEnd;
       const eb = b.subscription?.status === 'trial' ? b.subscription.trialEndsAt : b.subscription?.currentPeriodEnd;
@@ -68,7 +66,6 @@ function SubscriptionsTab({ schools, onOpenSchool }: { schools: SchoolRecord[]; 
         <select className={cx(inputCls, 'sm:w-48')} value={status} onChange={(e) => setStatus(e.target.value)}>
           <option value="all">All statuses</option>
           {Object.entries(SUB_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-          <option value="none">No plan</option>
         </select>
       </div>
       {rows.length === 0 ? <EmptyState icon={<Wallet className="h-5 w-5" />} title="No subscriptions match" /> : (
@@ -76,7 +73,7 @@ function SubscriptionsTab({ schools, onOpenSchool }: { schools: SchoolRecord[]; 
           <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="border-b border-slate-100 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                <th className="px-5 py-3">School</th><th className="px-3 py-3">Plan</th><th className="px-3 py-3">Status</th>
+                <th className="px-5 py-3">School</th><th className="px-3 py-3">Cycle</th><th className="px-3 py-3">Status</th>
                 <th className="px-3 py-3 text-right">Students</th><th className="px-3 py-3 text-right">Per cycle</th>
                 <th className="px-3 py-3 text-right">MRR</th><th className="px-3 py-3">Ends</th>
               </tr>
@@ -89,8 +86,7 @@ function SubscriptionsTab({ schools, onOpenSchool }: { schools: SchoolRecord[]; 
                 return (
                   <tr key={s.id} onClick={() => onOpenSchool(s.id)} className="cursor-pointer hover:bg-indigo-50/40">
                     <td className="px-5 py-3 font-semibold text-slate-900">{s.name}</td>
-                    <td className="px-3 py-3 text-slate-700">{sub?.planName ?? <span className="text-slate-400">No plan</span>}
-                      {sub?.billingCycle && sub.planName && <span className="text-xs text-slate-400"> · {sub.billingCycle}</span>}</td>
+                    <td className="px-3 py-3 capitalize text-slate-700">{sub?.billingCycle ?? <span className="text-slate-400">—</span>}</td>
                     <td className="px-3 py-3">{sub && <Badge tone={SUB_STATUS[sub.status].tone}>{SUB_STATUS[sub.status].label}</Badge>}</td>
                     <td className="px-3 py-3 text-right">
                       {s.students}{sub?.studentLimit ? <span className={cx('text-xs', s.students > sub.studentLimit ? 'font-bold text-rose-600' : 'text-slate-400')}> / {sub.studentLimit}</span> : null}
@@ -249,7 +245,7 @@ function NewInvoiceModal({ schools, onClose, onCreated }: { schools: SchoolRecor
       ...cur,
       school_id: id,
       amount: sub?.amount ? String(sub.amount / 100) : cur.amount,
-      description: sub?.planName ? `Veducore ${sub.planName} plan — ${s!.students} students` : cur.description,
+      description: `Veducore ${sub?.billingCycle ?? ''} subscription — ${s!.students} students`.replace('  ', ' '),
       period_start: start.toISOString().slice(0, 10),
       period_end: end.toISOString().slice(0, 10),
     }));
@@ -285,7 +281,7 @@ function NewInvoiceModal({ schools, onClose, onCreated }: { schools: SchoolRecor
           </select>
         </Field>
         <Field label="Description" required className="sm:col-span-2">
-          <input className={inputCls} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} placeholder="Veducore Growth plan — 2026-27" />
+          <input className={inputCls} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} placeholder="Veducore yearly subscription — 2026-27" />
         </Field>
         <Field label="Period from"><input type="date" className={inputCls} value={f.period_start} onChange={(e) => setF({ ...f, period_start: e.target.value })} /></Field>
         <Field label="Period to"><input type="date" className={inputCls} value={f.period_end} onChange={(e) => setF({ ...f, period_end: e.target.value })} /></Field>
@@ -385,113 +381,4 @@ ${i.notes ? `<div class="notes">${esc(i.notes)}</div>` : ''}
 <p class="muted" style="margin-top:40px;font-size:12px">Thank you for choosing Veducore.</p>
 <script>window.onload=()=>window.print()</script></body></html>`);
   w.document.close();
-}
-
-// ── Plans ────────────────────────────────────────────────────────────────────
-
-function PlansTab({ canManage, onChanged }: { canManage: boolean; onChanged: () => void }) {
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState<Partial<Plan> | null>(null);
-
-  async function load() {
-    setLoading(true);
-    try {
-      setPlans((await callManageSchools<{ plans: Plan[] }>({ action: 'plans-list' })).plans);
-    } catch (e) {
-      toast(errMsg(e), 'error');
-    } finally {
-      setLoading(false);
-    }
-  }
-  useEffect(() => { load(); }, []);
-
-  if (loading && !plans.length) return <LoadingBlock />;
-  return (
-    <>
-      <div className="flex justify-between gap-3">
-        <p className="text-sm text-slate-500">Price per cycle = base price + price per student × enrolled students. A school's custom price overrides this.</p>
-        {canManage && <Button size="sm" onClick={() => setEditing({ billing_cycle: 'yearly', is_active: true, features: [], sort_order: plans.length })}
-          icon={<Plus className="h-3.5 w-3.5" />}>New plan</Button>}
-      </div>
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        {plans.map((p) => (
-          <div key={p.id} className={cx('flex flex-col rounded-3xl border bg-white p-5 shadow-sm', p.is_active ? 'border-slate-100' : 'border-dashed border-slate-300 opacity-70')}>
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-base font-bold text-slate-900">{p.name}</p>
-                <p className="text-xs text-slate-500">{p.description}</p>
-              </div>
-              {!p.is_active && <Badge>Hidden</Badge>}
-            </div>
-            <p className="mt-4 text-2xl font-bold text-slate-900">{rupees(p.price_per_student)}<span className="text-sm font-medium text-slate-500"> /student</span></p>
-            <p className="text-xs text-slate-500">+ {rupees(p.base_price)} base · billed {p.billing_cycle}</p>
-            <p className="mt-1 text-xs text-slate-500">{p.max_students ? `Up to ${p.max_students} students` : 'Unlimited students'}</p>
-            <ul className="mt-4 flex-1 space-y-1.5 text-sm text-slate-600">
-              {p.features.map((f) => <li key={f} className="flex gap-2"><CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-500" />{f}</li>)}
-            </ul>
-            {canManage && <Button className="mt-4" size="sm" variant="secondary" onClick={() => setEditing(p)} icon={<Pencil className="h-3.5 w-3.5" />}>Edit</Button>}
-          </div>
-        ))}
-      </div>
-      {editing && <PlanModal plan={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load(); onChanged(); }} />}
-    </>
-  );
-}
-
-function PlanModal({ plan, onClose, onSaved }: { plan: Partial<Plan>; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({
-    name: plan.name ?? '', description: plan.description ?? '',
-    base_price: plan.base_price != null ? String(plan.base_price / 100) : '0',
-    price_per_student: plan.price_per_student != null ? String(plan.price_per_student / 100) : '0',
-    billing_cycle: plan.billing_cycle ?? 'yearly', max_students: plan.max_students ? String(plan.max_students) : '',
-    features: (plan.features ?? []).join('\n'), is_active: plan.is_active !== false, sort_order: plan.sort_order ?? 0,
-  });
-  const [saving, setSaving] = useState(false);
-  async function save() {
-    setSaving(true);
-    try {
-      await callManageSchools({
-        action: 'plan-save',
-        plan: {
-          id: plan.id, ...f,
-          base_price: Math.round(Number(f.base_price || 0) * 100),
-          price_per_student: Math.round(Number(f.price_per_student || 0) * 100),
-          features: f.features.split('\n').map((s) => s.trim()).filter(Boolean),
-        },
-      });
-      toast('Plan saved');
-      onSaved();
-    } catch (e) {
-      toast(errMsg(e), 'error');
-    } finally {
-      setSaving(false);
-    }
-  }
-  return (
-    <Modal open onClose={onClose} title={plan.id ? `Edit ${plan.name}` : 'New plan'}
-      subtitle={plan.id ? 'Price changes apply to every school on this plan without a custom price' : undefined}
-      footer={<><Button variant="secondary" onClick={onClose}>Cancel</Button><Button onClick={save} loading={saving} disabled={!f.name.trim()}>Save plan</Button></>}>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Name" required><input className={inputCls} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
-        <Field label="Billing cycle">
-          <select className={inputCls} value={f.billing_cycle} onChange={(e) => setF({ ...f, billing_cycle: e.target.value as Plan['billing_cycle'] })}>
-            <option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option>
-          </select>
-        </Field>
-        <Field label="Description" className="sm:col-span-2"><input className={inputCls} value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></Field>
-        <Field label="Base price per cycle (₹)"><input type="number" min={0} className={inputCls} value={f.base_price} onChange={(e) => setF({ ...f, base_price: e.target.value })} /></Field>
-        <Field label="Price per student per cycle (₹)"><input type="number" min={0} className={inputCls} value={f.price_per_student} onChange={(e) => setF({ ...f, price_per_student: e.target.value })} /></Field>
-        <Field label="Max students" hint="Empty = unlimited"><input type="number" min={1} className={inputCls} value={f.max_students} onChange={(e) => setF({ ...f, max_students: e.target.value })} /></Field>
-        <Field label="Display order"><input type="number" className={inputCls} value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: Number(e.target.value) })} /></Field>
-        <Field label="Features (one per line)" className="sm:col-span-2">
-          <textarea className={cx(inputCls, 'min-h-[100px]')} value={f.features} onChange={(e) => setF({ ...f, features: e.target.value })} />
-        </Field>
-        <label className="flex items-center gap-2 text-sm text-slate-700 sm:col-span-2">
-          <input type="checkbox" checked={f.is_active} onChange={(e) => setF({ ...f, is_active: e.target.checked })} className="rounded" />
-          Available for new schools
-        </label>
-      </div>
-    </Modal>
-  );
 }

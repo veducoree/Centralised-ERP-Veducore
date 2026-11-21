@@ -8,6 +8,7 @@ import { LoadingSpinner } from '@/components/ui/Primitives';
 import { useAuth } from '@/auth/AuthContext';
 import { useToast } from '@/components/ui/Toast';
 import { fetchStudentById, fetchAttendance, fetchStudentRecords, fetchRemarks, fetchFees, ensureParentForStudent } from '@/services/api';
+import { parentLoginId } from '@/lib/parentUtils';
 import type { Student, Attendance, StudentRecord, Remark, Fee } from '@/types';
 import { formatDate, formatCurrency } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/Badge';
@@ -300,7 +301,7 @@ export default function StudentDetailPage() {
                     variant="outline"
                     className="border-slate-200 bg-white hover:bg-slate-50 text-slate-700 shadow-2xs"
                     onClick={() => {
-                      const text = `Parent Login Credentials\nStudent: ${student.full_name} (${student.admission_number})\nParent: ${parentData.parent.full_name}\nUsername: ${parentData.parent.email}\nPassword: ${parentData.parent.password || ''}\nPortal: Veducore Parent App / Web`;
+                      const text = `Parent Login Credentials\nStudent: ${student.full_name} (${student.admission_number})\nParent: ${parentData.parent.full_name}\nLogin (Mobile): ${parentLoginId(parentData.parent.email)}\nPassword: ${parentData.parent.password || ''}\nPortal: Veducore Parent App / Web`;
                       navigator.clipboard.writeText(text);
                       toast('Parent credentials copied to clipboard', 'success');
                     }}
@@ -327,19 +328,19 @@ export default function StudentDetailPage() {
 
                   <div className="rounded-xl border border-cyan-200 bg-cyan-50/50 p-3.5 space-y-3">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-cyan-800">Login Username:</span>
+                      <span className="font-medium text-cyan-800">Login (Mobile):</span>
                       <div className="flex items-center gap-1.5">
                         <code className="rounded bg-white px-2 py-0.5 font-mono font-semibold text-cyan-900 border border-cyan-200 text-xs">
-                          {parentData.parent.email}
+                          {parentLoginId(parentData.parent.email)}
                         </code>
                         <button
                           type="button"
                           onClick={() => {
-                            navigator.clipboard.writeText(parentData.parent.email);
-                            toast('Username copied', 'success');
+                            navigator.clipboard.writeText(parentLoginId(parentData.parent.email));
+                            toast('Mobile number copied', 'success');
                           }}
                           className="rounded p-1 text-cyan-600 hover:bg-white hover:text-cyan-800 transition-colors"
-                          title="Copy username"
+                          title="Copy mobile number"
                         >
                           <Copy className="h-3.5 w-3.5" />
                         </button>
@@ -393,7 +394,7 @@ export default function StudentDetailPage() {
                         toast('Parent account created and linked successfully!', 'success');
                         await loadData();
                       } catch (err) {
-                        toast('Failed to provision parent account', 'error');
+                        toast(err instanceof Error ? err.message : 'Failed to provision parent account', 'error');
                       } finally {
                         setProvisioningParent(false);
                       }

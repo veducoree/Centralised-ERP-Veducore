@@ -58,7 +58,7 @@ export function PlatformBanner() {
       tone: d <= 3 ? 'warning' : 'info',
       text: sub === 'trial'
         ? (d < 0 ? 'Your Veducore trial has ended.' : `Your Veducore trial ends ${d === 0 ? 'today' : `in ${d} day${d === 1 ? '' : 's'}`}.`) + ' Contact Veducore to choose a plan.'
-        : (d < 0 ? 'Your Veducore subscription period has ended.' : `Your Veducore ${platform?.plan_name ?? ''} plan renews ${d === 0 ? 'today' : `in ${d} day${d === 1 ? '' : 's'}`}.`),
+        : (d < 0 ? 'Your Veducore subscription period has ended.' : `Your Veducore subscription renews ${d === 0 ? 'today' : `in ${d} day${d === 1 ? '' : 's'}`}.`),
     };
   }
 

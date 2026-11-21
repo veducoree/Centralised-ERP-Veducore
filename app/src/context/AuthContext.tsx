@@ -233,7 +233,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const pw = password.trim();
       const emailsToTry = [raw];
       if (!raw.includes('@')) {
-        emailsToTry.push(`${raw}@veducore.internal`);
+        // A mobile number is a parent login: <10 digits>@parent.veducore.
+        let digits = raw.replace(/[^0-9]/g, '');
+        if (digits.length === 12 && digits.startsWith('91')) digits = digits.slice(2);
+        if (digits.length === 11 && digits.startsWith('0')) digits = digits.slice(1);
+        if (/^[6-9][0-9]{9}$/.test(digits) && /^[0-9+\s-]+$/.test(raw)) {
+          emailsToTry.splice(0, 1, `${digits}@parent.veducore`);
+        } else {
+          emailsToTry.push(`${raw}@veducore.internal`);
+        }
       }
 
       let lastError: string | null = null;

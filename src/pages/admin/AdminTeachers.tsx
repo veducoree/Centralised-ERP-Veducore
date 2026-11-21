@@ -5,6 +5,7 @@ import { Library } from 'lucide-react';
 import { Card, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Form';
+import { EmployeeIdInput } from '@/components/ui/AdmissionNumberInput';
 import { Modal, ConfirmDialog } from '@/components/ui/Modal';
 import { SearchInput, PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
 import { useToast } from '@/components/ui/Toast';
@@ -438,7 +439,7 @@ export default function AdminTeachers() {
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input label="Full Name" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} error={errors.full_name} />
-          <Input label="Employee ID" required value={form.employee_id} onChange={(e) => setForm({ ...form, employee_id: e.target.value })} error={errors.employee_id} />
+          <EmployeeIdInput value={form.employee_id} onChange={(v) => setForm((f) => ({ ...f, employee_id: v }))} error={errors.employee_id} />
           <Input
             label="Username"
             required

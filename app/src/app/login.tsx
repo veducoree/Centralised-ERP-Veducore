@@ -141,13 +141,13 @@ export default function LoginScreen() {
                 />
                 <TextInput
                   style={styles.input}
-                  placeholder="Email address"
+                  placeholder="Email, username or parent mobile"
                   placeholderTextColor="#94A3B8"
                   value={email}
                   onChangeText={onEmailChange}
                   onFocus={() => setEmailFocused(true)}
                   onBlur={() => setEmailFocused(false)}
-                  keyboardType="email-address"
+                  keyboardType="default"
                   autoCapitalize="none"
                   autoCorrect={false}
                 />

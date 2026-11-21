@@ -1,22 +1,48 @@
-import type { Student } from '@/types';
+/**
+ * Parent logins use the parent's mobile number.
+ * Behind the scenes the auth email is <10-digit mobile>@parent.veducore, so
+ * one mobile number = one parent login (siblings share it).
+ * Default password: <parent first name>@<school short name>, e.g. ramesh@gvps
+ */
+export const PARENT_LOGIN_DOMAIN = 'parent.veducore';
 
-export interface ParentChildEntry {
-  studentId: string;
-  studentName: string;
-  className: string;
-  sectionName: string;
-  admissionNumber: string;
-  username: string;
-  password: string;
+/** "+91 98765-43210" / "098765 43210" → "9876543210"; null if it isn't a valid Indian mobile. */
+export function normalizeMobile(raw: string | null | undefined): string | null {
+  let d = (raw ?? '').replace(/\D/g, '');
+  if (d.length === 12 && d.startsWith('91')) d = d.slice(2);
+  if (d.length === 11 && d.startsWith('0')) d = d.slice(1);
+  return /^[6-9]\d{9}$/.test(d) ? d : null;
 }
 
-export interface ParentGroup {
-  id: string;
-  fatherName: string;
-  motherName: string;
-  parentEmail: string;
-  parentPhone: string;
-  children: ParentChildEntry[];
+export function parentLoginEmail(mobile: string): string {
+  return `${mobile}@${PARENT_LOGIN_DOMAIN}`;
+}
+
+/** What to show as the parent's login: the mobile number for new-style logins, else the stored email. */
+export function parentLoginId(email: string | null | undefined): string {
+  const e = (email ?? '').trim();
+  const suffix = `@${PARENT_LOGIN_DOMAIN}`;
+  return e.toLowerCase().endsWith(suffix) ? e.slice(0, -suffix.length) : e;
+}
+
+/** School short name for passwords: the one Veducore set, else the first word of the name. */
+export function schoolShortName(school: { short_name?: string | null; name?: string | null } | null | undefined): string {
+  const set = (school?.short_name ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return set || getSchoolSlug(school?.name ?? '');
+}
+
+/** Parent's name and relationship from the student's father / mother names. */
+export function parentFromStudent(s: { father_name?: string | null; mother_name?: string | null; full_name: string }) {
+  if (s.father_name?.trim()) return { name: s.father_name.trim(), relationship: 'Father' };
+  if (s.mother_name?.trim()) return { name: s.mother_name.trim(), relationship: 'Mother' };
+  return { name: `${s.full_name.trim()}'s Parent`, relationship: 'Guardian' };
+}
+
+/** Default parent password: first name (letters only, lowercase) @ school short name. */
+export function parentPassword(parentName: string, shortName: string): string {
+  const first = (parentName.trim().split(/\s+/)[0] ?? '').toLowerCase().replace(/[^a-z]/g, '');
+  const name = first.length >= 2 ? first : 'parent';
+  return `${name}@${shortName || 'school'}`;
 }
 
 /** Returns the first word of a school name, lowercased and letters-only.
@@ -52,79 +78,15 @@ export function generateTeacherUsername(fullName: string, schoolName: string): s
   return first && slug ? `${first}@${slug}.veducore` : '';
 }
 
-/** Generates parent credentials:
- *  username: admissionnumber@schoolslug.veducore (e.g. 23@green.veducore)
- *  password: studentfirstname4letters + dobYear (e.g. arya2005)
- */
-export function generateParentCredentials(
-  studentName: string,
-  admissionNumber: string,
-  schoolName = 'school',
-  dateOfBirth?: string | null,
-): { username: string; password: string } {
-  const slug = getSchoolSlug(schoolName);
-  const adm = admissionNumber.replace(/\s+/g, '');
-  const username = `${adm}@${slug}.veducore`;
-
-  // Student name first 4 letters (letters only, lowercase)
-  const lettersOnly = studentName.replace(/[^a-zA-Z]/g, '').toLowerCase();
-  const namePart = (lettersOnly.slice(0, 4) || 'user').padEnd(4, '0');
-
-  // DOB year (e.g. "2005-08-15" or "15/08/2005" → "2005")
-  let year = '';
-  if (dateOfBirth) {
-    const match = dateOfBirth.match(/(\d{4})/);
-    if (match) year = match[1];
-  }
-  if (!year) {
-    const admMatch = admissionNumber.match(/(\d{4})/);
-    year = admMatch ? admMatch[1] : '2005';
-  }
-
-  const password = `${namePart}${year}`;
-
-  return { username, password };
-}
-
-export function getParentGroups(students: Student[], schoolName = 'school'): ParentGroup[] {
-  const map = new Map<string, ParentGroup>();
-
-  for (const student of students) {
-    const email = (student.parent_email ?? '').trim().toLowerCase();
-    const mother = (student.mother_name ?? '').trim().toLowerCase();
-    if (!email && !mother) continue;
-
-    const key = `${email}||${mother}`;
-    const creds = generateParentCredentials(
-      student.full_name,
-      student.admission_number ?? '',
-      schoolName,
-      student.date_of_birth,
-    );
-
-    const child: ParentChildEntry = {
-      studentId: student.id,
-      studentName: student.full_name,
-      className: student.class?.name ?? '',
-      sectionName: student.section?.name ?? '',
-      admissionNumber: student.admission_number ?? '',
-      username: creds.username,
-      password: creds.password,
-    };
-
-    if (map.has(key)) {
-      map.get(key)!.children.push(child);
-    } else {
-      map.set(key, {
-        id: `pg-${key.replace(/[^a-z0-9]/g, '-')}`,
-        fatherName: student.father_name ?? '',
-        motherName: student.mother_name ?? '',
-        parentEmail: student.parent_email ?? '',
-        parentPhone: '',
-        children: [child],
-      });
-    }
-  }
-
-  return Array.from(map.values());
+/** Parent login for a student: mobile number + default password. */
+export function generateParentCredentials(params: {
+  mobile: string;
+  parentName: string;
+  shortName: string;
+}): { username: string; email: string; password: string } {
+  return {
+    username: params.mobile,
+    email: parentLoginEmail(params.mobile),
+    password: parentPassword(params.parentName, params.shortName),
+  };
 }

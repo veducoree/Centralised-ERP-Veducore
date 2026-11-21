@@ -21,6 +21,8 @@ export {
   fetchStudents,
   fetchStudentById,
   createStudent,
+  fetchNextAdmissionNumber,
+  fetchNextEmployeeId,
   ensureParentForStudent,
   updateStudent,
   deleteStudent,

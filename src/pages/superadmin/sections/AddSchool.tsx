@@ -1,41 +1,36 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { appLink } from '../../../lib/appUrl';
 import { Building2, CheckCircle2, Copy, Eye, EyeOff, Plus, Sparkles, UserRound, Wallet } from 'lucide-react';
-import { callManageSchools, errMsg, generatePassword, rupees, type Plan } from '../api';
+import { callManageSchools, errMsg, generatePassword } from '../api';
 import { Button, Card, ErrorBanner, Field, cx, inputCls, toast } from '../ui';
 
 const EMPTY = {
-  name: '', address: '', city: '', contact_number: '', academic_year: '2026-27',
-  admin_name: '', email: '', admin_password: '', plan_id: '', trial_days: '30',
+  name: '', address: '', city: '', contact_number: '', academic_year: '2026-27', admission_prefix: '', employee_prefix: '', short_name: '',
+  admin_name: '', email: '', admin_password: '',
+  sub_status: 'trial', trial_days: '30', billing_cycle: 'yearly', price: '',
 };
 
 export default function AddSchoolSection({ onCreated }: { onCreated: (schoolId: string) => void }) {
   const [f, setF] = useState(EMPTY);
-  const [plans, setPlans] = useState<Plan[]>([]);
   const [showPw, setShowPw] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [done, setDone] = useState<{ id: string; name: string; email: string; password: string } | null>(null);
 
-  useEffect(() => {
-    callManageSchools<{ plans: Plan[] }>({ action: 'plans-list' })
-      .then((r) => {
-        const active = r.plans.filter((p) => p.is_active);
-        setPlans(active);
-        const trial = active.find((p) => p.code === 'trial');
-        if (trial) setF((cur) => ({ ...cur, plan_id: cur.plan_id || trial.id }));
-      })
-      .catch(() => {});
-  }, []);
-
   const set = (k: keyof typeof EMPTY) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setF({ ...f, [k]: e.target.value });
-  const plan = plans.find((p) => p.id === f.plan_id);
 
   function validate() {
     const e: Record<string, string> = {};
     if (!f.name.trim()) e.name = 'Required';
+    if (!/^[A-Za-z0-9]{2,12}$/.test(f.short_name.trim())) e.short_name = '2–12 letters or numbers, e.g. GVPS';
+    if (f.admission_prefix.trim() && !/^[A-Za-z0-9/-]{1,12}$/.test(f.admission_prefix.trim())) {
+      e.admission_prefix = 'Only letters, numbers, / or - (max 12)';
+    }
+    if (f.employee_prefix.trim() && !/^[A-Za-z0-9/-]{1,12}$/.test(f.employee_prefix.trim())) {
+      e.employee_prefix = 'Only letters, numbers, / or - (max 12)';
+    }
     if (!f.admin_name.trim()) e.admin_name = 'Required';
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(f.email.trim())) e.email = 'Enter a valid email';
     if (f.admin_password.length < 8) e.admin_password = 'At least 8 characters';
@@ -49,9 +44,13 @@ export default function AddSchoolSection({ onCreated }: { onCreated: (schoolId: 
     setSubmitting(true);
     setSubmitError('');
     try {
-      const r = await callManageSchools<{ school_id: string }>({ action: 'create-school', ...f, trial_days: Number(f.trial_days) || 30 });
+      const r = await callManageSchools<{ school_id: string }>({
+        action: 'create-school', ...f,
+        trial_days: Number(f.trial_days) || 30,
+        price: f.price === '' ? null : Math.round(Number(f.price) * 100),
+      });
       setDone({ id: r.school_id, name: f.name.trim(), email: f.email.trim().toLowerCase(), password: f.admin_password });
-      setF({ ...EMPTY, plan_id: f.plan_id });
+      setF(EMPTY);
       setErrors({});
     } catch (err) {
       setSubmitError(errMsg(err));
@@ -95,13 +94,33 @@ export default function AddSchoolSection({ onCreated }: { onCreated: (schoolId: 
           <Field label="School name" required error={errors.name} className="sm:col-span-2">
             <input className={inputCls} value={f.name} onChange={set('name')} placeholder="e.g. Green Valley Public School" autoFocus />
           </Field>
+          <Field label="School short name" required error={errors.short_name}
+            hint={`Used in parent passwords: parentname@${f.short_name.trim().toLowerCase() || 'gvps'}`}>
+            <input className={cx(inputCls, 'font-mono')} value={f.short_name} maxLength={12}
+              onChange={(e) => setF({ ...f, short_name: e.target.value.replace(/[^A-Za-z0-9]/g, '') })} placeholder="e.g. GVPS" />
+          </Field>
           <Field label="Address" className="sm:col-span-2">
             <input className={inputCls} value={f.address} onChange={set('address')} placeholder="Street, area" />
           </Field>
           <Field label="City"><input className={inputCls} value={f.city} onChange={set('city')} placeholder="e.g. Jaipur" /></Field>
           <Field label="Phone"><input className={inputCls} value={f.contact_number} onChange={set('contact_number')} placeholder="+91 98765 43210" /></Field>
           <Field label="Academic year"><input className={inputCls} value={f.academic_year} onChange={set('academic_year')} /></Field>
+          <Field label="Admission number prefix" error={errors.admission_prefix}
+            hint={f.admission_prefix.trim()
+              ? `Students will be numbered like ${f.admission_prefix.trim().toUpperCase()}001`
+              : 'Optional. Given by the school, e.g. STUD. Leave blank for plain numbers.'}>
+            <input className={cx(inputCls, 'font-mono uppercase')} value={f.admission_prefix} maxLength={12}
+              onChange={(e) => setF({ ...f, admission_prefix: e.target.value.toUpperCase().replace(/\s/g, '') })} placeholder="e.g. STUD" />
+          </Field>
+          <Field label="Employee ID prefix" error={errors.employee_prefix}
+            hint={f.employee_prefix.trim()
+              ? `Teachers will be numbered like ${f.employee_prefix.trim().toUpperCase()}001`
+              : 'Optional. For teacher employee IDs, e.g. EMP.'}>
+            <input className={cx(inputCls, 'font-mono uppercase')} value={f.employee_prefix} maxLength={12}
+              onChange={(e) => setF({ ...f, employee_prefix: e.target.value.toUpperCase().replace(/\s/g, '') })} placeholder="e.g. EMP" />
+          </Field>
         </div>
+        <p className="mt-4 text-xs text-slate-500">These details are locked for the school admin. Only Veducore can change them later.</p>
       </Card>
 
       <Card title="Owner login" icon={<UserRound className="h-4 w-4" />} subtitle="The school's principal or administrator. They can add more staff later.">
@@ -128,32 +147,28 @@ export default function AddSchoolSection({ onCreated }: { onCreated: (schoolId: 
         </div>
       </Card>
 
-      <Card title="Plan" icon={<Wallet className="h-4 w-4" />} subtitle="You can change this any time from the school's Subscription tab">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {plans.map((p) => (
-            <button type="button" key={p.id} onClick={() => setF({ ...f, plan_id: p.id })}
-              className={cx('rounded-2xl border p-4 text-left transition',
-                f.plan_id === p.id ? 'border-indigo-500 bg-indigo-50/60 ring-2 ring-indigo-500/20' : 'border-slate-200 hover:border-slate-300')}>
-              <p className="font-semibold text-slate-900">{p.name}</p>
-              <p className="mt-1 text-xs text-slate-500">
-                {p.base_price || p.price_per_student
-                  ? <>{rupees(p.base_price)} + {rupees(p.price_per_student)}/student · {p.billing_cycle}</>
-                  : 'Free'}
-              </p>
-              {p.max_students && <p className="mt-1 text-[11px] text-slate-400">Up to {p.max_students} students</p>}
-            </button>
-          ))}
-          <button type="button" onClick={() => setF({ ...f, plan_id: '' })}
-            className={cx('rounded-2xl border p-4 text-left transition', !f.plan_id ? 'border-indigo-500 bg-indigo-50/60 ring-2 ring-indigo-500/20' : 'border-slate-200 hover:border-slate-300')}>
-            <p className="font-semibold text-slate-900">Decide later</p>
-            <p className="mt-1 text-xs text-slate-500">No plan assigned</p>
-          </button>
-        </div>
-        {plan?.code === 'trial' && (
-          <Field label="Trial length (days)" className="mt-4 max-w-[200px]">
-            <input className={inputCls} type="number" min={1} max={365} value={f.trial_days} onChange={set('trial_days')} />
+      <Card title="Subscription" icon={<Wallet className="h-4 w-4" />} subtitle="You can change this any time from the school's Subscription tab">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Field label="Start as">
+            <select className={inputCls} value={f.sub_status} onChange={set('sub_status')}>
+              <option value="trial">Free trial</option>
+              <option value="active">Active (paid)</option>
+            </select>
           </Field>
-        )}
+          {f.sub_status === 'trial' && (
+            <Field label="Trial length (days)">
+              <input className={inputCls} type="number" min={1} max={365} value={f.trial_days} onChange={set('trial_days')} />
+            </Field>
+          )}
+          <Field label="Billing cycle">
+            <select className={inputCls} value={f.billing_cycle} onChange={set('billing_cycle')}>
+              <option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option>
+            </select>
+          </Field>
+          <Field label="Price per cycle (₹)" hint="Optional">
+            <input className={inputCls} type="number" min={0} value={f.price} onChange={set('price')} placeholder="0" />
+          </Field>
+        </div>
       </Card>
 
       <div className="flex justify-end">

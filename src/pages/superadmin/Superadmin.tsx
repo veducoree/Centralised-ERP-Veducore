@@ -44,7 +44,7 @@ const NAV: { group: string; items: { id: Section; label: string; icon: React.Rea
   },
   {
     group: 'Business', items: [
-      { id: 'billing', label: 'Billing & plans', icon: <Wallet className="h-[18px] w-[18px]" /> },
+      { id: 'billing', label: 'Billing', icon: <Wallet className="h-[18px] w-[18px]" /> },
       { id: 'payments', label: 'Online payments', icon: <CreditCard className="h-[18px] w-[18px]" /> },
     ],
   },
@@ -67,10 +67,10 @@ const NAV: { group: string; items: { id: Section; label: string; icon: React.Rea
 const TITLES: Record<Section, [string, string]> = {
   dashboard: ['Dashboard', 'Platform health, revenue and growth at a glance'],
   schools: ['Schools', 'Every school on Veducore — open one to manage it'],
-  'add-school': ['Onboard a school', 'Create the school, its owner login and plan in one step'],
+  'add-school': ['Onboard a school', 'Create the school and its owner login in one step'],
   'id-cards': ['ID cards', 'Design templates and print student ID card sheets'],
   'report-cards': ['Report cards', "Design each school's annual report card on its own blank card"],
-  billing: ['Billing & plans', "Subscriptions, invoices and Veducore's pricing"],
+  billing: ['Billing', 'Subscriptions and invoices'],
   payments: ['Online payments', 'Parent fee payments across all schools'],
   announcements: ['Announcements', 'Messages to school admins, teachers and parents'],
   ads: ['Login page ads', 'Banner ads that rotate at the bottom of the login page'],

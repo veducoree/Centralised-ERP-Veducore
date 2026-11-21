@@ -176,7 +176,7 @@ function Composer({ schools, onClose, onSent }: { schools: SchoolRecord[]; onClo
                   <label key={s.id} className="flex cursor-pointer items-center gap-2.5 rounded-xl px-2 py-1.5 text-sm hover:bg-slate-50">
                     <input type="checkbox" checked={f.school_ids.includes(s.id)} onChange={() => toggle(s.id)} className="rounded" />
                     <span className="flex-1 text-slate-700">{s.name}</span>
-                    <span className="text-xs text-slate-400">{s.subscription?.planName ?? ''}</span>
+                    <span className="text-xs text-slate-400">{s.city ?? ''}</span>
                   </label>
                 ))}
               </div>

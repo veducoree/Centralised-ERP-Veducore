@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Form';
 import { Modal, ConfirmDialog } from '@/components/ui/Modal';
 import { BulkStudentUpload } from '@/components/ui/BulkStudentUpload';
+import { AdmissionNumberInput } from '@/components/ui/AdmissionNumberInput';
 import { SearchInput, PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
@@ -16,6 +17,7 @@ import type { Student, Class, Section } from '@/types';
 import { formatDate, validateEmail, getInitials } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/Badge';
 import { supabase } from '@/lib/supabase';
+import { normalizeMobile, parentLoginId } from '@/lib/parentUtils';
 
 export default function AdminStudents() {
   const { profile } = useAuth();
@@ -115,6 +117,9 @@ export default function AdminStudents() {
     if (!form.full_name) e.full_name = 'Full name is required';
     if (!form.class_id) e.class_id = 'Class is required';
     if (!form.section_id) e.section_id = 'Section is required';
+    // Parent logs in with this number, so it's required for new students.
+    if (!editing && !normalizeMobile(form.emergency_contact)) e.emergency_contact = "Enter the parent's 10-digit mobile number";
+    else if (form.emergency_contact && !normalizeMobile(form.emergency_contact)) e.emergency_contact = 'Enter a valid 10-digit mobile number';
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -144,9 +149,13 @@ export default function AdminStudents() {
         toast('Student updated successfully', 'success');
       } else {
         const res = await createStudent(data);
-        toast('Student & Parent account created successfully!', 'success');
-        if ((res as any)?._parentResult?.credentials) {
-          const pr = (res as any)._parentResult;
+        if (res?._parentError) {
+          toast(`Student added, but parent login failed: ${res._parentError}`, 'error');
+        } else {
+          toast('Student & Parent account created successfully!', 'success');
+        }
+        if (res?._parentResult?.credentials) {
+          const pr = res._parentResult;
           setParentCredModal({
             studentName: form.full_name,
             parentName: pr.parent?.full_name || form.father_name || `${form.full_name}'s Parent`,
@@ -180,7 +189,7 @@ export default function AdminStudents() {
         setParentCredModal({
           studentName: student.full_name,
           parentName: p.full_name || `${student.full_name}'s Parent`,
-          username: p.email,
+          username: parentLoginId(p.email),
           password: p.password || '(not set)',
         });
         setParentCredVisible(true);
@@ -199,7 +208,7 @@ export default function AdminStudents() {
       }
     } catch (err) {
       console.error(err);
-      toast('Failed to load parent credentials', 'error');
+      toast(err instanceof Error ? err.message : 'Failed to load parent credentials', 'error');
     } finally {
       setLoadingParentCred(null);
     }
@@ -345,7 +354,11 @@ export default function AdminStudents() {
         }
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Input label="Admission Number" required value={form.admission_number} onChange={(e) => setForm({ ...form, admission_number: e.target.value })} error={errors.admission_number} />
+          {editing ? (
+            <Input label="Admission Number" required value={form.admission_number} onChange={(e) => setForm({ ...form, admission_number: e.target.value })} error={errors.admission_number} />
+          ) : (
+            <AdmissionNumberInput value={form.admission_number} onChange={(v) => setForm((f) => ({ ...f, admission_number: v }))} error={errors.admission_number} />
+          )}
           <Input label="Full Name" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} error={errors.full_name} />
           <Input label="Father's Name" value={form.father_name} onChange={(e) => setForm({ ...form, father_name: e.target.value })} placeholder="Father's full name" />
           <Input label="Mother's Name" value={form.mother_name} onChange={(e) => setForm({ ...form, mother_name: e.target.value })} placeholder="Mother's full name" />
@@ -373,7 +386,7 @@ export default function AdminStudents() {
           />
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-700">
-              Mobile Number
+              Parent Mobile Number {!editing && <span className="text-red-500">*</span>}
             </label>
             <div className="flex rounded-[10px] overflow-hidden">
               <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-slate-200 bg-slate-50 text-slate-600 text-sm font-medium select-none">
@@ -391,6 +404,9 @@ export default function AdminStudents() {
                 placeholder="10-digit mobile number"
               />
             </div>
+            {errors.emergency_contact
+              ? <p className="mt-1 text-xs text-red-600">{errors.emergency_contact}</p>
+              : <p className="mt-1 text-xs text-slate-400">Parent logs in with this number</p>}
           </div>
           <div className="sm:col-span-2">
             <Input label="Address" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
@@ -420,17 +436,17 @@ export default function AdminStudents() {
             <div className="rounded-xl border border-cyan-200 bg-gradient-to-br from-cyan-50/70 to-brand-50/50 p-4 space-y-3">
               <div className="flex items-center justify-between pb-3 border-b border-cyan-100">
                 <div>
-                  <p className="text-xs font-medium text-slate-500 mb-0.5">Username / Email</p>
+                  <p className="text-xs font-medium text-slate-500 mb-0.5">Login (Mobile Number)</p>
                   <p className="font-mono text-sm font-semibold text-cyan-900">{parentCredModal.username}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => {
                     navigator.clipboard.writeText(parentCredModal.username);
-                    toast('Username copied', 'success');
+                    toast('Mobile number copied', 'success');
                   }}
                   className="rounded-lg p-1.5 bg-white shadow-2xs border border-slate-200 text-slate-500 hover:text-cyan-700 hover:border-cyan-300 transition-all"
-                  title="Copy username"
+                  title="Copy mobile number"
                 >
                   <Copy className="h-4 w-4" />
                 </button>
@@ -473,7 +489,7 @@ export default function AdminStudents() {
               variant="outline"
               className="w-full flex items-center justify-center gap-2 border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium shadow-2xs"
               onClick={() => {
-                const text = `Parent Login Credentials\nStudent: ${parentCredModal.studentName}\nParent: ${parentCredModal.parentName}\nUsername: ${parentCredModal.username}\nPassword: ${parentCredModal.password}\nPortal: Veducore Parent App / Web`;
+                const text = `Parent Login Credentials\nStudent: ${parentCredModal.studentName}\nParent: ${parentCredModal.parentName}\nLogin (Mobile): ${parentCredModal.username}\nPassword: ${parentCredModal.password}\nPortal: Veducore Parent App / Web`;
                 navigator.clipboard.writeText(text);
                 toast('Parent credentials copied to clipboard', 'success');
               }}

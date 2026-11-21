@@ -43,6 +43,12 @@ export interface School {
   motto?: string | null;
   affiliation_board?: string | null;
   affiliation_code?: string | null;
+  /** Fixed start of admission numbers, set by Veducore (e.g. "STUD"). */
+  admission_prefix?: string | null;
+  /** Short code used in parent passwords (e.g. "gvps"), set by Veducore. */
+  short_name?: string | null;
+  /** Fixed start of teacher employee IDs, set by Veducore (e.g. "EMP"). */
+  employee_prefix?: string | null;
   settings?: Record<string, any> | null;
   created_at: string;
   updated_at: string;

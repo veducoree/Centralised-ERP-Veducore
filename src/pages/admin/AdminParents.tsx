@@ -16,6 +16,7 @@ import {
 } from '@/services/api';
 import type { Parent, School } from '@/types';
 import { getInitials } from '@/lib/utils';
+import { parentLoginId } from '@/lib/parentUtils';
 import { StatusBadge } from '@/components/ui/Badge';
 
 // ─── Main View ───────────────────────────────────────────────────────────────
@@ -212,7 +213,7 @@ function AdminParentsView() {
                       {p.phone ? (p.phone.startsWith('+91') ? p.phone : `+91 ${p.phone}`) : '—'}
                     </p>
                     <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
-                      <Mail className="h-3 w-3 text-slate-400 flex-shrink-0" /> {p.email}
+                      <Mail className="h-3 w-3 text-slate-400 flex-shrink-0" /> {parentLoginId(p.email)}
                     </p>
                     {p.address && (
                       <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5 max-w-xs truncate" title={p.address}>
@@ -297,8 +298,8 @@ function AdminParentsView() {
                 <p className="text-sm font-semibold text-slate-900">{editing.full_name}</p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-slate-500 font-medium">Login Username</p>
-                <p className="text-xs font-mono text-slate-700">{editing.email}</p>
+                <p className="text-xs text-slate-500 font-medium">Login (Mobile)</p>
+                <p className="text-xs font-mono text-slate-700">{parentLoginId(editing.email)}</p>
               </div>
             </div>
 
@@ -394,17 +395,17 @@ function AdminParentsView() {
             <div className="rounded-xl border border-cyan-200 bg-gradient-to-br from-cyan-50/70 to-brand-50/50 p-4 space-y-3">
               <div className="flex items-center justify-between pb-3 border-b border-cyan-100">
                 <div>
-                  <p className="text-xs font-medium text-slate-500 mb-0.5">Username / Email</p>
-                  <p className="font-mono text-sm font-semibold text-cyan-900">{credParent.email}</p>
+                  <p className="text-xs font-medium text-slate-500 mb-0.5">Login (Mobile)</p>
+                  <p className="font-mono text-sm font-semibold text-cyan-900">{parentLoginId(credParent.email)}</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => {
-                    navigator.clipboard.writeText(credParent.email);
-                    toast('Username copied', 'success');
+                    navigator.clipboard.writeText(parentLoginId(credParent.email));
+                    toast('Mobile number copied', 'success');
                   }}
                   className="rounded-lg p-1.5 bg-white shadow-2xs border border-slate-200 text-slate-500 hover:text-cyan-700 hover:border-cyan-300 transition-all"
-                  title="Copy username"
+                  title="Copy mobile number"
                 >
                   <Copy className="h-4 w-4" />
                 </button>
@@ -449,9 +450,9 @@ function AdminParentsView() {
               className="w-full flex items-center justify-center gap-2 border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium shadow-2xs"
               onClick={() => {
                 const students = credParent.parent_students?.map((ps) => ps.student?.full_name).filter(Boolean).join(', ') || 'N/A';
-                const text = `Parent Login Credentials\nSchool: ${school?.name || 'Veducore School'}\nParent: ${credParent.full_name}\nStudent: ${students}\nUsername: ${credParent.email}\nPassword: ${credParent.password || ''}\nPortal: Veducore Parent App / Portal`;
+                const text = `Parent Login Credentials\nSchool: ${school?.name || 'Veducore School'}\nParent: ${credParent.full_name}\nStudent: ${students}\nLogin (Mobile): ${parentLoginId(credParent.email)}\nPassword: ${credParent.password || ''}\nPortal: Veducore Parent App / Portal`;
                 navigator.clipboard.writeText(text);
-                toast('Username & Password copied to clipboard', 'success');
+                toast('Login & password copied to clipboard', 'success');
               }}
             >
               <Copy className="h-4 w-4" /> Copy All Credentials

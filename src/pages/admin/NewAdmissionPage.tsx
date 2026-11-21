@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle, Copy, X, Lock,
   ArrowLeft, AlertTriangle, IndianRupee, Pencil, Printer,
-  MessageCircle, PlusCircle,
+  MessageCircle, PlusCircle, Users,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Input, Select } from '@/components/ui/Form';
+import { AdmissionNumberInput } from '@/components/ui/AdmissionNumberInput';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
@@ -28,7 +29,7 @@ import type {
   AdmissionFeesData,
 } from '@/types';
 import { INDIAN_STATES, formatCurrency } from '@/lib/utils';
-import { generateParentCredentials } from '@/lib/parentUtils';
+import { generateParentCredentials, normalizeMobile, parentFromStudent, schoolShortName } from '@/lib/parentUtils';
 
 // ─── Wizard persistence key ───────────────────────────────────────────────────
 const WIZARD_KEY = 'veducore_admission_wizard_v3';
@@ -66,7 +67,11 @@ interface FormData {
   transport_selected: boolean;
   // Step 4 — Fees
   fees: AdmissionFeesData;
+  /** Other children of the same parents, admitted one after another after this one. */
+  pending_siblings: SiblingDraft[];
 }
+
+interface SiblingDraft { full_name: string; date_of_birth: string; gender: string }
 
 const DEFAULT_FEES: AdmissionFeesData = {
   line_items: [],
@@ -92,9 +97,33 @@ const INITIAL_FORM: FormData = {
   tc_number: '', tc_date: '',
   transport_selected: false,
   fees: DEFAULT_FEES,
+  pending_siblings: [],
 };
 
 const STEP_LABELS = ['Personal', 'Address', 'Class & School', 'Fees', 'Review'];
+
+/** Parent / family fields kept when admitting a sibling. */
+const FAMILY_FIELDS = [
+  'father_name', 'mother_name', 'parent_email', 'phone', 'whatsapp', 'same_as_phone',
+  'address_line1', 'address_line2', 'city', 'state', 'pin_code', 'country',
+] as const;
+
+/**
+ * A fresh form for the next child with the same parents and address. If the
+ * admin listed siblings in Step 1, the next one's name / DOB / gender are
+ * filled in and the rest stay queued.
+ */
+function siblingForm(prev: FormData): FormData {
+  const [nextChild, ...rest] = prev.pending_siblings ?? [];
+  const next: FormData = {
+    ...INITIAL_FORM,
+    fees: { ...DEFAULT_FEES, payment_date: new Date().toISOString().split('T')[0] },
+    pending_siblings: rest,
+    ...(nextChild ? { full_name: nextChild.full_name, date_of_birth: nextChild.date_of_birth, gender: nextChild.gender || 'male' } : {}),
+  };
+  for (const k of FAMILY_FIELDS) (next as unknown as Record<string, unknown>)[k] = prev[k];
+  return next;
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -296,7 +325,7 @@ function CredentialsBox({ username, password }: { username: string; password: st
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between text-sm">
-          <span className="text-brand-700">Username:</span>
+          <span className="text-brand-700">Login (Mobile):</span>
           <div className="flex items-center gap-1">
             <code className="rounded bg-white px-2 py-0.5 font-mono text-brand-800">{username}</code>
             <CopyButton text={username} />
@@ -369,6 +398,50 @@ function Step1({ formData, errors, update }: StepProps) {
           <option value="other">Other</option>
         </Select>
       </div>
+
+      {/* Siblings: same parents, admitted one after another */}
+      <div className="rounded-xl border border-violet-200 bg-violet-50/40 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="flex items-center gap-1.5 text-sm font-semibold text-violet-800"><Users className="h-4 w-4" /> Siblings — same parents</p>
+            <p className="text-xs text-violet-600">Admitting brothers / sisters together? Add them here. Parent details and address are filled once and reused.</p>
+          </div>
+          <button type="button"
+            onClick={() => update({ pending_siblings: [...(formData.pending_siblings ?? []), { full_name: '', date_of_birth: '', gender: 'male' }] })}
+            className="flex items-center gap-1.5 rounded-lg border border-violet-300 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50">
+            <PlusCircle className="h-3.5 w-3.5" /> Add another child
+          </button>
+        </div>
+        {(formData.pending_siblings ?? []).length > 0 && (
+          <div className="mt-3 space-y-3">
+            {formData.pending_siblings.map((sib, i) => {
+              const setSib = (patch: Partial<SiblingDraft>) =>
+                update({ pending_siblings: formData.pending_siblings.map((x, j) => (j === i ? { ...x, ...patch } : x)) });
+              return (
+                <div key={i} className="grid grid-cols-1 gap-3 rounded-lg border border-violet-100 bg-white p-3 sm:grid-cols-[1.4fr_1fr_0.8fr_auto] sm:items-start">
+                  <Input label={`Child ${i + 2} — Full Name`} required value={sib.full_name} onChange={(e) => setSib({ full_name: e.target.value })}
+                    error={errors[`sib_${i}_name`]} placeholder="Full name" />
+                  <Input label="Date of Birth" type="date" required value={sib.date_of_birth} onChange={(e) => setSib({ date_of_birth: e.target.value })}
+                    error={errors[`sib_${i}_dob`]} />
+                  <Select label="Gender" required value={sib.gender} onChange={(e) => setSib({ gender: e.target.value })}>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                    <option value="other">Other</option>
+                  </Select>
+                  <button type="button" title="Remove"
+                    onClick={() => update({ pending_siblings: formData.pending_siblings.filter((_, j) => j !== i) })}
+                    className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-600 sm:mt-7">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              );
+            })}
+            <p className="text-xs text-violet-600">
+              After this child&apos;s admission is saved you go straight to the next child — only class, section and fees are left to fill.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -428,7 +501,7 @@ function Step3({ formData, errors, update, classes }: Step3Props) {
           <option value="">Select section</option>
           {availableSections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
         </Select>
-        <Input label="Admission Number" required value={formData.admission_number} onChange={(e) => update({ admission_number: e.target.value })} error={errors.admission_number} placeholder="e.g. 20240051" />
+        <AdmissionNumberInput value={formData.admission_number} onChange={(v) => update({ admission_number: v })} error={errors.admission_number} />
         <Input label="Previous School Name" value={formData.prev_school_name} onChange={(e) => update({ prev_school_name: e.target.value })} placeholder="Optional" />
         <Select label="Previous School Board" value={formData.prev_school_board} onChange={(e) => update({ prev_school_board: e.target.value })}>
           <option value="">Select board (optional)</option>
@@ -925,6 +998,8 @@ export default function NewAdmissionPage() {
   const [resultParentCredentials, setResultParentCredentials] = useState<{ username: string; password: string } | null>(null);
   // Online (Razorpay) at admission: null = not used, true = paid, false = not completed
   const [onlinePaid, setOnlinePaid] = useState<boolean | null>(null);
+  // Children admitted in a row for the same parents ("Add Sibling").
+  const [siblings, setSiblings] = useState<{ name: string; admissionNumber: string }[]>([]);
 
   // Idempotency key — generated once per wizard session, persists across refresh
   const idempotencyKeyRef = useRef<string>('');
@@ -1001,6 +1076,10 @@ export default function NewAdmissionPage() {
       }
       if (!formData.date_of_birth) e.date_of_birth = 'Date of birth is required';
       if (!formData.gender) e.gender = 'Gender is required';
+      (formData.pending_siblings ?? []).forEach((sib, i) => {
+        if (!sib.full_name.trim()) e[`sib_${i}_name`] = 'Name is required';
+        if (!sib.date_of_birth) e[`sib_${i}_dob`] = 'Date of birth is required';
+      });
     }
 
     if (step === 2) {
@@ -1167,6 +1246,7 @@ export default function NewAdmissionPage() {
       setResultReceiptId(result.receiptId);
       setResultStudentName(formData.full_name);
       setResultParentCredentials(result.parentCredentials);
+      if (result.parentError) toast(`Admission saved, but parent login failed: ${result.parentError}`, 'error');
 
       // Clear wizard session storage
       try { sessionStorage.removeItem(WIZARD_KEY); } catch { /* ignore */ }
@@ -1181,8 +1261,14 @@ export default function NewAdmissionPage() {
   }
 
   // ── Credentials for review step ─────────────────────────────────────────────
-  const parentCreds = school !== null
-    ? generateParentCredentials(formData.full_name, formData.admission_number, school.name, formData.date_of_birth)
+  // Preview of the parent login: their mobile number + parentfirstname@schoolshortname.
+  const previewMobile = normalizeMobile(formData.phone);
+  const parentCreds = school !== null && previewMobile
+    ? generateParentCredentials({
+        mobile: previewMobile,
+        parentName: parentFromStudent(formData).name,
+        shortName: schoolShortName(school),
+      })
     : null;
   const credentials = parentCreds ? { username: parentCreds.username, password: parentCreds.password } : null;
 
@@ -1226,6 +1312,17 @@ export default function NewAdmissionPage() {
                 </div>
                 <h2 className="text-xl font-bold text-slate-900">Admission Successful!</h2>
                 <p className="mt-1 text-sm text-slate-500">Student has been enrolled and fee records created.</p>
+
+                {siblings.length > 0 && (
+                  <div className="mt-4 w-full rounded-xl border border-violet-200 bg-violet-50/60 p-3 text-left text-sm text-violet-800">
+                    <p className="flex items-center gap-1.5 font-semibold"><Users className="h-4 w-4" /> Same family ({siblings.length + 1} children)</p>
+                    <p className="mt-1 text-xs">
+                      {[...siblings, { name: resultStudentName, admissionNumber: resultAdmissionNumber }]
+                        .map((x) => `${x.name} (${x.admissionNumber})`).join(' · ')}
+                    </p>
+                    <p className="mt-1 text-xs text-violet-600">All of them use the same parent login.</p>
+                  </div>
+                )}
 
                 {/* Admission + Receipt info */}
                 <div className="mt-6 w-full rounded-xl bg-slate-50 p-4 text-left space-y-2">
@@ -1306,10 +1403,34 @@ export default function NewAdmissionPage() {
                     </button>
                   )}
 
+                  {/* Next listed sibling, or a new sibling — same parents either way */}
+                  <button
+                    onClick={() => {
+                      const queued = (formData.pending_siblings ?? []).length > 0;
+                      setSiblings((cur) => [...cur, { name: resultStudentName, admissionNumber: resultAdmissionNumber }]);
+                      idempotencyKeyRef.current = '';
+                      setOnlinePaid(null);
+                      setFormData(siblingForm(formData));
+                      // Listed child: personal + address are done, go to Class & School.
+                      setCurrentStep(queued ? 3 : 1);
+                      setSubmitted(false);
+                      setErrors({});
+                    }}
+                    className={(formData.pending_siblings ?? []).length > 0
+                      ? 'flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 transition-colors'
+                      : 'flex items-center gap-2 rounded-xl border border-violet-300 bg-violet-50 px-4 py-2.5 text-sm font-medium text-violet-700 hover:bg-violet-100 transition-colors'}>
+                    <Users className="h-4 w-4" />
+                    {(formData.pending_siblings ?? []).length > 0
+                      ? `Next child: ${formData.pending_siblings[0].full_name} →`
+                      : 'Add Sibling (same parents)'}
+                  </button>
+
                   {/* Add Another */}
                   <button
                     onClick={() => {
+                      setSiblings([]);
                       idempotencyKeyRef.current = '';
+                      setOnlinePaid(null);
                       setFormData(INITIAL_FORM);
                       setCurrentStep(1);
                       setSubmitted(false);
@@ -1333,6 +1454,15 @@ export default function NewAdmissionPage() {
               </div>
             ) : (
               <>
+                {siblings.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 border-b border-violet-100 bg-violet-50/60 px-4 py-3 text-sm text-violet-800 sm:px-6">
+                    <Users className="h-4 w-4 shrink-0" />
+                    <span>
+                      Sibling of {siblings.map((x) => `${x.name} (${x.admissionNumber})`).join(', ')} — parent details and address are already filled.
+                      Just enter this child's details.
+                    </span>
+                  </div>
+                )}
                 {/* ── Stepper ─────────────────────────────────────────────── */}
                 <div className="border-b border-slate-100 px-4 py-5 sm:px-6">
                   <div className="flex items-center overflow-x-auto">

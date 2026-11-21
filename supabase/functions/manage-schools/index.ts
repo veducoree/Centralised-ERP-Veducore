@@ -56,6 +56,27 @@ function str(v: unknown): string | null {
   return t === "" ? null : t;
 }
 
+/** Admission number / employee ID prefix: optional, letters/digits/'/'/'-', max 12, stored upper-case. */
+function codePrefix(v: unknown, label = "Admission prefix"): string | null {
+  const t = str(v);
+  if (t === null) return null;
+  if (!/^[A-Za-z0-9/-]{1,12}$/.test(t)) {
+    throw new HttpError(400, `${label} can only have letters, numbers, / or - (max 12)`);
+  }
+  return t.toUpperCase();
+}
+
+/** School short name (used in parent passwords): 2–12 letters/digits, stored lower-case. */
+function shortName(v: unknown, required = false): string | null {
+  const t = str(v);
+  if (t === null) {
+    if (required) throw new HttpError(400, "School short name is required");
+    return null;
+  }
+  if (!/^[A-Za-z0-9]{2,12}$/.test(t)) throw new HttpError(400, "School short name can only have letters and numbers (2–12)");
+  return t.toLowerCase();
+}
+
 function paise(v: unknown, name: string): number {
   const n = Number(v);
   if (!Number.isFinite(n) || n < 0) throw new HttpError(400, `${name} must be a positive amount`);
@@ -219,6 +240,9 @@ async function loadSchoolsFull(ctx: Ctx) {
       contactNumber: s.contact_number ?? "",
       email: s.email ?? "",
       academicYear: s.academic_year ?? "",
+      admissionPrefix: s.admission_prefix ?? "",
+      employeePrefix: s.employee_prefix ?? "",
+      shortName: s.short_name ?? "",
       logoUrl: s.logo_url ?? null,
       status: (s.status ?? "Active") === "Active" ? "Active" : "Suspended",
       suspendedAt: s.suspended_at ?? null,
@@ -317,7 +341,7 @@ const ACTIONS: Record<string, { roles: Role[]; run: (ctx: Ctx) => Promise<unknow
         })
         .map((s: any) => ({
           id: s.id, name: s.name,
-          planName: s.subscription?.planName,
+          billingCycle: s.subscription?.billingCycle ?? null,
           status: s.subscription?.status,
           endsOn: s.subscription?.status === "trial" ? s.subscription?.trialEndsAt : s.subscription?.currentPeriodEnd,
           amount: s.subscription?.amount ?? 0,
@@ -337,10 +361,11 @@ const ACTIONS: Record<string, { roles: Role[]; run: (ctx: Ctx) => Promise<unknow
       const yearStart = new Date(new Date().getFullYear(), 0, 1).getTime();
       const inv = invoices ?? [];
       const outstanding = inv.filter((i: any) => i.status === "issued");
-      const planMix: Record<string, number> = {};
+      // Schools by subscription status (plans are no longer used).
+      const subscriptionMix: Record<string, number> = {};
       for (const s of schools) {
-        const k = s.subscription?.planName ?? "No plan";
-        planMix[k] = (planMix[k] ?? 0) + 1;
+        const k = s.subscription?.status ?? "none";
+        subscriptionMix[k] = (subscriptionMix[k] ?? 0) + 1;
       }
 
       return {
@@ -371,9 +396,9 @@ const ACTIONS: Record<string, { roles: Role[]; run: (ctx: Ctx) => Promise<unknow
         health,
         atRisk: atRisk.slice(0, 8),
         renewals: renewals.slice(0, 8),
-        planMix,
+        subscriptionMix,
         topSchools: [...schools].sort((a: any, b: any) => b.students - a.students).slice(0, 5)
-          .map((s: any) => ({ id: s.id, name: s.name, students: s.students, teachers: s.teachers, planName: s.subscription?.planName })),
+          .map((s: any) => ({ id: s.id, name: s.name, students: s.students, teachers: s.teachers })),
         recentActivity: activity ?? [],
       };
     },
@@ -448,6 +473,9 @@ const ACTIONS: Record<string, { roles: Role[]; run: (ctx: Ctx) => Promise<unknow
         contact_number: str(b.contact_number),
         email,
         academic_year: str(b.academic_year) ?? "2026-27",
+        admission_prefix: codePrefix(b.admission_prefix),
+        employee_prefix: codePrefix(b.employee_prefix, "Employee ID prefix"),
+        short_name: shortName(b.short_name, true),
         timezone: "Asia/Kolkata",
         currency: "INR",
         currency_symbol: "₹",
@@ -478,25 +506,24 @@ const ACTIONS: Record<string, { roles: Role[]; run: (ctx: Ctx) => Promise<unknow
         status: "active",
       }, { onConflict: "id" });
 
-      // Subscription row is created by trigger; apply the chosen plan.
-      if (b.plan_id) {
-        const { data: plan } = await ctx.db.from("platform_plans").select("*").eq("id", b.plan_id).maybeSingle();
-        if (plan) {
-          const isTrial = plan.code === "trial";
-          const trialDays = Number(b.trial_days) > 0 ? Number(b.trial_days) : 30;
-          const start = today();
-          await ctx.db.from("school_subscriptions").upsert({
-            school_id: school.id,
-            plan_id: plan.id,
-            status: isTrial ? "trial" : "active",
-            billing_cycle: plan.billing_cycle,
-            student_limit: plan.max_students,
-            trial_ends_at: isTrial ? new Date(Date.now() + trialDays * DAY).toISOString().slice(0, 10) : null,
-            current_period_start: isTrial ? null : start,
-            current_period_end: isTrial ? null : addMonths(start, cycleMonths(plan.billing_cycle)),
-            updated_at: new Date().toISOString(),
-          }, { onConflict: "school_id" });
-        }
+      // Subscription row is created by trigger; set how the school starts.
+      // Plans are no longer used: price is set directly per school.
+      {
+        const isTrial = b.sub_status !== "active";
+        const cycle = ["monthly", "quarterly", "yearly"].includes(b.billing_cycle) ? b.billing_cycle : "yearly";
+        const trialDays = Number(b.trial_days) > 0 ? Math.min(365, Number(b.trial_days)) : 30;
+        const start = today();
+        await ctx.db.from("school_subscriptions").upsert({
+          school_id: school.id,
+          plan_id: null,
+          status: isTrial ? "trial" : "active",
+          billing_cycle: cycle,
+          price_override: b.price === null || b.price === undefined || b.price === "" ? null : paise(b.price, "Price"),
+          trial_ends_at: isTrial ? new Date(Date.now() + trialDays * DAY).toISOString().slice(0, 10) : null,
+          current_period_start: isTrial ? null : start,
+          current_period_end: isTrial ? null : addMonths(start, cycleMonths(cycle)),
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "school_id" });
       }
 
       await audit(ctx, "school.created", school.id, { school_name: name, admin_email: email });
@@ -515,6 +542,9 @@ const ACTIONS: Record<string, { roles: Role[]; run: (ctx: Ctx) => Promise<unknow
         ["email", "email"], ["academicYear", "academic_year"]] as const) {
         if (k in f) update[col] = str(f[k]);
       }
+      if ("admissionPrefix" in f) update.admission_prefix = codePrefix(f.admissionPrefix);
+      if ("employeePrefix" in f) update.employee_prefix = codePrefix(f.employeePrefix, "Employee ID prefix");
+      if ("shortName" in f) update.short_name = shortName(f.shortName);
       if (!Object.keys(update).length) throw new HttpError(400, "Nothing to update");
       const { error } = await ctx.db.from("schools").update(update).eq("id", schoolId);
       if (error) throw new HttpError(400, error.message);
@@ -690,7 +720,7 @@ const ACTIONS: Record<string, { roles: Role[]; run: (ctx: Ctx) => Promise<unknow
       const status = ["trial", "active", "past_due", "cancelled", "expired"].includes(s.status) ? s.status : "active";
       const row = {
         school_id: schoolId,
-        plan_id: s.plan_id || null,
+        plan_id: null, // plans are no longer used; price_override is the price
         status,
         billing_cycle: ["monthly", "quarterly", "yearly"].includes(s.billing_cycle) ? s.billing_cycle : "yearly",
         price_override: s.price_override === null || s.price_override === "" || s.price_override === undefined
@@ -704,7 +734,7 @@ const ACTIONS: Record<string, { roles: Role[]; run: (ctx: Ctx) => Promise<unknow
       };
       const { error } = await ctx.db.from("school_subscriptions").upsert(row, { onConflict: "school_id" });
       if (error) throw new HttpError(400, error.message);
-      await audit(ctx, "subscription.updated", schoolId, { status, plan_id: row.plan_id, period_end: row.current_period_end });
+      await audit(ctx, "subscription.updated", schoolId, { status, price: row.price_override, period_end: row.current_period_end });
       return { success: true };
     },
   },
