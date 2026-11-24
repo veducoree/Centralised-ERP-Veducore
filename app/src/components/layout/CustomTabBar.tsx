@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useSyncExternalStore } from 'react';
 import {
   View,
   Text,
@@ -57,12 +57,33 @@ function TabButton({ tab, focused, onPress }: { tab: TabItem; focused: boolean; 
   );
 }
 
+// Live height of the bottom tab bar (0 when none is shown), so overlays like
+// the update sheet can sit right on top of it.
+let tabBarHeight = 0;
+const tabBarListeners = new Set<() => void>();
+function setTabBarHeight(h: number) {
+  if (h === tabBarHeight) return;
+  tabBarHeight = h;
+  tabBarListeners.forEach((l) => l());
+}
+export function useTabBarHeight(): number {
+  return useSyncExternalStore(
+    (l) => { tabBarListeners.add(l); return () => { tabBarListeners.delete(l); }; },
+    () => tabBarHeight,
+  );
+}
+
 export function CustomTabBar({ tabs, activeTab, onTabPress }: CustomTabBarProps) {
   const insets = useSafeAreaInsets();
   const bottomPad = insets.bottom > 0 ? insets.bottom : 10;
+  useEffect(() => () => setTabBarHeight(0), []);
 
   return (
-    <View style={[styles.container, { paddingBottom: bottomPad }]} accessibilityRole="tablist">
+    <View
+      style={[styles.container, { paddingBottom: bottomPad }]}
+      accessibilityRole="tablist"
+      onLayout={(e) => setTabBarHeight(Math.round(e.nativeEvent.layout.height))}
+    >
       {tabs.map((tab) => (
         <TabButton key={tab.name} tab={tab} focused={activeTab === tab.name} onPress={() => onTabPress(tab.name)} />
       ))}
