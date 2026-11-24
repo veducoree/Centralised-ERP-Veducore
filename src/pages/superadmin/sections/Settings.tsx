@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { KeyRound, LogOut, UserRound } from 'lucide-react';
 import { errMsg, mgmtSupabase, type Me } from '../api';
 import { Badge, Button, Card, Field, KV, ROLES, inputCls, toast } from '../ui';
+import { isWrongCredentials, lockMessage, loginLockRemaining, recordLoginFailure, recordLoginSuccess } from '@/lib/loginThrottle';
 
 export default function SettingsSection({ me, onSignOutEverywhere }: { me: Me; onSignOutEverywhere: () => void }) {
   const [current, setCurrent] = useState('');
@@ -17,8 +18,14 @@ export default function SettingsSection({ me, onSignOutEverywhere }: { me: Me; o
     setSaving(true);
     try {
       // Confirm the current password before changing it.
+      const lockedFor = loginLockRemaining('mgmt-reauth', me.email);
+      if (lockedFor > 0) throw new Error(lockMessage(lockedFor));
       const { error: authErr } = await mgmtSupabase.auth.signInWithPassword({ email: me.email, password: current });
-      if (authErr) throw new Error('Current password is wrong');
+      if (authErr) {
+        const lock = isWrongCredentials(authErr.message) ? recordLoginFailure('mgmt-reauth', me.email) : 0;
+        throw new Error(lock > 0 ? lockMessage(lock) : 'Current password is wrong');
+      }
+      recordLoginSuccess('mgmt-reauth', me.email);
       const { error } = await mgmtSupabase.auth.updateUser({ password: next });
       if (error) throw error;
       setCurrent(''); setNext(''); setConfirm('');

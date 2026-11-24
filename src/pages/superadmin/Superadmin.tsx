@@ -13,6 +13,10 @@ import { Badge, LoadingBlock, ROLES, Toaster, cx, inputCls } from './ui';
 import NotFound from '@/pages/NotFound';
 import DashboardSection from './sections/Dashboard';
 import SchoolsSection from './sections/Schools';
+import {
+  isServerRateLimit, isWrongCredentials, lockMessage, loginLockRemaining,
+  recordLoginFailure, recordLoginSuccess, SERVER_RATE_LIMIT_MESSAGE,
+} from '@/lib/loginThrottle';
 
 // Sections load on first open so the portal starts fast.
 const SchoolDrawer = lazy(() => import('./sections/SchoolDrawer'));
@@ -309,8 +313,19 @@ function AuthScreen({ onSignedIn }: { onSignedIn: (me: Me) => void }) {
   }, []);
 
   async function signIn(em: string, pw: string) {
-    const { error: authErr } = await mgmtSupabase!.auth.signInWithPassword({ email: em.trim().toLowerCase(), password: pw });
-    if (authErr) throw new Error(authErr.message === 'Invalid login credentials' ? 'Wrong email or password' : authErr.message);
+    const id = em.trim().toLowerCase();
+    const lockedFor = loginLockRemaining('mgmt', id);
+    if (lockedFor > 0) throw new Error(lockMessage(lockedFor));
+    const { error: authErr } = await mgmtSupabase!.auth.signInWithPassword({ email: id, password: pw });
+    if (authErr) {
+      if (isServerRateLimit(authErr.message)) throw new Error(SERVER_RATE_LIMIT_MESSAGE);
+      if (isWrongCredentials(authErr.message)) {
+        const lock = recordLoginFailure('mgmt', id);
+        throw new Error(lock > 0 ? lockMessage(lock) : 'Wrong email or password');
+      }
+      throw new Error(authErr.message);
+    }
+    recordLoginSuccess('mgmt', id);
     try {
       const r = await callManageSchools<{ me: Me }>({ action: 'me' });
       onSignedIn(r.me);

@@ -8,6 +8,10 @@ import type { Profile, School } from '@/types';
 import { resetAppIconSafely } from '@/lib/appIcon';
 import { AppState } from 'react-native';
 import { checkAccountAccess, setLoginNotice } from '@/lib/accountAccess';
+import {
+  isServerRateLimit, isWrongCredentials, lockMessage, loginLockRemaining,
+  recordLoginFailure, recordLoginSuccess, SERVER_RATE_LIMIT_MESSAGE,
+} from '@/lib/loginThrottle';
 
 const PROFILE_CACHE_KEY = 'veducore_mobile_profile_cache';
 const SCHOOL_CACHE_KEY = 'veducore_mobile_school_cache';
@@ -231,6 +235,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (identifier: string, password: string): Promise<{ error?: string }> => {
       const raw = identifier.trim().toLowerCase();
       const pw = password.trim();
+      // Too many wrong passwords for this login (or on this phone) → wait.
+      const lockedFor = await loginLockRemaining('app', raw);
+      if (lockedFor > 0) return { error: lockMessage(lockedFor) };
       // Same rules as the web login:
       //  • an email → as typed
       //  • a mobile number → parent login <10 digits>@parent.veducore,
@@ -256,6 +263,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           });
 
           if (!error && data?.user) {
+            await recordLoginSuccess('app', raw);
             // Paused school / deactivated login: say why, inline, instead
             // of opening an empty app.
             const access = await checkAccountAccess();
@@ -298,6 +306,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
+      if (isServerRateLimit(lastError)) return { error: SERVER_RATE_LIMIT_MESSAGE };
+      if (isWrongCredentials(lastError)) {
+        const lock = await recordLoginFailure('app', raw);
+        if (lock > 0) return { error: lockMessage(lock) };
+      }
       return { error: lastError || 'Invalid email or password' };
     },
     [fetchProfileAndSchool]

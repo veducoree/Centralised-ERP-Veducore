@@ -2309,24 +2309,18 @@ export async function createAdmissionWithFees(params: {
   } catch (parentErr) {
     parentError = parentErr instanceof Error ? parentErr.message : 'Could not create the parent login';
   }
-  invalidateCache('parents:');
+  invalidateCacheForAdmission(params.school_id);
 
   return { student, receiptNumber, receiptId, parentCredentials, parentError };
 }
 
 // Internal helper — invalidates all caches touched by admission
 function invalidateCacheForAdmission(schoolId: string) {
-  const apiCacheRef = (globalThis as unknown as { __veducore_cache?: Map<string, unknown> }).__veducore_cache;
-  if (!apiCacheRef) return;
-  for (const key of apiCacheRef.keys()) {
-    if (
-      key.startsWith('students:') ||
-      key.startsWith('parents:') ||
-      key.startsWith(`adminDashboard:${schoolId}`)
-    ) {
-      apiCacheRef.delete(key);
-    }
-  }
+  invalidateCache('students:');
+  invalidateCache('studentsBySection:');
+  invalidateCache('parentStudents:');
+  invalidateCache('parents:');
+  invalidateCache(`adminDashboard:${schoolId}`);
 }
 
 // ============================================================
@@ -3706,10 +3700,13 @@ export async function saveFeeHeadAmounts(schoolId: string, rows: { fee_head_id: 
     const { error } = await supabase.from('fee_head_amounts').upsert(keep, { onConflict: 'fee_head_id,class_id' });
     if (error) throw error;
   }
-  for (const d of drop) {
-    const { error } = await supabase.from('fee_head_amounts').delete().eq('fee_head_id', d.fee_head_id).eq('class_id', d.class_id);
-    if (error) throw error;
-  }
+  // One delete per fee head (all its cleared classes at once), in parallel.
+  const byHead = new Map<string, string[]>();
+  for (const d of drop) byHead.set(d.fee_head_id, [...(byHead.get(d.fee_head_id) ?? []), d.class_id]);
+  const results = await Promise.all([...byHead].map(([headId, classIds]) =>
+    supabase.from('fee_head_amounts').delete().eq('fee_head_id', headId).in('class_id', classIds)));
+  const failed = results.find((r) => r.error);
+  if (failed?.error) throw failed.error;
 }
 
 /**

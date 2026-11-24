@@ -13,6 +13,10 @@ import { supabase } from '@/lib/supabase';
 import { getInitials } from '@/lib/utils';
 import { generateTeacherUsername, parentLoginId, TEACHER_LOGIN_DOMAIN } from '@/lib/parentUtils';
 import type { Teacher, School } from '@/types';
+import {
+  isServerRateLimit, isWrongCredentials, lockMessage, loginLockRemaining,
+  recordLoginFailure, recordLoginSuccess, SERVER_RATE_LIMIT_MESSAGE,
+} from '@/lib/loginThrottle';
 
 export default function ProfilePage() {
   const { profile, signOut } = useAuth();
@@ -56,15 +60,20 @@ export default function ProfilePage() {
 
     setPwSaving(true);
     try {
-      // Re-authenticate with current password first
+      // Re-authenticate with current password first (same attempt limit as login)
+      const lockedFor = loginLockRemaining('reauth', profile.email);
+      if (lockedFor > 0) { toast(lockMessage(lockedFor), 'error'); return; }
       const { error: signInErr } = await supabase.auth.signInWithPassword({
         email: profile.email,
         password: pwForm.current,
       });
       if (signInErr) {
-        toast('Current password is incorrect', 'error');
+        if (isServerRateLimit(signInErr.message)) { toast(SERVER_RATE_LIMIT_MESSAGE, 'error'); return; }
+        const lock = isWrongCredentials(signInErr.message) ? recordLoginFailure('reauth', profile.email) : 0;
+        toast(lock > 0 ? lockMessage(lock) : 'Current password is incorrect', 'error');
         return;
       }
+      recordLoginSuccess('reauth', profile.email);
 
       // Update password via Supabase Auth
       const { error: updateErr } = await supabase.auth.updateUser({ password: pwForm.next });

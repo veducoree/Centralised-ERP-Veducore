@@ -4,6 +4,10 @@ import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { clearApiCache, fetchSchool } from '@/services/api';
 import { checkAccountAccess, setLoginNotice, takeLoginNotice } from '@/lib/accountAccess';
+import {
+  isServerRateLimit, isWrongCredentials, lockMessage, loginLockRemaining,
+  recordLoginFailure, recordLoginSuccess, SERVER_RATE_LIMIT_MESSAGE,
+} from '@/lib/loginThrottle';
 import type { Profile, Student, UserRole } from '@/types';
 
 export interface AuthContextValue {
@@ -231,6 +235,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const raw = identifier.trim().toLowerCase();
     const pw = password.trim();
+    // Too many wrong passwords for this login (or on this browser) → wait.
+    const lockedFor = loginLockRemaining('web', raw);
+    if (lockedFor > 0) return { error: lockMessage(lockedFor) };
     // Usernames map to synthetic internal emails. A bare username is never a valid
     // email, so go straight to the internal address (saves one network round trip).
     // A mobile number is a parent login (<10 digits>@parent.veducore) or a
@@ -244,6 +251,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     for (const email of emailsToTry) {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password: pw });
       if (!error && data?.user) {
+        recordLoginSuccess('web', raw);
         currentUserIdRef.current = data.user.id;
         setSession(data.session);
         setUser(data.user);
@@ -256,7 +264,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         return { error: null };
       }
-      if (error) lastError = error.message;
+      if (error) {
+        lastError = error.message;
+        // Only a wrong-credentials answer is worth trying the next form.
+        if (!isWrongCredentials(error.message)) break;
+      }
+    }
+    if (isServerRateLimit(lastError)) return { error: SERVER_RATE_LIMIT_MESSAGE };
+    if (isWrongCredentials(lastError)) {
+      const lock = recordLoginFailure('web', raw);
+      if (lock > 0) return { error: lockMessage(lock) };
     }
     return { error: lastError };
   };
