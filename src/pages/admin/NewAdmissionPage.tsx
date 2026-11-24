@@ -28,17 +28,23 @@ import type {
   AdmissionFeesData,
 } from '@/types';
 import { INDIAN_STATES, formatCurrency } from '@/lib/utils';
-import { generateParentCredentials, normalizeMobile, parentFromStudent, schoolShortName } from '@/lib/parentUtils';
+import { generateParentCredentials, joinName, normalizeMobile, schoolShortName, type NameParts } from '@/lib/parentUtils';
+import { NameFields } from '@/components/ui/NameFields';
 
 // ─── Wizard persistence key ───────────────────────────────────────────────────
 // v4: one form for the parents + any number of children (siblings).
-const WIZARD_KEY = 'veducore_admission_wizard_v4';
+// v5: student name split into first / middle / last.
+const WIZARD_KEY = 'veducore_admission_wizard_v5';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 /** One child being admitted. Parents, address and payment are shared. */
 interface ChildForm {
   // Step 1
+  first_name: string;
+  middle_name: string;
+  last_name: string;
+  /** first + middle + last, kept in sync by NameFields. */
   full_name: string;
   date_of_birth: string;
   gender: string;
@@ -112,7 +118,7 @@ const EMPTY_DISCOUNT: AdmissionDiscount = { type: 'flat', value: 0, reason: 'Oth
 
 function emptyChild(): ChildForm {
   return {
-    full_name: '', date_of_birth: '', gender: 'male',
+    first_name: '', middle_name: '', last_name: '', full_name: '', date_of_birth: '', gender: 'male',
     class_id: '', class_name: '', section_id: '', section_name: '',
     admission_number: '', prev_school_name: '', prev_school_board: '',
     tc_number: '', tc_date: '', transport_selected: false,
@@ -497,8 +503,14 @@ function Step1({ formData, errors, update, updateChild }: StepProps) {
                 </button>
               </div>
             )}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Input label="Student Full Name" required value={c.full_name} onChange={(e) => updateChild(i, { full_name: e.target.value })} error={errors[`c${i}_full_name`]} placeholder="Enter full name" />
+            <NameFields
+              label="Student"
+              idPrefix={`child${i}`}
+              value={{ first_name: c.first_name, middle_name: c.middle_name, last_name: c.last_name }}
+              onChange={(n: NameParts) => updateChild(i, { ...n, full_name: joinName(n) })}
+              error={errors[`c${i}_full_name`]}
+            />
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
               <Input label="Date of Birth" type="date" required value={c.date_of_birth} onChange={(e) => updateChild(i, { date_of_birth: e.target.value })} error={errors[`c${i}_date_of_birth`]} max={today()} />
               <Select label="Gender" required value={c.gender} onChange={(e) => updateChild(i, { gender: e.target.value })} error={errors[`c${i}_gender`]}>
                 <option value="">Select gender</option>
@@ -1072,7 +1084,7 @@ export default function NewAdmissionPage() {
       }
       if (kids.length === 0) e.children = 'Add at least one child';
       kids.forEach((c, i) => {
-        if (!c.full_name.trim()) e[`c${i}_full_name`] = 'Student name is required';
+        if (!c.first_name.trim()) e[`c${i}_full_name`] = 'Student first name is required';
         if (!c.date_of_birth) e[`c${i}_date_of_birth`] = 'Date of birth is required';
         else if (c.date_of_birth > today()) e[`c${i}_date_of_birth`] = 'Date of birth cannot be in the future';
         if (!c.gender) e[`c${i}_gender`] = 'Gender is required';
@@ -1168,7 +1180,10 @@ export default function NewAdmissionPage() {
           result = await createAdmissionWithFees({
             school_id: schoolId,
             admission_number: c.admission_number.trim(),
-            full_name: c.full_name.trim(),
+            full_name: joinName(c),
+            first_name: c.first_name.trim() || null,
+            middle_name: c.middle_name.trim() || null,
+            last_name: c.last_name.trim() || null,
             father_name: formData.father_name.trim(),
             mother_name: formData.mother_name.trim() || null,
             parent_email: formData.parent_email.trim() || null,
@@ -1277,14 +1292,14 @@ export default function NewAdmissionPage() {
     setErrors({});
   }
 
-  // Preview of the parent login: their mobile number + parentfirstname@schoolshortname.
+  // Preview of the parent login: their mobile number + a password from the (first) student's name.
   const previewMobile = normalizeMobile(formData.phone);
   const firstChild = formData.children[0] ?? emptyChild();
   const credentials = school !== null && previewMobile
     ? (() => {
         const c = generateParentCredentials({
           mobile: previewMobile,
-          parentName: parentFromStudent({ ...formData, full_name: firstChild.full_name }).name,
+          studentName: firstChild,
           shortName: schoolShortName(school),
         });
         return { username: c.username, password: c.password };

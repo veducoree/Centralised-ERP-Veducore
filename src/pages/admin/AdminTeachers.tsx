@@ -23,7 +23,11 @@ import {
 import { SubjectAllotmentEditor } from '@/components/teachers/SubjectAllotmentEditor';
 import { sortByClassOrder, sortSections } from '@/lib/classOrder';
 import { StatusBadge, Badge } from '@/components/ui/Badge';
-import { generateTeacherUsername } from '@/lib/parentUtils';
+import {
+  generateTeacherCredentials, generateTeacherUsername, joinName, namePartsOf, normalizeMobile,
+  parentLoginId, schoolShortName, TEACHER_LOGIN_DOMAIN, type NameParts,
+} from '@/lib/parentUtils';
+import { NameFields } from '@/components/ui/NameFields';
 
 export default function AdminTeachers() {
   const { profile } = useAuth();
@@ -37,10 +41,11 @@ export default function AdminTeachers() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
-    full_name: '', username: '', password: '', phone: '', employee_id: '',
+    first_name: '', middle_name: '', last_name: '', phone: '', employee_id: '',
     qualification: '', date_of_joining: '', address: '',
   });
   const [editForm, setEditForm] = useState<Partial<Teacher>>({});
+  const [editName, setEditName] = useState<NameParts>({ first_name: '', middle_name: '', last_name: '' });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Class / section / subject allotment
@@ -60,9 +65,18 @@ export default function AdminTeachers() {
   const [schoolLoaded, setSchoolLoaded] = useState(false);
 
   function getUsername(t: Teacher): string {
-    if (t.email) return t.email;
+    if (t.email) return parentLoginId(t.email);
     return generateTeacherUsername(t.full_name, school?.name ?? '');
   }
+
+  // Login = teacher's mobile number, password = from their name (see namePassword).
+  const formMobile = normalizeMobile(form.phone);
+  const formCreds = generateTeacherCredentials({
+    mobile: formMobile ?? '',
+    name: form,
+    shortName: schoolShortName(school),
+  });
+  const formPassword = form.first_name.trim() ? formCreds.password : '';
 
   useEffect(() => {
     if (!profile?.school_id) return;
@@ -71,11 +85,6 @@ export default function AdminTeachers() {
       .catch(console.error)
       .finally(() => setSchoolLoaded(true));
   }, [profile?.school_id]);
-
-  useEffect(() => {
-    const generated = generateTeacherUsername(form.full_name, school?.name ?? '');
-    setForm(prev => ({ ...prev, username: generated }));
-  }, [form.full_name, school]);
 
   const loadData = useCallback(async () => {
     if (!profile?.school_id) return;
@@ -142,7 +151,7 @@ export default function AdminTeachers() {
 
   function openAdd() {
     setForm({
-      full_name: '', username: '', password: '', phone: '', employee_id: '',
+      first_name: '', middle_name: '', last_name: '', phone: '', employee_id: '',
       qualification: '', date_of_joining: new Date().toISOString().split('T')[0], address: '',
     });
     setAllotRows([newAllotmentRow()]);
@@ -152,6 +161,7 @@ export default function AdminTeachers() {
 
   function openEdit(t: Teacher) {
     setEditing(t);
+    setEditName(namePartsOf(t));
     setEditForm({
       full_name: t.full_name, phone: t.phone, qualification: t.qualification,
       date_of_joining: t.date_of_joining, status: t.status, address: t.address ?? '',
@@ -170,11 +180,11 @@ export default function AdminTeachers() {
 
   function validate() {
     const e: Record<string, string> = {};
-    if (!form.full_name.trim()) e.full_name = 'Name is required';
-    if (!form.username) e.username = 'Name is required to generate username';
+    if (!form.first_name.trim()) e.full_name = 'First name is required';
+    if (!form.phone) e.phone = 'Mobile number is required — the teacher logs in with it';
+    else if (!formMobile) e.phone = 'Enter a valid 10-digit mobile number';
+    else if (teachers.some((t) => (t.email ?? '').toLowerCase() === formCreds.email)) e.phone = 'Another teacher already uses this mobile number';
     if (!form.employee_id.trim()) e.employee_id = 'Employee ID is required';
-    if (!form.password) e.password = 'Password is required';
-    else if (form.password.trim().length < 6) e.password = 'Password must be at least 6 characters';
     const allotErr = validateAllotmentRows(allotRows);
     if (allotErr) e.allotment = allotErr;
     setErrors(e);
@@ -182,31 +192,48 @@ export default function AdminTeachers() {
   }
 
   async function handleCreate() {
-    if (!validate() || !profile?.school_id) return;
+    if (!validate() || !profile?.school_id || !formMobile) return;
     setSaving(true);
+    const fullName = joinName(form);
+    const password = formCreds.password;
     try {
-      const res = await createTeacherAccount({
-        email: form.username,   // username IS the login identifier
-        password: form.password.trim(), // login trims, so store it trimmed too
-        full_name: form.full_name,
-        school_id: profile.school_id,
-        phone: form.phone || undefined,
-        employee_id: form.employee_id,
-        qualification: form.qualification || undefined,
-        date_of_joining: form.date_of_joining || undefined,
-      });
+      let res;
+      try {
+        res = await createTeacherAccount({
+          email: formCreds.email,   // <mobile>@teacher.veducore — the teacher types just the mobile
+          password,
+          full_name: fullName,
+          school_id: profile.school_id,
+          phone: formMobile,
+          employee_id: form.employee_id,
+          qualification: form.qualification || undefined,
+          date_of_joining: form.date_of_joining || undefined,
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        if (/already (been )?registered|already exists/i.test(msg)) {
+          throw new Error(`Mobile ${formMobile} is already a teacher login (maybe in another school)`);
+        }
+        throw err;
+      }
 
       const wanted = rowsToAllotments(allotRows);
       let createdTeacherId: string | undefined;
       const address = form.address.trim();
-      if (address && res?.id) {
+      if (res?.id) {
+        // Name parts (and address) aren't sent to create-user, so save them here.
         try {
           const created = await fetchTeacherByUserId(res.id);
           if (created) {
             createdTeacherId = created.id;
-            await updateTeacher(created.id, { address });
+            await updateTeacher(created.id, {
+              first_name: form.first_name.trim() || null,
+              middle_name: form.middle_name.trim() || null,
+              last_name: form.last_name.trim() || null,
+              ...(address ? { address } : {}),
+            });
           }
-        } catch { /* address is optional — can be added later via Edit */ }
+        } catch { /* optional — can be fixed later via Edit */ }
       }
       if (wanted.length && res?.id) {
         try {
@@ -231,16 +258,16 @@ export default function AdminTeachers() {
         id: createdTeacherId || res?.id || `teacher-${Date.now()}`,
         school_id: profile.school_id,
         user_id: res?.id,
-        full_name: form.full_name,
-        email: form.username,
+        full_name: fullName,
+        email: formCreds.email,
         employee_id: form.employee_id,
-        phone: form.phone || '',
+        phone: formMobile,
         qualification: form.qualification || '',
         subject: subjectNamesFor(allotRows).join(', '),
         date_of_joining: form.date_of_joining || '',
         address: form.address || null,
         status: 'active',
-        password: form.password.trim(),
+        password,
         avatar_url: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
@@ -262,7 +289,15 @@ export default function AdminTeachers() {
     if (!editing || !profile?.school_id) return;
     const allotErr = validateAllotmentRows(allotRows);
     if (allotErr) { toast(allotErr, 'error'); return; }
-    const updates: Partial<Teacher> = { ...editForm };
+    if (!editName.first_name.trim()) { toast('First name is required', 'error'); return; }
+    if (editForm.phone && !normalizeMobile(editForm.phone)) { toast('Enter a valid 10-digit mobile number', 'error'); return; }
+    const updates: Partial<Teacher> = {
+      ...editForm,
+      full_name: joinName(editName),
+      first_name: editName.first_name.trim() || null,
+      middle_name: editName.middle_name.trim() || null,
+      last_name: editName.last_name.trim() || null,
+    };
     // The password lives in Supabase Auth; writing only the teachers column made
     // the credentials card show a password that login rejected.
     const newPassword = (updates.password ?? '').trim();
@@ -438,20 +473,16 @@ export default function AdminTeachers() {
         }
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Input label="Full Name" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} error={errors.full_name} />
-          <EmployeeIdInput value={form.employee_id} onChange={(v) => setForm((f) => ({ ...f, employee_id: v }))} error={errors.employee_id} />
-          <Input
-            label="Username"
-            required
-            value={form.username}
-            readOnly
-            disabled
-            hint="Auto-generated from name"
-            error={errors.username}
-          />
-          <Input label="Password" type="password" required value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} error={errors.password} hint="Minimum 6 characters" />
+          <div className="sm:col-span-2">
+            <NameFields
+              idPrefix="teacher"
+              value={{ first_name: form.first_name, middle_name: form.middle_name, last_name: form.last_name }}
+              onChange={(n) => setForm({ ...form, ...n })}
+              error={errors.full_name}
+            />
+          </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">Phone</label>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">Mobile Number <span className="text-red-500">*</span></label>
             <div className="flex">
               <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-slate-200 bg-slate-50 text-slate-500 text-sm">+91</span>
               <input
@@ -462,9 +493,20 @@ export default function AdminTeachers() {
                   const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
                   setForm({ ...form, phone: digits });
                 }}
-                className="flex-1 rounded-r-[10px] border border-slate-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
+                className={`flex-1 rounded-r-[10px] border px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25 ${errors.phone ? 'border-red-400' : 'border-slate-200'}`}
                 placeholder="10-digit mobile number"
               />
+            </div>
+            {errors.phone
+              ? <p className="mt-1 text-xs text-red-600">{errors.phone}</p>
+              : <p className="mt-1 text-xs text-slate-500">The teacher logs in with this number.</p>}
+          </div>
+          <EmployeeIdInput value={form.employee_id} onChange={(v) => setForm((f) => ({ ...f, employee_id: v }))} error={errors.employee_id} />
+          <div className="sm:col-span-2 rounded-xl border border-brand-100 bg-brand-50/60 p-3 text-sm">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-brand-700">Login (auto-generated)</p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <p className="text-slate-600">Username: <code className="rounded bg-white px-2 py-0.5 font-mono text-brand-800">{formMobile || 'mobile number'}</code></p>
+              <p className="text-slate-600">Password: <code className="rounded bg-white px-2 py-0.5 font-mono text-brand-800">{formPassword || 'from name'}</code></p>
             </div>
           </div>
           <Input label="Qualification" value={form.qualification} onChange={(e) => setForm({ ...form, qualification: e.target.value })} placeholder="e.g. M.Sc, B.Ed" />
@@ -498,7 +540,9 @@ export default function AdminTeachers() {
         }
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Input label="Full Name" value={editForm.full_name || ''} onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} />
+          <div className="sm:col-span-2">
+            <NameFields idPrefix="edit_teacher" value={editName} onChange={setEditName} />
+          </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-700">Phone</label>
             <div className="flex">
@@ -515,6 +559,9 @@ export default function AdminTeachers() {
                 placeholder="10-digit mobile number"
               />
             </div>
+            {editing?.email?.toLowerCase().endsWith(`@${TEACHER_LOGIN_DOMAIN}`) && (
+              <p className="mt-1 text-xs text-slate-500">Login stays {parentLoginId(editing.email)} even if you change this.</p>
+            )}
           </div>
           <Input label="Qualification" value={editForm.qualification || ''} onChange={(e) => setEditForm({ ...editForm, qualification: e.target.value })} />
           <Input label="Date of Joining" type="date" value={editForm.date_of_joining || ''} onChange={(e) => setEditForm({ ...editForm, date_of_joining: e.target.value })} />

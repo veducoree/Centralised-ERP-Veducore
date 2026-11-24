@@ -3,7 +3,7 @@ import { parseTemplate as parseReportCardTemplate } from '@/lib/reportCard/templ
 export { generateSubjectCode } from '@/lib/subjectUtils';
 import { generateSubjectCode } from '@/lib/subjectUtils';
 import {
-  generateParentCredentials, normalizeMobile, parentFromStudent, parentLoginId, schoolShortName,
+  generateParentCredentials, namePartsOf, normalizeMobile, parentFromStudent, parentLoginId, schoolShortName,
 } from '@/lib/parentUtils';
 import type {
   Teacher, Parent, Student, Class, Section, Subject,
@@ -469,7 +469,7 @@ export async function fetchStudentById(id: string) {
 /**
  * Makes sure the student has a parent login. The login is the parent's mobile
  * number (students.emergency_contact); siblings with the same number share one
- * login. Default password: parentfirstname@schoolshortname.
+ * login. Default password comes from the student's name (see namePassword).
  * Throws with a readable message when it can't (no / bad mobile, number
  * already used by a parent in another school, …).
  */
@@ -496,7 +496,7 @@ export async function ensureParentForStudent(
 
   const { data: sch } = await supabase.from('schools').select('name, short_name').eq('id', student.school_id).maybeSingle();
   const { name: parentName, relationship } = parentFromStudent(student);
-  const creds = generateParentCredentials({ mobile, parentName, shortName: schoolShortName(sch) });
+  const creds = generateParentCredentials({ mobile, studentName: namePartsOf(student), shortName: schoolShortName(sch) });
 
   // 3. Create it (or link to the sibling's existing login) on the server.
   let result: { existing?: boolean };
@@ -2156,6 +2156,9 @@ export async function createAdmissionWithFees(params: {
   school_id: string;
   admission_number: string;
   full_name: string;
+  first_name?: string | null;
+  middle_name?: string | null;
+  last_name?: string | null;
   father_name: string;
   mother_name: string | null;
   parent_email: string | null;
@@ -2197,6 +2200,9 @@ export async function createAdmissionWithFees(params: {
     school_id: params.school_id,
     admission_number: params.admission_number,
     full_name: params.full_name,
+    first_name: params.first_name ?? null,
+    middle_name: params.middle_name ?? null,
+    last_name: params.last_name ?? null,
     father_name: params.father_name,
     mother_name: params.mother_name,
     parent_email: params.parent_email,

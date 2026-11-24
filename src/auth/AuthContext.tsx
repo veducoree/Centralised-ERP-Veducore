@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
-import { normalizeMobile, parentLoginEmail } from '@/lib/parentUtils';
+import { normalizeMobile, parentLoginEmail, teacherLoginEmail } from '@/lib/parentUtils';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { clearApiCache, fetchSchool } from '@/services/api';
@@ -233,10 +233,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const pw = password.trim();
     // Usernames map to synthetic internal emails. A bare username is never a valid
     // email, so go straight to the internal address (saves one network round trip).
-    // A mobile number is a parent login: <10 digits>@parent.veducore.
+    // A mobile number is a parent login (<10 digits>@parent.veducore) or a
+    // teacher login (<10 digits>@teacher.veducore); the password picks which.
     const mobile = /^[0-9+\s-]+$/.test(raw) ? normalizeMobile(raw) : null;
     const emailsToTry = raw.includes('@') ? [raw]
-      : mobile ? [parentLoginEmail(mobile)]
+      : mobile ? [parentLoginEmail(mobile), teacherLoginEmail(mobile)]
       : [`${raw}@veducore.internal`];
 
     let lastError: string | null = null;

@@ -3,7 +3,7 @@ import { Upload, Download, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { createStudent, fetchStudents } from '@/services/api';
-import { normalizeMobile } from '@/lib/parentUtils';
+import { joinName, normalizeMobile, splitFullName, tidyNameParts } from '@/lib/parentUtils';
 import type { Class, Section } from '@/types';
 
 // ---------------------------------------------------------------------------
@@ -21,6 +21,9 @@ interface BulkStudentUploadProps {
 interface ParsedRow {
   admission_number: string;
   full_name: string;
+  first_name: string;
+  middle_name: string;
+  last_name: string;
   father_name: string;
   mother_name: string;
   parent_email: string;
@@ -123,7 +126,10 @@ function headerKey(h: string): string {
 
 const HEADER_ALIASES: Record<string, string[]> = {
   admission_number: ['admission_number', 'admission_no', 'adm_no', 'admission', 'adm_number', 'sr_no', 'scholar_no'],
-  full_name: ['full_name', 'student_name', 'name', 'student'],
+  full_name: ['full_name', 'student_name', 'student_full_name', 'name', 'student'],
+  first_name: ['first_name', 'student_first_name', 'firstname', 'first', 'fname', 'given_name'],
+  middle_name: ['middle_name', 'student_middle_name', 'middlename', 'middle', 'mname'],
+  last_name: ['last_name', 'student_last_name', 'lastname', 'last', 'lname', 'surname'],
   father_name: ['father_name', 'father', 'fathers_name'],
   mother_name: ['mother_name', 'mother', 'mothers_name'],
   parent_email: ['parent_email', 'email', 'email_id'],
@@ -181,9 +187,9 @@ function classKey(name: string): string {
 // ---------------------------------------------------------------------------
 
 const SAMPLE_CSV = [
-  'admission_number,full_name,father_name,mother_name,parent_email,phone_number,date_of_birth,gender,class_name,section_name,address,admission_date',
-  '2024001,Rahul Sharma,Raj Sharma,Meena Sharma,sharma.family@example.com,9876543210,2010-05-15,male,Class 6,A,123 Main Street,2024-04-01',
-  '2024002,Priya Singh,Anil Singh,Renu Singh,singh.family@example.com,9876543211,2011-03-20,female,Class 7,B,456 Park Avenue,2024-04-01',
+  'admission_number,first_name,middle_name,last_name,father_name,mother_name,parent_email,phone_number,date_of_birth,gender,class_name,section_name,address,admission_date',
+  '2024001,Rahul,Kumar,Sharma,Raj Sharma,Meena Sharma,sharma.family@example.com,9876543210,2010-05-15,male,Class 6,A,123 Main Street,2024-04-01',
+  '2024002,Priya,,Singh,Anil Singh,Renu Singh,singh.family@example.com,9876543211,2011-03-20,female,Class 7,B,456 Park Avenue,2024-04-01',
 ].join('\n');
 
 function downloadSampleCsv() {
@@ -285,6 +291,9 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
 
         const iAdm = col('admission_number');
         const iName = col('full_name');
+        const iFirst = col('first_name');
+        const iMiddle = col('middle_name');
+        const iLast = col('last_name');
         const iFather = col('father_name');
         const iMother = col('mother_name');
         const iParentEmail = col('parent_email');
@@ -298,7 +307,7 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
 
         const missing = [
           iAdm < 0 && 'admission_number',
-          iName < 0 && 'full_name',
+          iName < 0 && iFirst < 0 && 'first_name (or full_name)',
           iPhone < 0 && 'phone_number',
           iClass < 0 && 'class_name',
           iSection < 0 && 'section_name',
@@ -328,7 +337,15 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
           const get = (idx: number) => (idx >= 0 ? (r[idx] ?? '').trim() : '');
 
           const admission_number = get(iAdm).replace(/\s+/g, '');
-          const full_name = get(iName).replace(/\s+/g, ' ');
+          // first / middle / last columns win; an old-style full_name column is split.
+          const tidyCase = (v: string) => v.replace(/\s+/g, ' ').trim()
+            .replace(/(^|[\s'-])(\p{L})/gu, (_m: string, sep: string, ch: string) => sep + ch.toUpperCase());
+          const parts = tidyNameParts(
+            iFirst >= 0 && get(iFirst)
+              ? { first_name: tidyCase(get(iFirst)), middle_name: tidyCase(get(iMiddle)), last_name: tidyCase(get(iLast)) }
+              : splitFullName(tidyCase(get(iName))),
+          );
+          const full_name = joinName(parts);
           const father_name = get(iFather).replace(/\s+/g, ' ');
           const mother_name = get(iMother).replace(/\s+/g, ' ');
           const parent_email = get(iParentEmail).toLowerCase();
@@ -352,7 +369,7 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
           else if (seen.has(admKey)) errors.push(`Admission number ${admission_number} repeated (also row ${seen.get(admKey)})`);
           if (admission_number && !seen.has(admKey)) seen.set(admKey, parsed.length + 1);
 
-          if (!full_name) errors.push('Full name required');
+          if (!parts.first_name) errors.push('Student first name required');
           // Parent logs in with this number.
           if (!phoneRaw) errors.push('Parent mobile number required');
           else if (/e\+/i.test(phoneRaw)) errors.push('Mobile number was changed by Excel (looks like 9.87E+09). Format the column as Text and type it again');
@@ -395,6 +412,7 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
           parsed.push({
             admission_number,
             full_name,
+            ...parts,
             father_name,
             mother_name,
             parent_email,
@@ -476,6 +494,9 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
           school_id: schoolId,
           admission_number: row.admission_number,
           full_name: row.full_name,
+          first_name: row.first_name || null,
+          middle_name: row.middle_name || null,
+          last_name: row.last_name || null,
           father_name: row.father_name || null,
           mother_name: row.mother_name || null,
           parent_email: row.parent_email || null,
@@ -565,9 +586,10 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
         <div className="mt-4 rounded-lg bg-slate-50 px-4 py-3">
           <p className="text-xs font-medium text-slate-500 mb-1">Expected CSV columns</p>
           <p className="text-xs text-slate-400 font-mono break-all">
-            admission_number, full_name, father_name, mother_name, parent_email, phone_number, date_of_birth, gender, class_name, section_name, address, admission_date
+            admission_number, first_name, middle_name, last_name, father_name, mother_name, parent_email, phone_number, date_of_birth, gender, class_name, section_name, address, admission_date
           </p>
-          <p className="mt-1 text-xs text-slate-400">Required: admission_number, full_name, phone_number (parent mobile — used for parent login), class_name, section_name. Dates as DD/MM/YYYY or YYYY-MM-DD; gender Male / Female / Other.</p>
+          <p className="mt-1 text-xs text-slate-400">Required: admission_number, first_name, phone_number (parent mobile — used for parent login), class_name, section_name. middle_name and last_name are optional. An old file with a single full_name column also works (it is split automatically). Dates as DD/MM/YYYY or YYYY-MM-DD; gender Male / Female / Other.</p>
+          <p className="mt-1 text-xs text-slate-400">Parent login: mobile number. Password from the student's name + @school code — Rahul Kumar Sharma → rakush@…, Rahul Sharma → rahush@…, Rahul → rahu@…</p>
         </div>
       </>
     );

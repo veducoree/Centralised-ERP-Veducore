@@ -70,6 +70,9 @@ export interface Teacher {
   school_id: string;
   user_id: string | null;
   full_name: string;
+  first_name?: string | null;
+  middle_name?: string | null;
+  last_name?: string | null;
   email: string;
   phone: string | null;
   employee_id: string;
@@ -106,6 +109,9 @@ export interface Student {
   school_id: string;
   admission_number: string;
   full_name: string;
+  first_name?: string | null;
+  middle_name?: string | null;
+  last_name?: string | null;
   father_name: string | null;
   mother_name?: string | null;
   parent_email?: string | null;

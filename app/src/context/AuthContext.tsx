@@ -233,7 +233,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const pw = password.trim();
       // Same rules as the web login:
       //  • an email → as typed
-      //  • a mobile number → parent login <10 digits>@parent.veducore
+      //  • a mobile number → parent login <10 digits>@parent.veducore,
+      //    then teacher login <10 digits>@teacher.veducore
       //    (then a numeric staff username, just in case)
       //  • anything else → username@veducore.internal
       let digits = raw.replace(/[^0-9]/g, '');
@@ -243,7 +244,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const emailsToTry = raw.includes('@')
         ? [raw]
         : isMobile
-          ? [`${digits}@parent.veducore`, `${raw.replace(/\s+/g, '')}@veducore.internal`]
+          ? [`${digits}@parent.veducore`, `${digits}@teacher.veducore`, `${raw.replace(/\s+/g, '')}@veducore.internal`]
           : [`${raw.replace(/\s+/g, '')}@veducore.internal`];
 
       let lastError: string | null = null;

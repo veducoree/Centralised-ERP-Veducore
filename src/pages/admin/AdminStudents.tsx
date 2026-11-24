@@ -16,7 +16,8 @@ import type { Student, Class, Section } from '@/types';
 import { formatDate, validateEmail, getInitials } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/Badge';
 import { supabase } from '@/lib/supabase';
-import { normalizeMobile, parentLoginId } from '@/lib/parentUtils';
+import { joinName, namePartsOf, normalizeMobile, parentLoginId } from '@/lib/parentUtils';
+import { NameFields } from '@/components/ui/NameFields';
 
 export default function AdminStudents() {
   const { profile } = useAuth();
@@ -35,7 +36,7 @@ export default function AdminStudents() {
   const [saving, setSaving] = useState(false);
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
   const [form, setForm] = useState({
-    admission_number: '', full_name: '', father_name: '', mother_name: '', date_of_birth: '', gender: 'male',
+    admission_number: '', first_name: '', middle_name: '', last_name: '', father_name: '', mother_name: '', date_of_birth: '', gender: 'male',
     class_id: '', section_id: '', address: '', parent_email: '', emergency_contact: '', admission_date: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -79,7 +80,7 @@ export default function AdminStudents() {
   function openAdd() {
     setEditing(null);
     setForm({
-      admission_number: '', full_name: '', father_name: '', mother_name: '', date_of_birth: '', gender: 'male',
+      admission_number: '', first_name: '', middle_name: '', last_name: '', father_name: '', mother_name: '', date_of_birth: '', gender: 'male',
       class_id: '', section_id: '', address: '', parent_email: '', emergency_contact: '',
       admission_date: new Date().toISOString().split('T')[0],
     });
@@ -94,7 +95,7 @@ export default function AdminStudents() {
     const cleanContact = digitsOnly.length >= 10 ? digitsOnly.slice(-10) : digitsOnly;
     setForm({
       admission_number: student.admission_number,
-      full_name: student.full_name,
+      ...namePartsOf(student),
       father_name: student.father_name || '',
       mother_name: student.mother_name || '',
       date_of_birth: student.date_of_birth || '',
@@ -113,7 +114,7 @@ export default function AdminStudents() {
   function validate() {
     const e: Record<string, string> = {};
     if (!form.admission_number) e.admission_number = 'Admission number is required';
-    if (!form.full_name) e.full_name = 'Full name is required';
+    if (!form.first_name.trim()) e.full_name = 'First name is required';
     if (!form.class_id) e.class_id = 'Class is required';
     if (!form.section_id) e.section_id = 'Section is required';
     // Parent logs in with this number, so it's required for new students.
@@ -130,7 +131,10 @@ export default function AdminStudents() {
       const data = {
         school_id: profile.school_id,
         admission_number: form.admission_number,
-        full_name: form.full_name,
+        full_name: joinName(form),
+        first_name: form.first_name.trim() || null,
+        middle_name: form.middle_name.trim() || null,
+        last_name: form.last_name.trim() || null,
         father_name: form.father_name || null,
         mother_name: form.mother_name || null,
         date_of_birth: form.date_of_birth || null,
@@ -156,8 +160,8 @@ export default function AdminStudents() {
         if (res?._parentResult?.credentials) {
           const pr = res._parentResult;
           setParentCredModal({
-            studentName: form.full_name,
-            parentName: pr.parent?.full_name || form.father_name || `${form.full_name}'s Parent`,
+            studentName: data.full_name,
+            parentName: pr.parent?.full_name || form.father_name || `${data.full_name}'s Parent`,
             username: pr.credentials.username,
             password: pr.credentials.password,
           });
@@ -354,8 +358,15 @@ export default function AdminStudents() {
         }
       >
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="sm:col-span-2">
+            <NameFields
+              idPrefix="student"
+              value={{ first_name: form.first_name, middle_name: form.middle_name, last_name: form.last_name }}
+              onChange={(n) => setForm({ ...form, ...n })}
+              error={errors.full_name}
+            />
+          </div>
           <Input label="Admission Number" required value={form.admission_number} onChange={(e) => setForm({ ...form, admission_number: e.target.value })} error={errors.admission_number} placeholder="e.g. 2026051" />
-          <Input label="Full Name" required value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} error={errors.full_name} />
           <Input label="Father's Name" value={form.father_name} onChange={(e) => setForm({ ...form, father_name: e.target.value })} placeholder="Father's full name" />
           <Input label="Mother's Name" value={form.mother_name} onChange={(e) => setForm({ ...form, mother_name: e.target.value })} placeholder="Mother's full name" />
           <Input label="Date of Birth" type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} />
