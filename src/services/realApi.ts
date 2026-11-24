@@ -2029,70 +2029,70 @@ export type {
 
 // ============================================================
 // fetchFeeStructuresForClass
-// Returns fee structures for a given class + academic year.
-// Falls back to school-wide structures (class_id IS NULL) if
-// no class-specific rows are found.
-// Also reads the localStorage mirror that AdminFees.tsx writes
-// (schools.settings.fee_structures) so structures defined there
-// are visible here too.
+// Fee heads a new student of this class is charged at admission:
+// the class's own structures + school-wide ("All Classes") ones.
+//
+// Where structures live: the Fees page saves them in
+// schools.settings.fee_structures (the fee_structures table is kept as a
+// second source). localStorage is only a last-resort offline copy.
+//
+// Academic year: structures for `academicYear` are preferred. If a class has
+// none for that year (e.g. they were saved with an old default year), its
+// active structures from any year are used rather than charging nothing.
 // ============================================================
 export async function fetchFeeStructuresForClass(
   schoolId: string,
   classId: string,
   academicYear: string
 ): Promise<FeeStructure[]> {
-  // 1. Try DB fee_structures table (class-specific first, then school-wide)
+  const all: FeeStructure[] = [];
+
+  // 1. School settings (what the Fees page writes)
   try {
-    const { data: classRows, error: classErr } = await supabase
-      .from('fee_structures')
-      .select('*')
-      .eq('school_id', schoolId)
-      .eq('class_id', classId)
-      .eq('academic_year', academicYear)
-      .eq('is_active', true)
-      .order('name');
-
-    if (!classErr && classRows && classRows.length > 0) {
-      return classRows as FeeStructure[];
-    }
-
-    // Fallback: school-wide (class_id IS NULL)
-    const { data: schoolRows, error: schoolErr } = await supabase
-      .from('fee_structures')
-      .select('*')
-      .eq('school_id', schoolId)
-      .is('class_id', null)
-      .eq('academic_year', academicYear)
-      .eq('is_active', true)
-      .order('name');
-
-    if (!schoolErr && schoolRows && schoolRows.length > 0) {
-      return schoolRows as FeeStructure[];
-    }
+    const { data: sch } = await supabase.from('schools').select('settings').eq('id', schoolId).maybeSingle();
+    const fromSettings = (sch?.settings as Record<string, unknown> | null | undefined)?.fee_structures;
+    if (Array.isArray(fromSettings)) all.push(...(fromSettings as FeeStructure[]));
   } catch {
-    // fall through to localStorage mirror
+    // fall through
   }
 
-  // 2. Fallback: AdminFees.tsx mirrors structures into localStorage
+  // 2. fee_structures table
   try {
-    const raw = localStorage.getItem(`veducore_fee_structures_${schoolId}`);
-    if (raw) {
-      const all = JSON.parse(raw) as FeeStructure[];
-      // Filter by class (or school-wide), active, and academic year
-      const forClass = all.filter(
-        (s) =>
-          s.is_active &&
-          s.academic_year === academicYear &&
-          (s.class_id === classId || s.class_id === null || s.class_id === '')
-      );
-      // Only this class / school-wide for this year — never another class's fees.
-      return forClass;
+    const { data: rows } = await supabase.from('fee_structures').select('*').eq('school_id', schoolId).eq('is_active', true);
+    for (const r of (rows || []) as FeeStructure[]) {
+      if (!all.some((x) => x.id === r.id)) all.push(r);
     }
   } catch {
     // ignore
   }
 
-  return [];
+  // 3. Offline copy only when nothing came from the database
+  if (all.length === 0) {
+    try {
+      const raw = localStorage.getItem(`veducore_fee_structures_${schoolId}`);
+      const parsed = raw ? (JSON.parse(raw) as FeeStructure[]) : [];
+      if (Array.isArray(parsed)) all.push(...parsed);
+    } catch {
+      // ignore
+    }
+  }
+
+  const usable = all.filter(
+    (s) => s && !String(s.id ?? '').startsWith('sample-') && s.is_active !== false && Number(s.amount) > 0
+  );
+  const forClass = (s: FeeStructure) => s.class_id === classId;
+  const schoolWide = (s: FeeStructure) => !s.class_id;
+  const sameYear = (s: FeeStructure) => (s.academic_year || '').trim() === academicYear;
+
+  // Per group (class-specific / school-wide): this year's if any, else any year.
+  const pick = (match: (s: FeeStructure) => boolean) => {
+    const group = usable.filter(match);
+    const thisYear = group.filter(sameYear);
+    return thisYear.length > 0 ? thisYear : group;
+  };
+  const result = [...pick(forClass), ...pick(schoolWide)];
+  // Class-specific first, then school-wide; keep a stable order by name.
+  return result.map((s) => ({ ...s, amount: Number(s.amount) }));
 }
 
 // ============================================================

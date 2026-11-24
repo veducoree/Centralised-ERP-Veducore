@@ -51,13 +51,15 @@ export default function AdminFees() {
 
   // ── Tab 2: Fee Structure ──
   const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
+  // New structures default to the school's current academic year.
+  const [schoolYear, setSchoolYear] = useState('');
   const [classes, setClasses] = useState<Class[]>([]);
   const [structureModalOpen, setStructureModalOpen] = useState(false);
   const [editingStructure, setEditingStructure] = useState<FeeStructure | null>(null);
   const [deleteStructureId, setDeleteStructureId] = useState<string | null>(null);
   const [structureForm, setStructureForm] = useState({
     name: '', fee_type: 'Tuition', class_id: '', amount: '', frequency: 'annual' as FeeStructure['frequency'],
-    due_day: '', academic_year: '2024-25', is_active: true,
+    due_day: '', academic_year: '', is_active: true,
   });
   const [structureErrors, setStructureErrors] = useState<Record<string, string>>({});
   const [structureSaving, setStructureSaving] = useState(false);
@@ -128,6 +130,7 @@ export default function AdminFees() {
     }
     fetchSchool(schoolId)
       .then((sch) => {
+        if (sch?.academic_year) setSchoolYear(sch.academic_year);
         const dbStructures = (sch?.settings as Record<string, unknown> | undefined)?.fee_structures;
         if (Array.isArray(dbStructures)) {
           const clean = (dbStructures as FeeStructure[]).filter((s) => !s.id.startsWith('sample-'));
@@ -253,7 +256,7 @@ export default function AdminFees() {
   // ── Tab 2: Structure Handlers ──
   function openAddStructure() {
     setEditingStructure(null);
-    setStructureForm({ name: '', fee_type: 'Tuition', class_id: '', amount: '', frequency: 'annual', due_day: '', academic_year: '2024-25', is_active: true });
+    setStructureForm({ name: '', fee_type: 'Tuition', class_id: '', amount: '', frequency: 'annual', due_day: '', academic_year: schoolYear || '2026-27', is_active: true });
     setStructureErrors({});
     setStructureModalOpen(true);
   }
