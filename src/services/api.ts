@@ -20,6 +20,7 @@ export {
   fetchParentByUserId,
   fetchStudents,
   fetchStudentById,
+  fetchStudentByAdmissionNumber,
   createStudent,
   fetchNextEmployeeId,
   ensureParentForStudent,

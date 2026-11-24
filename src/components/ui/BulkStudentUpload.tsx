@@ -2,7 +2,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { Upload, Download, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { createStudent, fetchStudents } from '@/services/api';
+import { createStudent, ensureParentForStudent, fetchStudentByAdmissionNumber, fetchStudents } from '@/services/api';
 import { joinName, normalizeMobile, splitFullName, tidyNameParts } from '@/lib/parentUtils';
 import type { Class, Section } from '@/types';
 
@@ -48,6 +48,36 @@ interface ImportResult {
 }
 
 type Phase = 'upload' | 'preview' | 'importing' | 'done';
+
+// How many students are created at the same time. Each one makes a login on
+// the server, so going much higher just queues up there.
+const IMPORT_CONCURRENCY = 5;
+const MAX_ATTEMPTS = 4;
+
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === 'object' && 'message' in err) return String((err as { message: unknown }).message);
+  return String(err ?? 'Unknown error');
+}
+
+/** Dropped connections, timeouts, gateway errors — worth trying again. */
+function isTransient(err: unknown): boolean {
+  if (err instanceof TypeError) return true;
+  return /network|failed to fetch|load failed|connection|timed? ?out|server busy|HTTP 5\d\d|fetch/i.test(errorMessage(err));
+}
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+async function withRetry<T>(fn: (attempt: number) => Promise<T>): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn(attempt);
+    } catch (err) {
+      if (attempt >= MAX_ATTEMPTS || !isTransient(err)) throw err;
+      await wait(1000 * 2 ** (attempt - 1)); // 1s, 2s, 4s
+    }
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Pure CSV parser (no external libraries)
@@ -210,6 +240,7 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
   const [phase, setPhase] = useState<Phase>('upload');
   const [parsedRows, setParsedRows] = useState<ParsedRow[]>([]);
   const [importing, setImporting] = useState(false);
+  const [progress, setProgress] = useState({ done: 0, total: 0, failed: 0 });
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
@@ -466,13 +497,60 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
 
   // ----- Import -----
 
+  async function importRow(row: ParsedRow) {
+    const payload = {
+      school_id: schoolId,
+      admission_number: row.admission_number,
+      full_name: row.full_name,
+      first_name: row.first_name || null,
+      middle_name: row.middle_name || null,
+      last_name: row.last_name || null,
+      father_name: row.father_name || null,
+      mother_name: row.mother_name || null,
+      parent_email: row.parent_email || null,
+      emergency_contact: row.phone_number || null,
+      date_of_birth: row.date_of_birth || null,
+      gender: row.gender || null,
+      class_id: row.class_id,
+      section_id: row.section_id,
+      address: row.address || null,
+      admission_date: row.admission_date || null,
+      status: 'active' as const,
+    };
+
+    // 1. The student. If a dropped connection hid a successful insert, the
+    //    retry hits "already used" — then pick up the row that was saved.
+    let hadNetworkError = false;
+    const student = await withRetry(async () => {
+      try {
+        return await createStudent(payload, { withParent: false });
+      } catch (err) {
+        if (hadNetworkError && /already used/i.test(errorMessage(err))) {
+          const existing = await fetchStudentByAdmissionNumber(schoolId, row.admission_number);
+          if (existing) return existing;
+        }
+        if (isTransient(err)) hadNetworkError = true;
+        throw err;
+      }
+    });
+    if (!student) throw new Error('Student was not saved');
+
+    // 2. The parent login. Safe to repeat: an existing login is reused.
+    let parentResult: Awaited<ReturnType<typeof ensureParentForStudent>> | null = null;
+    let note = '';
+    try {
+      parentResult = await withRetry(() => ensureParentForStudent(student));
+    } catch (err) {
+      note = errorMessage(err) || 'Could not create the parent login';
+    }
+    return { parentResult, note };
+  }
+
   async function handleImport() {
     if (!schoolId) return;
-    setPhase('importing');
     const valid = parsedRows.filter((r) => r.errors.length === 0);
-    let success = 0;
-    let failed = 0;
-    const failedDetails: Array<{ rowIndex: number; admission_number: string; error: string }> = [];
+    setPhase('importing');
+    setProgress({ done: 0, total: valid.length, failed: 0 });
 
     // Collect skipped (invalid) rows before the loop
     const skipped = parsedRows
@@ -484,52 +562,70 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
         errors: row.errors,
       }));
 
-    const creds: typeof createdCreds = [];
-    for (let i = 0; i < valid.length; i++) {
-      const row = valid[i];
-      // find original 1-based row index in parsedRows
-      const rowIndex = parsedRows.indexOf(row) + 1;
-      try {
-        const res = await createStudent({
-          school_id: schoolId,
-          admission_number: row.admission_number,
-          full_name: row.full_name,
-          first_name: row.first_name || null,
-          middle_name: row.middle_name || null,
-          last_name: row.last_name || null,
-          father_name: row.father_name || null,
-          mother_name: row.mother_name || null,
-          parent_email: row.parent_email || null,
-          emergency_contact: row.phone_number || null,
-          date_of_birth: row.date_of_birth || null,
-          gender: row.gender || null,
-          class_id: row.class_id,
-          section_id: row.section_id,
-          address: row.address || null,
-          admission_date: row.admission_date || null,
-          status: 'active',
-        });
-        creds.push({
-          admission_number: row.admission_number,
-          full_name: row.full_name,
-          parent: res?._parentResult?.parent?.full_name || row.father_name || row.mother_name || `${row.full_name}'s Parent`,
-          login: res?._parentResult?.credentials.username ?? '',
-          password: res?._parentResult?.credentials.password ?? '',
-          note: res?._parentError ?? '',
-        });
-        success++;
-      } catch (err) {
-        failed++;
-        failedDetails.push({
-          rowIndex,
-          admission_number: row.admission_number,
-          error: err instanceof Error ? err.message : 'Unknown error',
-        });
+    // Siblings share a parent login (same mobile), so rows with the same
+    // mobile go one after another; different families run in parallel.
+    const groups = new Map<string, ParsedRow[]>();
+    valid.forEach((row, i) => {
+      const key = row.phone_number || `__row${i}`;
+      const g = groups.get(key);
+      if (g) g.push(row); else groups.set(key, [row]);
+    });
+    const queue = [...groups.values()];
+
+    type Cred = (typeof createdCreds)[number];
+    const results = new Map<ParsedRow, { cred?: Cred; error?: string }>();
+    let done = 0;
+    let failedSoFar = 0;
+
+    const worker = async () => {
+      for (let group = queue.shift(); group; group = queue.shift()) {
+        for (const row of group) {
+          try {
+            const { parentResult, note } = await importRow(row);
+            results.set(row, {
+              cred: {
+                admission_number: row.admission_number,
+                full_name: row.full_name,
+                parent: parentResult?.parent?.full_name || row.father_name || row.mother_name || `${row.full_name}'s Parent`,
+                login: parentResult?.credentials.username ?? '',
+                password: parentResult?.credentials.password ?? '',
+                note,
+              },
+            });
+          } catch (err) {
+            failedSoFar++;
+            results.set(row, { error: errorMessage(err) || 'Unknown error' });
+          }
+          done++;
+          setProgress({ done, total: valid.length, failed: failedSoFar });
+        }
       }
+    };
+
+    // Ask before leaving the page while students are still being created.
+    const beforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', beforeUnload);
+    try {
+      await Promise.all(Array.from({ length: Math.min(IMPORT_CONCURRENCY, queue.length) }, worker));
+    } finally {
+      window.removeEventListener('beforeunload', beforeUnload);
+    }
+
+    // Report in CSV order.
+    const creds: Cred[] = [];
+    const failedDetails: ImportResult['failedDetails'] = [];
+    for (const row of valid) {
+      const r = results.get(row);
+      if (r?.cred) creds.push(r.cred);
+      else failedDetails.push({
+        rowIndex: parsedRows.indexOf(row) + 1,
+        admission_number: row.admission_number,
+        error: r?.error ?? 'Not processed',
+      });
     }
 
     setCreatedCreds(creds);
-    setImportResult({ success, failed, failedDetails, skipped });
+    setImportResult({ success: creds.length, failed: failedDetails.length, failedDetails, skipped });
     setPhase('done');
   }
 
@@ -658,8 +754,19 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
     return (
       <div className="flex flex-col items-center justify-center py-12 gap-3">
         <Loader2 className="h-10 w-10 animate-spin text-brand-500" />
-        <p className="text-sm font-medium text-slate-700">Enrolling students and provisioning parent accounts…</p>
-        <p className="text-xs text-slate-400">Please wait while student and parent records are created.</p>
+        <p className="text-sm font-medium text-slate-700">
+          Enrolling students and creating parent logins… {progress.done} / {progress.total}
+        </p>
+        <div className="w-full max-w-sm h-2 rounded-full bg-slate-100 overflow-hidden">
+          <div
+            className="h-full bg-brand-500 transition-all"
+            style={{ width: `${progress.total ? Math.round((progress.done / progress.total) * 100) : 0}%` }}
+          />
+        </div>
+        {progress.failed > 0 && (
+          <p className="text-xs text-red-500">{progress.failed} failed so far — details at the end.</p>
+        )}
+        <p className="text-xs text-slate-400">Keep this tab open until it finishes. Dropped connections are retried automatically.</p>
       </div>
     );
   }

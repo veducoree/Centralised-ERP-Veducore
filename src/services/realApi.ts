@@ -290,8 +290,11 @@ export async function createParentAccount(params: {
     }
   );
 
-  const result = await response.json();
-  if (!response.ok) throw new Error(result.error || 'Failed to create parent account');
+  // A gateway timeout / cold start can return HTML instead of JSON.
+  const result = await response.json().catch(() => ({} as { error?: string; existing?: boolean }));
+  if (!response.ok) {
+    throw new Error(result.error || `Failed to create parent account (server busy, HTTP ${response.status})`);
+  }
   // A sibling's existing login keeps its own password — don't overwrite the stored copy.
   if (params.password && !result.existing) {
     try {
@@ -466,6 +469,38 @@ export async function fetchStudentById(id: string) {
   return data as Student | null;
 }
 
+// School name/short name barely change; bulk imports would otherwise fetch
+// them once per student.
+const schoolNamesCache = new Map<string, Promise<{ name: string | null; short_name: string | null } | null>>();
+function schoolNamesFor(schoolId: string) {
+  let p = schoolNamesCache.get(schoolId);
+  if (!p) {
+    p = Promise.resolve(
+      supabase.from('schools').select('name, short_name').eq('id', schoolId).maybeSingle()
+        .then(({ data, error }) => {
+          if (error) throw error;
+          return data as { name: string | null; short_name: string | null } | null;
+        }),
+    );
+    p.catch(() => schoolNamesCache.delete(schoolId));
+    // Short-lived: a rename in settings should show up on the next import.
+    setTimeout(() => schoolNamesCache.delete(schoolId), 5 * 60_000);
+    schoolNamesCache.set(schoolId, p);
+  }
+  return p;
+}
+
+export async function fetchStudentByAdmissionNumber(schoolId: string, admissionNumber: string) {
+  const { data, error } = await supabase
+    .from('students')
+    .select('*')
+    .eq('school_id', schoolId)
+    .eq('admission_number', admissionNumber)
+    .maybeSingle();
+  if (error) throw error;
+  return data as Student | null;
+}
+
 /**
  * Makes sure the student has a parent login. The login is the parent's mobile
  * number (students.emergency_contact); siblings with the same number share one
@@ -494,7 +529,7 @@ export async function ensureParentForStudent(
   const mobile = normalizeMobile((student as Student & { emergency_contact?: string | null }).emergency_contact);
   if (!mobile) throw new Error("Add the parent's 10-digit mobile number to create their login");
 
-  const { data: sch } = await supabase.from('schools').select('name, short_name').eq('id', student.school_id).maybeSingle();
+  const sch = await schoolNamesFor(student.school_id);
   const { name: parentName, relationship } = parentFromStudent(student);
   const creds = generateParentCredentials({ mobile, studentName: namePartsOf(student), shortName: schoolShortName(sch) });
 
