@@ -6,23 +6,18 @@ import { Card, StatCard } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input, Select } from '@/components/ui/Form';
 import { Modal, ConfirmDialog } from '@/components/ui/Modal';
-import { required, positiveNumber, paymentAmount, range } from '@/lib/validators';
+import { required, positiveNumber, paymentAmount } from '@/lib/validators';
 import { SearchInput, PageHeader, LoadingSpinner } from '@/components/ui/Primitives';
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
-import { fetchFees, fetchStudents, fetchFeeTypes, fetchClasses, createFee, recordFeePayment, deleteFee, fetchSchool, updateSchool, fetchGatewayStatus, saveGateway, disableGateway, onlineCharges, reconcilePayments, fetchOnlinePayments, markPaymentRefunded, type GatewayStatus, type OnlinePaymentRow } from '@/services/api';
-import type { Fee, Student, FeeType, FeeStructure, Class } from '@/types';
+import { fetchFees, fetchStudents, fetchFeeTypes, fetchClasses, createFee, recordFeePayment, deleteFee, fetchGatewayStatus, saveGateway, disableGateway, onlineCharges, reconcilePayments, fetchOnlinePayments, markPaymentRefunded, type GatewayStatus, type OnlinePaymentRow } from '@/services/api';
+import type { Fee, Student, FeeType, Class } from '@/types';
+import FeeHeadsSetup from '@/components/fees/FeeHeadsSetup';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { StatusBadge, Badge } from '@/components/ui/Badge';
 
 type ActiveTab = 'records' | 'online' | 'structure' | 'setup';
 type MethodFilter = 'all' | 'online' | 'offline';
-
-const SAMPLE_STRUCTURES: FeeStructure[] = [
-  { id: 'sample-1', school_id: '', name: 'Annual Tuition Fee 2024-25', fee_type: 'Tuition', class_id: null, amount: 25000, frequency: 'annual', due_day: 1, academic_year: '2024-25', is_active: true, created_at: '', updated_at: '' },
-  { id: 'sample-2', school_id: '', name: 'Admission Fee', fee_type: 'Admission', class_id: null, amount: 5000, frequency: 'one_time', due_day: null, academic_year: '2024-25', is_active: true, created_at: '', updated_at: '' },
-  { id: 'sample-3', school_id: '', name: 'Transport Fee', fee_type: 'Transport', class_id: null, amount: 3000, frequency: 'quarterly', due_day: 5, academic_year: '2024-25', is_active: true, created_at: '', updated_at: '' },
-];
 
 export default function AdminFees() {
   const { profile } = useAuth();
@@ -49,22 +44,8 @@ export default function AdminFees() {
   const [paymentForm, setPaymentForm] = useState({ amount: '', payment_date: new Date().toISOString().split('T')[0], payment_method: 'Cash', receipt_number: '' });
   const [paymentErrors, setPaymentErrors] = useState<Record<string, string>>({});
 
-  // ── Tab 2: Fee Structure ──
-  const [feeStructures, setFeeStructures] = useState<FeeStructure[]>([]);
-  // New structures default to the school's current academic year.
-  const [schoolYear, setSchoolYear] = useState('');
+  // ── Fee heads tab ──
   const [classes, setClasses] = useState<Class[]>([]);
-  const [structureModalOpen, setStructureModalOpen] = useState(false);
-  const [editingStructure, setEditingStructure] = useState<FeeStructure | null>(null);
-  const [deleteStructureId, setDeleteStructureId] = useState<string | null>(null);
-  const [structureForm, setStructureForm] = useState({
-    name: '', fee_type: 'Tuition', class_id: '', amount: '', frequency: 'annual' as FeeStructure['frequency'],
-    due_day: '', academic_year: '', is_active: true,
-  });
-  const [structureErrors, setStructureErrors] = useState<Record<string, string>>({});
-  const [structureSaving, setStructureSaving] = useState(false);
-  const [assigningStructure, setAssigningStructure] = useState<FeeStructure | null>(null);
-  const [assignLoading, setAssignLoading] = useState(false);
 
   // ── Tab 3: Payment Setup (keys live on the server; the secret never comes back) ──
   const [gateway, setGateway] = useState<GatewayStatus>({ active: false });
@@ -100,72 +81,11 @@ export default function AdminFees() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // Patch school_id in sample structures once profile loads
-  useEffect(() => {
-    if (profile?.school_id) {
-      setFeeStructures((prev) =>
-        prev.map((s) => s.school_id === '' ? { ...s, school_id: profile.school_id! } : s)
-      );
-    }
-  }, [profile?.school_id]);
-
   useEffect(() => {
     if (profile?.school_id) fetchGatewayStatus().then(setGateway).catch(() => {});
   }, [profile?.school_id]);
 
-  // Load fee structures from school.settings or localStorage
-  useEffect(() => {
-    if (!profile?.school_id) return;
-    const schoolId = profile.school_id;
-    const stored = localStorage.getItem(`veducore_fee_structures_${schoolId}`);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored) as FeeStructure[];
-        if (Array.isArray(parsed)) {
-          // Filter out legacy sample-1/2/3 entries so only admin-created structures remain
-          const real = parsed.filter((s) => !s.id.startsWith('sample-'));
-          setFeeStructures(real);
-        }
-      } catch { /* ignore */ }
-    }
-    fetchSchool(schoolId)
-      .then((sch) => {
-        if (sch?.academic_year) setSchoolYear(sch.academic_year);
-        const dbStructures = (sch?.settings as Record<string, unknown> | undefined)?.fee_structures;
-        if (Array.isArray(dbStructures)) {
-          const clean = (dbStructures as FeeStructure[]).filter((s) => !s.id.startsWith('sample-'));
-          setFeeStructures(clean);
-          localStorage.setItem(`veducore_fee_structures_${schoolId}`, JSON.stringify(clean));
-        }
-      })
-      .catch(() => {});
-  }, [profile?.school_id]);
-
-  const persistStructuresToSchool = useCallback(
-    async (nextStructures: FeeStructure[]) => {
-      if (!profile?.school_id) return;
-      localStorage.setItem(
-        `veducore_fee_structures_${profile.school_id}`,
-        JSON.stringify(nextStructures)
-      );
-      try {
-        const sch = await fetchSchool(profile.school_id);
-        const existingSettings =
-          sch?.settings && typeof sch.settings === 'object'
-            ? (sch.settings as Record<string, unknown>)
-            : {};
-        await updateSchool(profile.school_id, {
-          settings: {
-            ...existingSettings,
-            fee_structures: nextStructures,
-          },
-        });
-      } catch {
-        // ignore
-      }
-    },
-    [profile?.school_id]
-  );  // ── Tab 1: Filters ──
+  // ── Tab 1: Filters ──
   const isOnlinePayment = (pm: string | null) =>
     !!pm && (pm.includes('Razorpay') || pm.includes('Simulated') || pm.includes('Online'));
 
@@ -253,173 +173,6 @@ export default function AdminFees() {
     catch { toast('Failed to delete fee', 'error'); }
   }
 
-  // ── Tab 2: Structure Handlers ──
-  function openAddStructure() {
-    setEditingStructure(null);
-    setStructureForm({ name: '', fee_type: 'Tuition', class_id: '', amount: '', frequency: 'annual', due_day: '', academic_year: schoolYear || '2026-27', is_active: true });
-    setStructureErrors({});
-    setStructureModalOpen(true);
-  }
-
-  function openEditStructure(fs: FeeStructure) {
-    setEditingStructure(fs);
-    setStructureForm({
-      name: fs.name, fee_type: fs.fee_type, class_id: fs.class_id || '',
-      amount: fs.amount.toString(), frequency: fs.frequency,
-      due_day: fs.due_day?.toString() || '', academic_year: fs.academic_year, is_active: fs.is_active,
-    });
-    setStructureErrors({});
-    setStructureModalOpen(true);
-  }
-
-  async function handleSaveStructure() {
-    if (!profile?.school_id) return;
-    // Validate
-    const e: Record<string, string> = {};
-    const nameErr = required(structureForm.name, 'Name');
-    if (nameErr) e.name = nameErr;
-    const amtErr = required(structureForm.amount, 'Amount') ?? positiveNumber(structureForm.amount, 'Amount');
-    if (amtErr) e.amount = amtErr;
-    if (!structureForm.academic_year.trim()) e.academic_year = 'Academic year is required';
-    if (structureForm.due_day) {
-      const dayErr = range(1, 31)(structureForm.due_day, 'Due day');
-      if (dayErr) e.due_day = dayErr;
-    }
-    setStructureErrors(e);
-    if (Object.keys(e).length > 0) return;
-
-    setStructureSaving(true);
-    try {
-      const now = new Date().toISOString();
-      let updatedList: FeeStructure[] = [];
-      if (editingStructure) {
-        updatedList = feeStructures.map((s) =>
-          s.id === editingStructure.id
-            ? { ...s, ...structureForm, class_id: structureForm.class_id || null, amount: parseFloat(structureForm.amount), due_day: structureForm.due_day ? parseInt(structureForm.due_day) : null, updated_at: now }
-            : s
-        );
-      } else {
-        const newEntry: FeeStructure = {
-          id: Date.now().toString(),
-          school_id: profile.school_id,
-          name: structureForm.name,
-          fee_type: structureForm.fee_type,
-          class_id: structureForm.class_id || null,
-          amount: parseFloat(structureForm.amount),
-          frequency: structureForm.frequency,
-          due_day: structureForm.due_day ? parseInt(structureForm.due_day) : null,
-          academic_year: structureForm.academic_year,
-          is_active: structureForm.is_active,
-          created_at: now,
-          updated_at: now,
-        };
-        updatedList = [...feeStructures, newEntry];
-      }
-      setFeeStructures(updatedList);
-      await persistStructuresToSchool(updatedList);
-      setStructureModalOpen(false);
-      setStructureErrors({});
-      toast(editingStructure ? 'Fee structure updated' : 'Fee structure added', 'success');
-    } catch (err) {
-      toast(err instanceof Error ? err.message : 'Failed to save fee structure', 'error');
-    } finally {
-      setStructureSaving(false);
-    }
-  }
-
-  function handleDeleteStructure() {
-    if (!deleteStructureId) return;
-    const updatedList = feeStructures.filter((s) => s.id !== deleteStructureId);
-    setFeeStructures(updatedList);
-    persistStructuresToSchool(updatedList);
-    toast('Fee structure deleted', 'success');
-  }
-
-  async function handleAssignToStudents(fs: FeeStructure) {
-    if (!profile?.school_id) return;
-    setAssignLoading(true);
-    try {
-      const studs = await fetchStudents(profile.school_id, fs.class_id ? { classId: fs.class_id } : undefined);
-      const today = new Date();
-      const currentYear = today.getFullYear();
-
-      // Indian academic year month names April-first
-      const MONTH_NAMES_AC = [
-        'April', 'May', 'June', 'July', 'August', 'September',
-        'October', 'November', 'December', 'January', 'February', 'March',
-      ];
-
-      if (fs.frequency === 'monthly') {
-        // 12 records per student, April–March academic year
-        const tasks: Promise<unknown>[] = [];
-        for (const s of studs) {
-          for (let i = 0; i < 12; i++) {
-            const monthName = MONTH_NAMES_AC[i];
-            // April(3)–December(11) use currentYear; January(0)–March(2) use currentYear+1
-            const calMonth = i < 9 ? 3 + i : i - 9;
-            const calYear  = i < 9 ? currentYear : currentYear + 1;
-            const dueDay   = fs.due_day ?? 1;
-            const dueDate  = new Date(calYear, calMonth, dueDay).toISOString().split('T')[0];
-            tasks.push(
-              createFee({
-                school_id: profile.school_id!,
-                student_id: s.id,
-                fee_type: `${fs.name} - ${monthName}`,
-                amount: fs.amount,
-                due_date: dueDate,
-              })
-            );
-          }
-        }
-        await Promise.all(tasks);
-        toast(`Assigned 12 monthly records to ${studs.length} students`, 'success');
-
-      } else if (fs.frequency === 'quarterly') {
-        // 4 records per student
-        const quarters: Array<{ label: string; calMonth: number; calYear: number }> = [
-          { label: 'Q1', calMonth: 3,  calYear: currentYear },
-          { label: 'Q2', calMonth: 6,  calYear: currentYear },
-          { label: 'Q3', calMonth: 9,  calYear: currentYear },
-          { label: 'Q4', calMonth: 0,  calYear: currentYear + 1 },
-        ];
-        const tasks: Promise<unknown>[] = [];
-        for (const s of studs) {
-          for (const q of quarters) {
-            const dueDay  = fs.due_day ?? 1;
-            const dueDate = new Date(q.calYear, q.calMonth, dueDay).toISOString().split('T')[0];
-            tasks.push(
-              createFee({
-                school_id: profile.school_id!,
-                student_id: s.id,
-                fee_type: `${fs.name} - ${q.label}`,
-                amount: fs.amount,
-                due_date: dueDate,
-              })
-            );
-          }
-        }
-        await Promise.all(tasks);
-        toast(`Assigned 4 quarterly records to ${studs.length} students`, 'success');
-
-      } else {
-        // one_time or annual — single record
-        const dueDate = fs.due_day
-          ? new Date(today.getFullYear(), today.getMonth(), fs.due_day).toISOString().split('T')[0]
-          : today.toISOString().split('T')[0];
-        await Promise.all(
-          studs.map((s) =>
-            createFee({ school_id: profile.school_id!, student_id: s.id, fee_type: fs.name, amount: fs.amount, due_date: dueDate })
-          )
-        );
-        toast(`Assigned to ${studs.length} students`, 'success');
-      }
-
-      setAssigningStructure(null);
-      loadData();
-    } catch { toast('Failed to assign fees', 'error'); }
-    finally { setAssignLoading(false); }
-  }
-
   // ── Tab 3: Setup Handlers ──
   async function handleSaveGateway() {
     if (!/^rzp_(test|live)_[A-Za-z0-9]+$/.test(keyId.trim())) { toast('Key ID must look like rzp_live_… or rzp_test_…', 'error'); return; }
@@ -488,14 +241,10 @@ export default function AdminFees() {
     inactive: 'text-slate-500 hover:text-slate-700 hover:bg-slate-50 px-4 py-2.5 text-sm border-b-2 border-transparent',
   };
 
-  const frequencyLabel: Record<FeeStructure['frequency'], string> = {
-    one_time: 'One Time', monthly: 'Monthly', quarterly: 'Quarterly', annual: 'Annual',
-  };
-
   return (
     <DashboardLayout title="Fees">
       <div className="space-y-6">
-        <PageHeader title="Fee Management" description="Manage fee records, structures and online payment setup" />
+        <PageHeader title="Fee Management" description="Manage fee records, fee heads and online payment setup" />
 
         {/* ── Tab Bar ── */}
         <div className="border-b border-slate-200">
@@ -506,7 +255,7 @@ export default function AdminFees() {
                 onClick={() => setActiveTab(tab)}
                 className={activeTab === tab ? TAB_CLASSES.active : TAB_CLASSES.inactive}
               >
-                {tab === 'records' ? 'Fee Records' : tab === 'online' ? `Online Payments${refundsNeeded ? ` (${refundsNeeded})` : ''}` : tab === 'structure' ? 'Fee Structure' : 'Payment Setup'}
+                {tab === 'records' ? 'Fee Records' : tab === 'online' ? `Online Payments${refundsNeeded ? ` (${refundsNeeded})` : ''}` : tab === 'structure' ? 'Fee Heads' : 'Payment Setup'}
               </button>
             ))}
           </div>
@@ -610,63 +359,9 @@ export default function AdminFees() {
           </>
         )}
 
-        {/* ══════════════ TAB 2: FEE STRUCTURE ══════════════ */}
-        {activeTab === 'structure' && (
-          <>
-            <div className="flex justify-end">
-              <Button icon={<Plus className="h-4 w-4" />} onClick={openAddStructure}>Add Fee Structure</Button>
-            </div>
-
-            {feeStructures.length === 0 ? (
-              <div className="flex flex-col items-center justify-center rounded-[20px] border border-dashed border-slate-200 bg-white py-16 text-center">
-                <IndianRupee className="h-12 w-12 text-slate-300 mb-3" />
-                <p className="font-medium text-slate-600">No fee structures defined</p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto rounded-[20px] bg-white shadow-[0_4px_20px_rgba(91,110,232,0.08)]">
-                <table className="w-full text-left text-sm">
-                  <thead className="border-b border-slate-100 bg-[#F7F8FE]">
-                    <tr>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Name</th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Type</th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Class</th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Amount</th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Frequency</th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Due Day</th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">Status</th>
-                      <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {feeStructures.map((fs) => (
-                      <tr key={fs.id} className="hover:bg-[#F7F8FE]">
-                        <td className="px-4 py-3 font-medium text-slate-900">{fs.name}</td>
-                        <td className="px-4 py-3 text-slate-700">{fs.fee_type}</td>
-                        <td className="px-4 py-3 text-slate-700">
-                          {fs.class_id ? (classes.find((c) => c.id === fs.class_id)?.name || fs.class_id) : 'All Classes'}
-                        </td>
-                        <td className="px-4 py-3 text-slate-700">{formatCurrency(fs.amount, '₹')}</td>
-                        <td className="px-4 py-3 text-slate-700">{frequencyLabel[fs.frequency]}</td>
-                        <td className="px-4 py-3 text-slate-700">{fs.due_day ?? '—'}</td>
-                        <td className="px-4 py-3">
-                          <Badge variant={fs.is_active ? 'success' : 'neutral'}>{fs.is_active ? 'Active' : 'Inactive'}</Badge>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-1 whitespace-nowrap">
-                            <Button size="sm" variant="outline" onClick={() => openEditStructure(fs)}>Edit</Button>
-                            <Button size="sm" variant="outline" onClick={() => setAssigningStructure(fs)}>Assign to Students</Button>
-                            <button onClick={() => setDeleteStructureId(fs.id)} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600">
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
+        {/* ══════════════ TAB 2: FEE HEADS ══════════════ */}
+        {activeTab === 'structure' && profile?.school_id && (
+          <FeeHeadsSetup schoolId={profile.school_id} classes={classes} />
         )}
 
         {/* ══════════════ TAB 3: PAYMENT SETUP ══════════════ */}
@@ -883,109 +578,6 @@ export default function AdminFees() {
       {/* ── Delete Fee Confirm ── */}
       <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={handleDelete} title="Delete Fee" message="Are you sure you want to delete this fee record?" confirmText="Delete" variant="danger" />
 
-      {/* ── Fee Structure Modal ── */}
-      <Modal open={structureModalOpen} onClose={() => { setStructureModalOpen(false); setStructureErrors({}); }}
-        title={editingStructure ? 'Edit Fee Structure' : 'Add Fee Structure'} size="lg"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => { setStructureModalOpen(false); setStructureErrors({}); }}>Cancel</Button>
-            <Button onClick={handleSaveStructure} loading={structureSaving}>{editingStructure ? 'Save Changes' : 'Add'}</Button>
-          </>
-        }>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          {/* Name — full width */}
-          <div className="sm:col-span-2">
-            <Input label="Name" required value={structureForm.name}
-              error={structureErrors.name}
-              placeholder="e.g. Annual Tuition Fee"
-              onChange={(e) => { setStructureForm({ ...structureForm, name: e.target.value }); setStructureErrors((p) => ({ ...p, name: '' })); }} />
-          </div>
-
-          <Select label="Fee Type" value={structureForm.fee_type}
-            onChange={(e) => setStructureForm({ ...structureForm, fee_type: e.target.value })}>
-            {['Admission', 'Tuition', 'Transport', 'Hostel', 'Activity', 'Other'].map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </Select>
-
-          <Select label="Class" value={structureForm.class_id}
-            onChange={(e) => setStructureForm({ ...structureForm, class_id: e.target.value })}>
-            <option value="">All Classes</option>
-            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </Select>
-
-          <Input label="Amount (₹)" type="number" required min="0.01" step="0.01"
-            value={structureForm.amount} error={structureErrors.amount}
-            onChange={(e) => { setStructureForm({ ...structureForm, amount: e.target.value }); setStructureErrors((p) => ({ ...p, amount: '' })); }} />
-
-          <Select label="Frequency" value={structureForm.frequency}
-            onChange={(e) => setStructureForm({ ...structureForm, frequency: e.target.value as FeeStructure['frequency'] })}>
-            <option value="one_time">One Time</option>
-            <option value="monthly">Monthly</option>
-            <option value="quarterly">Quarterly</option>
-            <option value="annual">Annual</option>
-          </Select>
-
-          {structureForm.frequency !== 'one_time' && (
-            <Input label="Due Day (1–31)" type="number" min="1" max="31"
-              value={structureForm.due_day} error={structureErrors.due_day}
-              placeholder="Day of month"
-              onChange={(e) => { setStructureForm({ ...structureForm, due_day: e.target.value }); setStructureErrors((p) => ({ ...p, due_day: '' })); }} />
-          )}
-
-          <Input label="Academic Year" required value={structureForm.academic_year}
-            error={structureErrors.academic_year}
-            placeholder="e.g. 2026-27"
-            onChange={(e) => { setStructureForm({ ...structureForm, academic_year: e.target.value }); setStructureErrors((p) => ({ ...p, academic_year: '' })); }} />
-
-          {/* Active checkbox — full width */}
-          <div className="sm:col-span-2">
-            <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
-              <input type="checkbox" checked={structureForm.is_active}
-                onChange={(e) => setStructureForm({ ...structureForm, is_active: e.target.checked })}
-                className="rounded" />
-              Active
-            </label>
-          </div>
-        </div>
-      </Modal>
-
-      {/* ── Delete Structure Confirm ── */}
-      <ConfirmDialog open={!!deleteStructureId} onClose={() => setDeleteStructureId(null)} onConfirm={handleDeleteStructure} title="Delete Fee Structure" message="Are you sure you want to delete this fee structure?" confirmText="Delete" variant="danger" />
-
-      {/* ── Assign to Students Modal ── */}
-      <Modal open={!!assigningStructure} onClose={() => setAssigningStructure(null)} title="Assign to Students" size="sm"
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setAssigningStructure(null)}>Cancel</Button>
-            <Button onClick={() => assigningStructure && handleAssignToStudents(assigningStructure)} loading={assignLoading}>Confirm & Assign</Button>
-          </>
-        }>
-        {assigningStructure && (
-          <div className="space-y-3 text-sm text-slate-700">
-            <p>
-              This will create fee records of{' '}
-              <strong>{formatCurrency(assigningStructure.amount, '₹')}</strong> ({assigningStructure.fee_type}) for:
-            </p>
-            <p className="font-medium">
-              {assigningStructure.class_id
-                ? (classes.find((c) => c.id === assigningStructure.class_id)?.name || assigningStructure.class_id) + ' students'
-                : 'All students in the school'}
-            </p>
-            {assigningStructure.frequency === 'monthly' && (
-              <p className="text-brand-700 bg-brand-50 rounded-lg px-3 py-2">
-                Monthly frequency: <strong>12 records per student</strong> will be created (April – March).
-              </p>
-            )}
-            {assigningStructure.frequency === 'quarterly' && (
-              <p className="text-brand-700 bg-brand-50 rounded-lg px-3 py-2">
-                Quarterly frequency: <strong>4 records per student</strong> will be created (Q1–Q4).
-              </p>
-            )}
-            <p className="text-slate-500">Are you sure you want to proceed?</p>
-          </div>
-        )}
-      </Modal>
     </DashboardLayout>
   );
 }

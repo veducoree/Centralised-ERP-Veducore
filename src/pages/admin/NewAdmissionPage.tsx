@@ -12,7 +12,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
 import {
   fetchClasses, fetchSchool,
-  fetchFeeStructuresForClass,
+  fetchAdmissionFeeLines,
   createAdmissionWithFees,
   fetchFees,
   fetchGatewayStatus,
@@ -604,14 +604,10 @@ function Step3({ formData, errors, updateChild, classes }: Step3Props) {
               <div className="sm:col-span-2">
                 <label className="flex cursor-pointer items-center gap-2.5 text-sm text-slate-700">
                   <input type="checkbox" checked={c.transport_selected}
-                    onChange={(e) => updateChild(i, {
-                      transport_selected: e.target.checked,
-                      // Tick / untick the transport fee head if it's already loaded.
-                      fee_lines: c.fee_lines.map((l) => (/transport/i.test(l.fee_type) ? { ...l, include: e.target.checked } : l)),
-                    })} className="rounded" />
+                    onChange={(e) => updateChild(i, { transport_selected: e.target.checked })} className="rounded" />
                   <span>Student requires school transport</span>
                 </label>
-                <p className="mt-1 text-xs text-slate-400">Includes the Transport fee head (if the class has one). Assign the bus from the Transport module.</p>
+                <p className="mt-1 text-xs text-slate-400">After admission, assign the bus and stop in the Transport module — the stop&apos;s fare is added to fees automatically.</p>
               </div>
             </div>
           </div>
@@ -623,12 +619,10 @@ function Step3({ formData, errors, updateChild, classes }: Step3Props) {
 
 // Step 4: Fees — each child's fee heads + concession, one payment for the family
 interface Step4Props extends StepProps {
-  schoolId: string;
-  academicYear: string;
   canCollectPayment: boolean;
 }
 
-function Step4Fees({ formData, errors, update, updateChild, schoolId, academicYear, canCollectPayment }: Step4Props) {
+function Step4Fees({ formData, errors, update, updateChild, canCollectPayment }: Step4Props) {
   const [onlineEnabled, setOnlineEnabled] = useState<boolean | null>(null);
   useEffect(() => { fetchGatewayStatus().then((g) => setOnlineEnabled(!!g.active)).catch(() => setOnlineEnabled(false)); }, []);
   const [loading, setLoading] = useState<Record<number, boolean>>({});
@@ -641,16 +635,12 @@ function Step4Fees({ formData, errors, update, updateChild, schoolId, academicYe
     kids.forEach((c, i) => {
       if (!c.class_id || c.fees_loaded_for === c.class_id) return;
       setLoading((l) => ({ ...l, [i]: true }));
-      fetchFeeStructuresForClass(schoolId, c.class_id, academicYear)
-        .then((structures) => {
-          const lines: AdmissionFeeLineItem[] = structures.map((s) => ({
-            fee_type: s.name,
-            amount: Number(s.amount) || 0,
-            include: s.fee_type !== 'Transport' || c.transport_selected,
-            editable: true,
-          }));
-          // No structure: start empty — never charge made-up amounts.
-          updateChild(i, { fee_lines: lines, fees_loaded_for: c.class_id, no_structure_warning: structures.length === 0 });
+      // Due at admission from the Fee Heads set up for this class: one-time,
+      // annual and the first instalment. Later months are created automatically.
+      fetchAdmissionFeeLines(c.class_id, today())
+        .then((lines) => {
+          // No fee heads: start empty — never charge made-up amounts.
+          updateChild(i, { fee_lines: lines, fees_loaded_for: c.class_id, no_structure_warning: lines.length === 0 });
         })
         .catch(() => updateChild(i, { fee_lines: [], fees_loaded_for: c.class_id, no_structure_warning: true }))
         .finally(() => setLoading((l) => ({ ...l, [i]: false })));
@@ -686,8 +676,8 @@ function Step4Fees({ formData, errors, update, updateChild, schoolId, academicYe
               <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
                 <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" />
                 <p className="text-sm text-amber-800">
-                  No fee structure for {c.class_name || 'this class'} ({academicYear}). Add the fee heads below, or{' '}
-                  <a href="/admin/fees" target="_blank" rel="noreferrer" className="underline font-medium">set up the class fees in the Fees module</a>.
+                  No fee heads have an amount for {c.class_name || 'this class'}. Add lines below, or{' '}
+                  <a href="/admin/fees" target="_blank" rel="noreferrer" className="underline font-medium">fill the class amounts in Fees → Fee Heads</a>.
                 </p>
               </div>
             )}
@@ -733,7 +723,11 @@ function Step4Fees({ formData, errors, update, updateChild, schoolId, academicYe
                           </div>
                         </td>
                         <td className="px-2 py-3 text-center">
-                          <button type="button" onClick={() => updateChild(i, { fee_lines: c.fee_lines.filter((_, j) => j !== idx) })}
+                          <button type="button" title={line.source_key ? 'Don’t charge this' : 'Remove'}
+                            onClick={() => updateChild(i, {
+                              // Lines from a fee head are kept unticked so the due is never generated later.
+                              fee_lines: line.source_key ? c.fee_lines.map((l, j) => (j === idx ? { ...l, include: false } : l)) : c.fee_lines.filter((_, j) => j !== idx),
+                            })}
                             className="rounded p-1 text-slate-300 transition-colors hover:text-red-500">
                             <X className="h-4 w-4" />
                           </button>
@@ -747,6 +741,9 @@ function Step4Fees({ formData, errors, update, updateChild, schoolId, academicYe
                     className="flex items-center gap-1.5 text-xs font-medium text-brand-600 transition-colors hover:text-brand-800">
                     <PlusCircle className="h-3.5 w-3.5" /> Add fee line
                   </button>
+                  {c.fee_lines.some((l) => l.source_key) && (
+                    <p className="mt-1 text-[11px] text-slate-500">Shown: what is due at admission. The rest of the session&apos;s monthly / quarterly dues are added automatically. Untick a line to never charge it.</p>
+                  )}
                 </div>
               </div>
             )}
@@ -1482,7 +1479,7 @@ export default function NewAdmissionPage() {
                   )}
                   {currentStep === 4 && (
                     <Step4Fees formData={formData} errors={errors} update={update} updateChild={updateChild}
-                      schoolId={schoolId} academicYear={academicYear} canCollectPayment={canCollectPayment} />
+                      canCollectPayment={canCollectPayment} />
                   )}
                   {currentStep === 5 && <Step5Review formData={formData} credentials={credentials} onEditStep={goTo} />}
                 </div>

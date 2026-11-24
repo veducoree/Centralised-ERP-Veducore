@@ -517,6 +517,10 @@ export interface AdmissionFeeLineItem {
   amount: number;     // editable by admin
   include: boolean;   // checkbox — admin can untick
   editable: boolean;  // whether amount field is editable
+  /** Set when the line comes from a fee head (migration 058). */
+  fee_head_id?: string;
+  /** Unique key of the due, e.g. "head:<id>:2026-11" — prevents double charging. */
+  source_key?: string;
 }
 
 /** Discount applied at admission time */

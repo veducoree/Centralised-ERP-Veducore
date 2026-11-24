@@ -10,7 +10,7 @@ import { SearchInput, PageHeader, LoadingSpinner } from '@/components/ui/Primiti
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
 import {
-  fetchStudents, fetchClasses, createStudent, updateStudent, deleteStudent, ensureParentForStudent,
+  fetchStudents, fetchClasses, createStudent, updateStudent, deleteStudent, ensureParentForStudent, generateStudentFees,
 } from '@/services/api';
 import type { Student, Class, Section } from '@/types';
 import { formatDate, validateEmail, getInitials } from '@/lib/utils';
@@ -152,6 +152,12 @@ export default function AdminStudents() {
         toast('Student updated successfully', 'success');
       } else {
         const res = await createStudent(data);
+        // This session's dues from the Fee Heads (from the admission date). One-time
+        // admission fees are only charged through New Admission.
+        if (res?.id) {
+          try { await generateStudentFees(res.id); }
+          catch (feeErr) { toast(`Student added, but fees weren't generated: ${feeErr instanceof Error ? feeErr.message : ''}`, 'error'); }
+        }
         if (res?._parentError) {
           toast(`Student added, but parent login failed: ${res._parentError}`, 'error');
         } else {

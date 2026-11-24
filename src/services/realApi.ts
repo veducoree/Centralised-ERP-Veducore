@@ -3612,3 +3612,109 @@ export async function setReportCardPrintOffset(x: number, y: number) {
   const { error } = await supabase.rpc('set_report_card_print_offset', { p_x: x, p_y: y });
   if (error) throw error;
 }
+
+// ============================================================
+// Fee heads (migration 058)
+// Fee heads + per-class amounts for the current session. Dues are generated
+// by the server (generate_student_fees) and never duplicated.
+// ============================================================
+
+export type FeeHeadKind = 'one_time' | 'annual' | 'monthly' | 'quarterly';
+
+export interface FeeHead {
+  id: string;
+  school_id: string;
+  name: string;
+  kind: FeeHeadKind;
+  sort_order: number;
+  is_active: boolean;
+}
+
+/** Fee heads of the current session with their per-class amounts (class_id → amount). */
+export async function fetchFeeHeads(): Promise<(FeeHead & { amounts: Record<string, number> })[]> {
+  const { data, error } = await supabase
+    .from('fee_heads')
+    .select('*, fee_head_amounts(class_id, amount)')
+    .order('sort_order')
+    .order('created_at');
+  if (error) throw error;
+  type Row = FeeHead & { fee_head_amounts: { class_id: string; amount: number }[] | null };
+  return ((data || []) as Row[]).map(({ fee_head_amounts, ...h }) => ({
+    ...h,
+    amounts: Object.fromEntries((fee_head_amounts || []).map((a) => [a.class_id, Number(a.amount)])),
+  }));
+}
+
+export async function saveFeeHead(schoolId: string, head: { id?: string; name: string; kind: FeeHeadKind; sort_order?: number; is_active?: boolean }) {
+  const row = { name: head.name.trim(), kind: head.kind, sort_order: head.sort_order ?? 0, is_active: head.is_active ?? true, updated_at: new Date().toISOString() };
+  const q = head.id
+    ? supabase.from('fee_heads').update(row).eq('id', head.id).select().single()
+    : supabase.from('fee_heads').insert({ ...row, school_id: schoolId }).select().single();
+  const { data, error } = await q;
+  if (error) {
+    if (error.code === '23505') throw new Error(`A fee head named "${head.name.trim()}" already exists`);
+    throw error;
+  }
+  return data as FeeHead;
+}
+
+export async function deleteFeeHead(id: string) {
+  const { error } = await supabase.from('fee_heads').delete().eq('id', id);
+  if (error) throw error;
+}
+
+/** Saves the class-wise grid. Empty / 0 amounts are removed (class doesn't pay that head). */
+export async function saveFeeHeadAmounts(schoolId: string, rows: { fee_head_id: string; class_id: string; amount: number }[]) {
+  const keep = rows.filter((r) => r.amount > 0).map((r) => ({ ...r, school_id: schoolId, updated_at: new Date().toISOString() }));
+  const drop = rows.filter((r) => !(r.amount > 0));
+  if (keep.length) {
+    const { error } = await supabase.from('fee_head_amounts').upsert(keep, { onConflict: 'fee_head_id,class_id' });
+    if (error) throw error;
+  }
+  for (const d of drop) {
+    const { error } = await supabase.from('fee_head_amounts').delete().eq('fee_head_id', d.fee_head_id).eq('class_id', d.class_id);
+    if (error) throw error;
+  }
+}
+
+/**
+ * Creates this session's dues for every active student (or one class). Safe to
+ * run again. `fromMonth` (YYYY-MM-01) skips instalments before that month —
+ * for months already collected outside Veducore.
+ */
+export async function generateSchoolFees(classId?: string | null, fromMonth?: string | null): Promise<{ students: number; created: number }> {
+  const { data, error } = await supabase.rpc('generate_school_fees', { p_class: classId || null, p_from: fromMonth || null });
+  if (error) throw new Error(error.message);
+  invalidateCache('fees:');
+  return data as { students: number; created: number };
+}
+
+/** Creates / tidies one student's dues (class heads + transport). Safe to run again. */
+export async function generateStudentFees(studentId: string, fromMonth?: string | null): Promise<number> {
+  const { data, error } = await supabase.rpc('generate_student_fees', { p_student: studentId, p_skip: [], p_from: fromMonth || null, p_transport_only: false });
+  if (error) throw new Error(error.message);
+  invalidateCache('fees:');
+  return Number(data) || 0;
+}
+
+/** Bus-fare dues only (Transport module): creates / tidies the student's transport instalments. */
+export async function generateTransportFees(studentId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('generate_student_fees', { p_student: studentId, p_skip: [], p_from: null, p_transport_only: true });
+  if (error) throw new Error(error.message);
+  invalidateCache('fees:');
+  return Number(data) || 0;
+}
+
+/** What a new student of this class pays at admission (one-time + annual + first instalment). */
+export async function fetchAdmissionFeeLines(classId: string, joinDate?: string): Promise<AdmissionFeeLineItem[]> {
+  const { data, error } = await supabase.rpc('admission_fee_lines', { p_class: classId, p_join: joinDate || null });
+  if (error) throw new Error(error.message);
+  return ((data || []) as { fee_head_id: string; source_key: string; fee_type: string; amount: number }[]).map((r) => ({
+    fee_type: r.fee_type,
+    amount: Number(r.amount),
+    include: true,
+    editable: true,
+    fee_head_id: r.fee_head_id,
+    source_key: r.source_key,
+  }));
+}

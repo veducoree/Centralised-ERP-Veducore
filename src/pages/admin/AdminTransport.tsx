@@ -21,7 +21,7 @@ import {
   deleteAssignment,
   fetchStudents,
   fetchClasses,
-  createFee,
+  generateTransportFees,
   createNotification,
 } from '@/services/api';
 import type {
@@ -183,9 +183,6 @@ export default function AdminTransport() {
   const [assignStopId, setAssignStopId]           = useState('');
   const [assignStartDate, setAssignStartDate]     = useState(today);
   const [autoCreateFee, setAutoCreateFee]         = useState(true);
-  const [assignDueDate, setAssignDueDate]         = useState(() => {
-    const d = new Date(); d.setDate(d.getDate() + 10); return d.toISOString().split('T')[0];
-  });
 
   // ── Reject / stop modals ─────────────────────────────────
   const [rejectAssignmentId, setRejectAssignmentId] = useState<string | null>(null);
@@ -501,17 +498,12 @@ export default function AdminTransport() {
         approved_at: new Date().toISOString(),
       });
 
-      if (autoCreateFee && !editingAssignment) {
-        try {
-          const fee = await createFee({
-            school_id: profile.school_id,
-            student_id: assignStudentId,
-            fee_type: `Transport Fee (${VEHICLE[vt(vehicle.vehicle_type)].label} ${vehicle.bus_number} - ${stop.stop_name})`,
-            amount: stop.amount,
-            due_date: assignDueDate || today(),
-          });
-          if (fee?.id && saved?.id) await updateAssignmentStatus(saved.id, { status: 'approved', fee_id: fee.id });
-        } catch { /* fee is optional — assignment already saved */ }
+      // Transport dues for the session from the stop's fare (monthly / quarterly /
+      // yearly), from the start date. Never duplicated; a replaced assignment's
+      // unpaid future dues are removed.
+      if (autoCreateFee && saved?.id) {
+        try { await generateTransportFees(assignStudentId); }
+        catch (feeErr) { toast(`Transport saved, but fees weren't added: ${feeErr instanceof Error ? feeErr.message : ''}`, 'error'); }
       }
 
       notifyParent(assignStudentId, target ? 'Transport updated' : 'Transport assigned',
@@ -567,25 +559,15 @@ export default function AdminTransport() {
       const current = assignments.find((x) => x.student_id === a.student_id && isLive(x.status) && x.id !== a.id);
       if (current?.id) await updateAssignmentStatus(current.id, { status: 'stopped', end_date: today() });
 
-      let feeId: string | undefined;
-      try {
-        const fee = await createFee({
-          school_id: profile.school_id,
-          student_id: a.student_id,
-          fee_type: `Transport Fee (${meta.label} ${vehicle.bus_number} - ${stop.stop_name})`,
-          amount: stop.amount,
-          due_date: today(),
-        });
-        feeId = fee?.id;
-      } catch { /* non-fatal */ }
-
       await updateAssignmentStatus(a.id, {
         status: 'approved',
         approved_by: profile.id,
         approved_at: new Date().toISOString(),
         fare_snapshot: fareSnapshot,
-        ...(feeId ? { fee_id: feeId } : {}),
       });
+      // Session's transport dues from the stop fare (never duplicated).
+      try { await generateTransportFees(a.student_id); }
+      catch (feeErr) { toast(`Approved, but fees weren't added: ${feeErr instanceof Error ? feeErr.message : ''}`, 'error'); }
 
       notifyParent(a.student_id, 'Transport application approved',
         `Approved: ${meta.label} ${vehicle.bus_number} from ${stop.stop_name}${stop.pickup_time ? ` (pickup ${stop.pickup_time})` : ''}. `
@@ -628,6 +610,8 @@ export default function AdminTransport() {
     setSaving(true);
     try {
       await updateAssignmentStatus(stopAssignmentId, { status: 'stopped', end_date: today() });
+      // Remove its unpaid dues after today.
+      if (a) await generateTransportFees(a.student_id).catch(() => {});
       if (a) notifyParent(a.student_id, 'Transport stopped', `School transport from ${a.stop_name} has been stopped from ${formatDate(today())}.`, 'info');
       await loadData();
       setStopAssignmentId(null);
@@ -1345,14 +1329,11 @@ export default function AdminTransport() {
                   className="mt-0.5 h-4 w-4 rounded border-slate-300 text-brand-600" />
                 <div>
                   <p className="text-xs font-semibold text-slate-800">
-                    Create transport fee {assignStop ? `(${formatCurrency(assignStop.amount)})` : ''}
+                    Add transport fees {assignStop ? `(${formatCurrency(assignStop.amount)}/${periodWord(assignStop.fare_period)})` : ''}
                   </p>
-                  <p className="text-[11px] text-slate-500">Adds an invoice in Fees so the parent can pay it.</p>
+                  <p className="text-[11px] text-slate-500">Creates this session&apos;s transport dues in Fees from the start date (due on the school&apos;s monthly due day). Removed automatically if transport is stopped.</p>
                 </div>
               </label>
-              {autoCreateFee && (
-                <Input label="Fee due date" type="date" value={assignDueDate} onChange={(e) => setAssignDueDate(e.target.value)} />
-              )}
             </div>
           )}
 
