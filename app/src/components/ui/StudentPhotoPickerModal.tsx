@@ -12,6 +12,19 @@ import { COLORS, SPACING, RADIUS, SHADOW } from '@/lib/utils';
 import { appAlert } from '@/components/ui/AppDialog';
 import { Button } from '@/components/ui/Button';
 
+// The picker returns a file:// path that exists only on this phone, so saving it
+// left the web dashboard (and every other device) with a broken image. Store the
+// photo inline as a JPEG data URL instead — the same format the web uploader uses.
+function toDataUrl(result: ImagePicker.ImagePickerResult): string | null {
+  if (result.canceled) return null;
+  const asset = result.assets?.[0];
+  if (!asset?.base64) {
+    appAlert('Photo Error', 'Could not read the selected photo. Please try again.');
+    return null;
+  }
+  return `data:${asset.mimeType ?? 'image/jpeg'};base64,${asset.base64}`;
+}
+
 interface StudentPhotoPickerModalProps {
   visible: boolean;
   onClose: () => void;
@@ -38,11 +51,13 @@ export function StudentPhotoPickerModal({
       const result = await ImagePicker.launchCameraAsync({
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        quality: 0.4,
+        base64: true,
       });
 
-      if (!result.canceled && result.assets && result.assets[0]?.uri) {
-        onPhotoSelected(result.assets[0].uri);
+      const url = toDataUrl(result);
+      if (url) {
+        onPhotoSelected(url);
         onClose();
       }
     } catch (err) {
@@ -62,11 +77,13 @@ export function StudentPhotoPickerModal({
       const result = await ImagePicker.launchImageLibraryAsync({
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 0.8,
+        quality: 0.4,
+        base64: true,
       });
 
-      if (!result.canceled && result.assets && result.assets[0]?.uri) {
-        onPhotoSelected(result.assets[0].uri);
+      const url = toDataUrl(result);
+      if (url) {
+        onPhotoSelected(url);
         onClose();
       }
     } catch (err) {

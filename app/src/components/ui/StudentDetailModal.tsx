@@ -97,7 +97,7 @@ export function StudentDetailModal({
   const handlePhotoSelected = async (uri: string | null) => {
     setAvatarUrl(uri);
     try {
-      await updateStudent(student.id, { avatar_url: uri ?? undefined });
+      await updateStudent(student.id, { avatar_url: uri });
       onStudentUpdated?.();
     } catch (err) {
       console.error('Failed to update student photo:', err);
