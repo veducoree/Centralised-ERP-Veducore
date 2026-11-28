@@ -5,7 +5,6 @@ import { useAuth, getDashboardPath } from '@/auth/AuthContext';
 import { takeLoginNotice } from '@/lib/accountAccess';
 import { CenteredLoader } from '@/components/ui/Skeleton';
 import veducoreLogo from '@/assets/veducore-logo.png';
-import LoginAdBanner from '@/components/ads/LoginAdBanner';
 
 // ── Image Captcha Helper ──────────────────────────────────────────────────────
 
@@ -391,13 +390,6 @@ export default function LoginPage() {
 
       </main>
 
-      {/* Bottom banner ad, flush with the bottom edge. Kept in normal flow (not fixed) so it
-          never overlaps the form on small screens (AdSense accidental-click policy). */}
-      <aside className="w-full border-t border-gray-200 bg-white/80 px-4 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-sm">
-        <div className="mx-auto w-full max-w-xl">
-          <LoginAdBanner />
-        </div>
-      </aside>
     </div>
   );
 }

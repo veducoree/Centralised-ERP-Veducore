@@ -2,7 +2,7 @@
 import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import {
   AlertCircle, BarChart3, Building2, Contact2, FileSpreadsheet, Eye, EyeOff, History, LifeBuoy, Loader2, LogOut,
-  GalleryHorizontal, Megaphone, Menu, Plus, Settings, ShieldCheck, Users, X,
+  Megaphone, Menu, Plus, Settings, ShieldCheck, Users, X,
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import veducoreLogo from '@/assets/veducore-logo.png';
@@ -22,7 +22,6 @@ import {
 const SchoolDrawer = lazy(() => import('./sections/SchoolDrawer'));
 const AddSchoolSection = lazy(() => import('./sections/AddSchool'));
 const AnnouncementsSection = lazy(() => import('./sections/Announcements'));
-const AdsSection = lazy(() => import('./sections/Ads'));
 const SupportSection = lazy(() => import('./sections/Support'));
 const TeamSection = lazy(() => import('./sections/Team'));
 const AuditLogSection = lazy(() => import('./sections/AuditLog'));
@@ -32,7 +31,7 @@ const ReportCardsSection = lazy(() => import('./sections/ReportCards'));
 
 type Section =
   | 'dashboard' | 'schools' | 'add-school' | 'id-cards' | 'report-cards'
-  | 'announcements' | 'ads' | 'support' | 'team' | 'audit' | 'settings';
+  | 'announcements' | 'support' | 'team' | 'audit' | 'settings';
 
 const NAV: { group: string; items: { id: Section; label: string; icon: React.ReactNode; managersOnly?: boolean }[] }[] = [
   { group: '', items: [{ id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="h-[18px] w-[18px]" /> }] },
@@ -47,7 +46,6 @@ const NAV: { group: string; items: { id: Section; label: string; icon: React.Rea
   {
     group: 'Engage', items: [
       { id: 'announcements', label: 'Announcements', icon: <Megaphone className="h-[18px] w-[18px]" /> },
-      { id: 'ads', label: 'Login page ads', icon: <GalleryHorizontal className="h-[18px] w-[18px]" />, managersOnly: true },
       { id: 'support', label: 'Support desk', icon: <LifeBuoy className="h-[18px] w-[18px]" /> },
     ],
   },
@@ -67,7 +65,6 @@ const TITLES: Record<Section, [string, string]> = {
   'id-cards': ['ID cards', 'Design templates and print student ID card sheets'],
   'report-cards': ['Report cards', "Design each school's annual report card on its own blank card"],
   announcements: ['Announcements', 'Messages to school admins, teachers and parents'],
-  ads: ['Login page ads', 'Banner ads that rotate at the bottom of the login page'],
   support: ['Support desk', 'Tickets raised by school admins'],
   team: ['Team & roles', 'Who can access this portal and what they can do'],
   audit: ['Audit log', 'A record of every change made here'],
@@ -151,7 +148,7 @@ export default function Superadmin() {
   useEffect(() => { if (me) loadSchools(); }, [me, loadSchools]);
 
   // Support staff can't open manager-only sections: send them to the dashboard URL.
-  const managerOnly = section === 'add-school' || section === 'id-cards' || section === 'report-cards' || section === 'ads';
+  const managerOnly = section === 'add-school' || section === 'id-cards' || section === 'report-cards';
   useEffect(() => {
     if (me && me.role === 'support' && managerOnly) navigate(BASE, { replace: true });
   }, [me, managerOnly, navigate]);
@@ -253,7 +250,6 @@ export default function Superadmin() {
           )}
           {current === 'report-cards' && <ReportCardsSection schools={schools} />}
           {current === 'announcements' && <AnnouncementsSection me={me} schools={schools} />}
-          {current === 'ads' && <AdsSection me={me} />}
           {current === 'support' && <SupportSection me={me} onOpenSchool={setOpenSchool} />}
           {current === 'team' && <TeamSection me={me} />}
           {current === 'audit' && <AuditLogSection />}
