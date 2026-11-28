@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { fetchNextEmployeeId } from '@/services/api';
+import { exceedsDigitLimit, type DigitLimit } from '@/lib/codeDigits';
 
 type NextFetcher = () => Promise<{ prefix: string; next: string | null }>;
 
@@ -14,7 +15,7 @@ type NextFetcher = () => Promise<{ prefix: string; next: string | null }>;
  * number after the school's highest existing one (STUD453 → STUD454).
  */
 export function PrefixedNumberInput({
-  value, onChange, error, autoFill = true, label, fetchNext, placeholder = 'e.g. 1024',
+  value, onChange, error, autoFill = true, label, fetchNext, placeholder = 'e.g. 1024', limit = null,
 }: {
   value: string;
   onChange: (full: string) => void;
@@ -23,6 +24,8 @@ export function PrefixedNumberInput({
   label: string;
   fetchNext: NextFetcher;
   placeholder?: string;
+  /** Allowed digits in the number part (set by Veducore), or null for no limit. */
+  limit?: DigitLimit | null;
 }) {
   const [prefix, setPrefix] = useState('');
   const [loaded, setLoaded] = useState(false);
@@ -63,25 +66,31 @@ export function PrefixedNumberInput({
         <input
           className="h-full min-w-0 flex-1 px-3.5 text-sm text-slate-900 placeholder-slate-400 focus:outline-none"
           value={numberPart}
-          placeholder={prefix ? '001' : placeholder}
+          placeholder={limit ? `${limit.min}–${limit.max} digits` : prefix ? '001' : placeholder}
           onChange={(e) => {
             let typed = e.target.value.replace(/\s/g, '');
             // Admin typed the prefix too (e.g. pasted "STUD001") — don't double it.
             if (prefix && typed.toUpperCase().startsWith(prefix.toUpperCase())) typed = typed.slice(prefix.length);
+            // Never let a typing mistake add a digit beyond the school's limit.
+            if (exceedsDigitLimit(typed, limit)) return;
             onChange(typed ? prefix + typed : '');
           }}
         />
       </div>
       {error
         ? <p className="mt-1 text-xs text-red-600">{error}</p>
-        : loaded && prefix
-          ? <p className="mt-1 text-xs text-slate-400">Saved as {value || `${prefix}…`}</p>
+        : loaded && (prefix || limit)
+          ? <p className="mt-1 text-xs text-slate-400">
+              {prefix ? `Saved as ${value || `${prefix}…`}` : ''}
+              {prefix && limit ? ' · ' : ''}
+              {limit ? `${limit.min}–${limit.max} digits` : ''}
+            </p>
           : null}
     </div>
   );
 }
 
-type WrapperProps = { value: string; onChange: (full: string) => void; error?: string; autoFill?: boolean };
+type WrapperProps = { value: string; onChange: (full: string) => void; error?: string; autoFill?: boolean; limit?: DigitLimit | null };
 
 /** Employee ID for a new teacher (prefix e.g. "EMP"). */
 export function EmployeeIdInput(props: WrapperProps) {

@@ -3,9 +3,10 @@ import { appLink } from '../../../lib/appUrl';
 import { Building2, CheckCircle2, Copy, Eye, EyeOff, Plus, Sparkles, UserRound, Wallet } from 'lucide-react';
 import { callManageSchools, errMsg, generatePassword } from '../api';
 import { Button, Card, ErrorBanner, Field, cx, inputCls, toast } from '../ui';
+import { DIGIT_LIMIT_CHOICES } from '../../../lib/codeDigits';
 
 const EMPTY = {
-  name: '', address: '', city: '', contact_number: '', academic_year: '2026-27', employee_prefix: '', short_name: '',
+  name: '', address: '', city: '', contact_number: '', academic_year: '2026-27', employee_prefix: '', short_name: '', admission_digits: '', employee_digits: '',
   admin_name: '', email: '', admin_password: '',
   sub_status: 'trial', trial_days: '30', billing_cycle: 'yearly', price: '',
 };
@@ -44,6 +45,8 @@ export default function AddSchoolSection({ onCreated }: { onCreated: (schoolId: 
       const r = await callManageSchools<{ school_id: string }>({
         action: 'create-school', ...f,
         trial_days: Number(f.trial_days) || 30,
+        admission_digits: f.admission_digits ? Number(f.admission_digits) : null,
+        employee_digits: f.employee_digits ? Number(f.employee_digits) : null,
         price: f.price === '' ? null : Math.round(Number(f.price) * 100),
       });
       setDone({ id: r.school_id, name: f.name.trim(), email: f.email.trim().toLowerCase(), password: f.admin_password });
@@ -108,6 +111,24 @@ export default function AddSchoolSection({ onCreated }: { onCreated: (schoolId: 
               : 'Optional. For teacher employee IDs, e.g. EMP.'}>
             <input className={cx(inputCls, 'font-mono uppercase')} value={f.employee_prefix} maxLength={12}
               onChange={(e) => setF({ ...f, employee_prefix: e.target.value.toUpperCase().replace(/\s/g, '') })} placeholder="e.g. EMP" />
+          </Field>
+          <Field label="Admission number digits"
+            hint={f.admission_digits
+              ? `Admission numbers must have ${f.admission_digits}–${Number(f.admission_digits) + 1} digits. Stops typing mistakes; one extra digit is left for growth.`
+              : 'Optional. Limits the digits so a typing mistake cannot add an extra one.'}>
+            <select className={inputCls} value={f.admission_digits} onChange={set('admission_digits')}>
+              <option value="">No limit</option>
+              {DIGIT_LIMIT_CHOICES.map((n) => <option key={n} value={n}>{n}–{n + 1} digits</option>)}
+            </select>
+          </Field>
+          <Field label="Employee ID digits"
+            hint={f.employee_digits
+              ? `Employee IDs must have ${f.employee_digits}–${Number(f.employee_digits) + 1} digits (after the prefix).`
+              : 'Optional. Same limit for teacher employee IDs.'}>
+            <select className={inputCls} value={f.employee_digits} onChange={set('employee_digits')}>
+              <option value="">No limit</option>
+              {DIGIT_LIMIT_CHOICES.map((n) => <option key={n} value={n}>{n}–{n + 1} digits</option>)}
+            </select>
           </Field>
         </div>
         <p className="mt-4 text-xs text-slate-500">These details are locked for the school admin. Only Veducore can change them later.</p>

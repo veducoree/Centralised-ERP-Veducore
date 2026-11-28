@@ -112,6 +112,10 @@ export interface SchoolRecord {
   employeePrefix: string;
   /** Short code used in parent passwords, e.g. "gvps" → ramesh@gvps. */
   shortName: string;
+  /** Admission numbers have this many to this+1 digits (null = no limit). */
+  admissionDigits: number | null;
+  /** Employee IDs have this many to this+1 digits (null = no limit). */
+  employeeDigits: number | null;
   logoUrl: string | null;
   status: 'Active' | 'Suspended';
   suspendedAt: string | null;

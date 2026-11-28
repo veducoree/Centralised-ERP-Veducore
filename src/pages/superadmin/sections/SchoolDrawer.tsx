@@ -13,6 +13,7 @@ import {
   Badge, Button, Card, Drawer, ErrorBanner, Field, HEALTH, KV, LoadingBlock, Modal, SUB_STATUS, Tabs,
   cx, inputCls, toast,
 } from '../ui';
+import { DIGIT_LIMIT_CHOICES } from '../../../lib/codeDigits';
 import { SchoolAvatar } from './Schools';
 
 interface Detail {
@@ -220,11 +221,13 @@ function ProfileTab({ s, canManage, onSaved }: { s: SchoolRecord; canManage: boo
   const [f, setF] = useState({
     name: s.name, address: s.address, city: s.city, contactNumber: s.contactNumber, email: s.email, academicYear: s.academicYear,
     employeePrefix: s.employeePrefix ?? '', shortName: s.shortName ?? '',
+    admissionDigits: s.admissionDigits ? String(s.admissionDigits) : '', employeeDigits: s.employeeDigits ? String(s.employeeDigits) : '',
   });
   const [saving, setSaving] = useState(false);
   const dirty = JSON.stringify(f) !== JSON.stringify({
     name: s.name, address: s.address, city: s.city, contactNumber: s.contactNumber, email: s.email, academicYear: s.academicYear,
     employeePrefix: s.employeePrefix ?? '', shortName: s.shortName ?? '',
+    admissionDigits: s.admissionDigits ? String(s.admissionDigits) : '', employeeDigits: s.employeeDigits ? String(s.employeeDigits) : '',
   });
   const badShort = !!f.shortName.trim() && !/^[A-Za-z0-9]{2,12}$/.test(f.shortName.trim());
   const badPrefix = (v: string) => !!v.trim() && !/^[A-Za-z0-9/-]{1,12}$/.test(v.trim());
@@ -233,7 +236,10 @@ function ProfileTab({ s, canManage, onSaved }: { s: SchoolRecord; canManage: boo
   async function save() {
     setSaving(true);
     try {
-      await callManageSchools({ action: 'update-school', school_id: s.id, fields: f });
+      await callManageSchools({
+        action: 'update-school', school_id: s.id,
+        fields: { ...f, admissionDigits: f.admissionDigits ? Number(f.admissionDigits) : null, employeeDigits: f.employeeDigits ? Number(f.employeeDigits) : null },
+      });
       toast('School profile saved');
       onSaved();
     } catch (e) {
@@ -243,7 +249,7 @@ function ProfileTab({ s, canManage, onSaved }: { s: SchoolRecord; canManage: boo
     }
   }
 
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF({ ...f, [k]: e.target.value });
 
   return (
     <Card title="School profile" subtitle="Shown across the school's admin panel, app and documents. Locked for the school admin — only Veducore can change these.">
@@ -269,6 +275,19 @@ function ProfileTab({ s, canManage, onSaved }: { s: SchoolRecord; canManage: boo
           hint="For teacher employee IDs. Changing it only affects new teachers.">
           <input className={cx(inputCls, 'font-mono uppercase')} value={f.employeePrefix} maxLength={12} disabled={!canManage} placeholder="e.g. EMP"
             onChange={(e) => setF({ ...f, employeePrefix: e.target.value.toUpperCase().replace(/\s/g, '') })} />
+        </Field>
+        <Field label="Admission number digits"
+          hint="Limits digits in new admission numbers (stops typing mistakes). Existing students keep their numbers.">
+          <select className={inputCls} value={f.admissionDigits} onChange={set('admissionDigits')} disabled={!canManage}>
+            <option value="">No limit</option>
+              {DIGIT_LIMIT_CHOICES.map((n) => <option key={n} value={n}>{n}–{n + 1} digits</option>)}
+          </select>
+        </Field>
+        <Field label="Employee ID digits" hint="Limits digits in new teacher employee IDs (after the prefix).">
+          <select className={inputCls} value={f.employeeDigits} onChange={set('employeeDigits')} disabled={!canManage}>
+            <option value="">No limit</option>
+              {DIGIT_LIMIT_CHOICES.map((n) => <option key={n} value={n}>{n}–{n + 1} digits</option>)}
+          </select>
         </Field>
       </div>
       {canManage && (

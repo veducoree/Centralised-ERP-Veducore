@@ -47,6 +47,13 @@ export interface School {
   short_name?: string | null;
   /** Fixed start of teacher employee IDs, set by Veducore (e.g. "EMP"). */
   employee_prefix?: string | null;
+  /** Fixed start of admission numbers, set by Veducore (may be unset). */
+  admission_prefix?: string | null;
+  /** Allowed digits in admission numbers / employee IDs (set by Veducore; null = no limit). */
+  admission_digits_min?: number | null;
+  admission_digits_max?: number | null;
+  employee_digits_min?: number | null;
+  employee_digits_max?: number | null;
   settings?: Record<string, any> | null;
   created_at: string;
   updated_at: string;

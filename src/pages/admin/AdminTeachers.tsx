@@ -15,6 +15,7 @@ import {
   fetchTeacherByUserId, fetchClasses, fetchSubjects, fetchSubjectAllotments,
   setTeacherSubjectAllotments,
 } from '@/services/api';
+import { digitLimitError, schoolDigitLimit } from '@/lib/codeDigits';
 import type { Teacher, School, Class, Section, Subject } from '@/types';
 import {
   allotmentsToRows, rowsToAllotments, validateAllotmentRows,
@@ -184,7 +185,9 @@ export default function AdminTeachers() {
     if (!form.phone) e.phone = 'Mobile number is required — the teacher logs in with it';
     else if (!formMobile) e.phone = 'Enter a valid 10-digit mobile number';
     else if (teachers.some((t) => (t.email ?? '').toLowerCase() === formCreds.email)) e.phone = 'Another teacher already uses this mobile number';
+    const empDigitErr = digitLimitError(form.employee_id.trim(), schoolDigitLimit(school, 'employee'), 'Employee ID', school?.employee_prefix);
     if (!form.employee_id.trim()) e.employee_id = 'Employee ID is required';
+    else if (empDigitErr) e.employee_id = empDigitErr;
     const allotErr = validateAllotmentRows(allotRows);
     if (allotErr) e.allotment = allotErr;
     setErrors(e);
@@ -501,7 +504,8 @@ export default function AdminTeachers() {
               ? <p className="mt-1 text-xs text-red-600">{errors.phone}</p>
               : <p className="mt-1 text-xs text-slate-500">The teacher logs in with this number.</p>}
           </div>
-          <EmployeeIdInput value={form.employee_id} onChange={(v) => setForm((f) => ({ ...f, employee_id: v }))} error={errors.employee_id} />
+          <EmployeeIdInput value={form.employee_id} onChange={(v) => setForm((f) => ({ ...f, employee_id: v }))} error={errors.employee_id}
+            limit={schoolDigitLimit(school, 'employee')} />
           <div className="sm:col-span-2 rounded-xl border border-brand-100 bg-brand-50/60 p-3 text-sm">
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-brand-700">Login (auto-generated)</p>
             <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">

@@ -33,6 +33,7 @@ import type {
 import { INDIAN_STATES, formatCurrency } from '@/lib/utils';
 import { generateParentCredentials, joinName, normalizeMobile, schoolShortName, type NameParts } from '@/lib/parentUtils';
 import { NameFields } from '@/components/ui/NameFields';
+import { digitLimitError, exceedsDigitLimit, schoolDigitLimit, type DigitLimit } from '@/lib/codeDigits';
 
 // ─── Wizard persistence key ───────────────────────────────────────────────────
 // v4: one form for the parents + any number of children (siblings).
@@ -741,9 +742,12 @@ function Step2({ formData, errors, update }: StepProps) {
 // Step 3: Class & School — asked for every child
 interface Step3Props extends StepProps {
   classes: (Class & { sections: Section[] })[];
+  /** Allowed digits in the admission number (set by Veducore), or null. */
+  admissionLimit: DigitLimit | null;
+  admissionPrefix: string;
 }
 
-function Step3({ formData, errors, updateChild, classes }: Step3Props) {
+function Step3({ formData, errors, updateChild, classes, admissionLimit, admissionPrefix }: Step3Props) {
   const kids = formData.children;
   return (
     <div className="space-y-5">
@@ -772,8 +776,19 @@ function Step3({ formData, errors, updateChild, classes }: Step3Props) {
                 <option value="">Select section</option>
                 {sections.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </Select>
-              <Input label="Admission Number" required value={c.admission_number} onChange={(e) => updateChild(i, { admission_number: e.target.value })}
-                error={errors[`c${i}_admission_number`]} placeholder="e.g. 2026051" />
+              <div>
+                <Input label="Admission Number" required value={c.admission_number}
+                  onChange={(e) => {
+                    const v = e.target.value.replace(/\s/g, '');
+                    // Never let a typing mistake add a digit beyond the school's limit.
+                    if (!exceedsDigitLimit(v, admissionLimit, admissionPrefix)) updateChild(i, { admission_number: v });
+                  }}
+                  error={errors[`c${i}_admission_number`]}
+                  placeholder={admissionLimit ? `${admissionLimit.min}–${admissionLimit.max} digits` : 'e.g. 2026051'} />
+                {admissionLimit && !errors[`c${i}_admission_number`] && (
+                  <p className="mt-1 text-xs text-slate-400">Your school uses {admissionLimit.min}–{admissionLimit.max} digit admission numbers</p>
+                )}
+              </div>
               <Input label="Previous School Name" value={c.prev_school_name} onChange={(e) => updateChild(i, { prev_school_name: e.target.value })} placeholder="Optional" />
               <Select label="Previous School Board" value={c.prev_school_board} onChange={(e) => updateChild(i, { prev_school_board: e.target.value })}>
                 <option value="">Select board (optional)</option>
@@ -1260,6 +1275,7 @@ export default function NewAdmissionPage() {
   }, []);
 
   const academicYear = school?.academic_year ?? '2026-27';
+  const admissionLimit = schoolDigitLimit(school, 'admission');
 
   // ── Existing parent lookup (by mobile number) ───────────────────────────────
   const [lookup, setLookup] = useState<MobileLookup>({ mobile: '', loading: false, family: null });
@@ -1358,7 +1374,9 @@ export default function NewAdmissionPage() {
         if (!c.class_id) e[`c${i}_class_id`] = 'Class is required';
         if (!c.section_id) e[`c${i}_section_id`] = 'Section is required';
         const adm = c.admission_number.trim();
+        const digitErr = digitLimitError(adm, admissionLimit, 'Admission number', school?.admission_prefix);
         if (!adm) e[`c${i}_admission_number`] = 'Admission number is required';
+        else if (digitErr) e[`c${i}_admission_number`] = digitErr;
         else if (seen.has(adm.toUpperCase())) e[`c${i}_admission_number`] = `Same number as child ${seen.get(adm.toUpperCase())! + 1}`;
         else seen.set(adm.toUpperCase(), i);
       });
@@ -1787,7 +1805,8 @@ export default function NewAdmissionPage() {
                     lookup={lookup} mobileConflict={mobileConflict} onLink={linkFamily} onUnlink={unlinkFamily} />}
                   {currentStep === 2 && <Step2 formData={formData} errors={errors} update={update} updateChild={updateChild} />}
                   {currentStep === 3 && (
-                    <Step3 formData={formData} errors={errors} update={update} updateChild={updateChild} classes={classes} />
+                    <Step3 formData={formData} errors={errors} update={update} updateChild={updateChild} classes={classes}
+                      admissionLimit={admissionLimit} admissionPrefix={school?.admission_prefix ?? ''} />
                   )}
                   {currentStep === 4 && (
                     <Step4Fees formData={formData} errors={errors} update={update} updateChild={updateChild}

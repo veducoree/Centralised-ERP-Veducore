@@ -66,6 +66,14 @@ function codePrefix(v: unknown, label = "Employee ID prefix"): string | null {
   return t.toUpperCase();
 }
 
+/** Digit limit choice "n" → n to n+1 digits (n = 2…14); empty = no limit. */
+function digitLimit(v: unknown, label: string): { min: number | null; max: number | null } {
+  if (v === null || v === undefined || v === "") return { min: null, max: null };
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 2 || n > 14) throw new HttpError(400, `${label}: choose a digit range between 2–3 and 14–15`);
+  return { min: n, max: n + 1 };
+}
+
 /** School short name (used in parent passwords): 2–12 letters/digits, stored lower-case. */
 function shortName(v: unknown, required = false): string | null {
   const t = str(v);
@@ -242,6 +250,8 @@ async function loadSchoolsFull(ctx: Ctx) {
       academicYear: s.academic_year ?? "",
       employeePrefix: s.employee_prefix ?? "",
       shortName: s.short_name ?? "",
+      admissionDigits: s.admission_digits_min ?? null,
+      employeeDigits: s.employee_digits_min ?? null,
       logoUrl: s.logo_url ?? null,
       status: (s.status ?? "Active") === "Active" ? "Active" : "Suspended",
       suspendedAt: s.suspended_at ?? null,
@@ -474,6 +484,11 @@ const ACTIONS: Record<string, { roles: Role[]; run: (ctx: Ctx) => Promise<unknow
         academic_year: str(b.academic_year) ?? "2026-27",
         employee_prefix: codePrefix(b.employee_prefix, "Employee ID prefix"),
         short_name: shortName(b.short_name, true),
+        ...(() => {
+          const a = digitLimit(b.admission_digits, "Admission number digits");
+          const e = digitLimit(b.employee_digits, "Employee ID digits");
+          return { admission_digits_min: a.min, admission_digits_max: a.max, employee_digits_min: e.min, employee_digits_max: e.max };
+        })(),
         timezone: "Asia/Kolkata",
         currency: "INR",
         currency_symbol: "₹",
@@ -542,6 +557,16 @@ const ACTIONS: Record<string, { roles: Role[]; run: (ctx: Ctx) => Promise<unknow
       }
       if ("employeePrefix" in f) update.employee_prefix = codePrefix(f.employeePrefix, "Employee ID prefix");
       if ("shortName" in f) update.short_name = shortName(f.shortName);
+      if ("admissionDigits" in f) {
+        const a = digitLimit(f.admissionDigits, "Admission number digits");
+        update.admission_digits_min = a.min;
+        update.admission_digits_max = a.max;
+      }
+      if ("employeeDigits" in f) {
+        const e = digitLimit(f.employeeDigits, "Employee ID digits");
+        update.employee_digits_min = e.min;
+        update.employee_digits_max = e.max;
+      }
       if (!Object.keys(update).length) throw new HttpError(400, "Nothing to update");
       const { error } = await ctx.db.from("schools").update(update).eq("id", schoolId);
       if (error) throw new HttpError(400, error.message);

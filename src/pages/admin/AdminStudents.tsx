@@ -10,9 +10,10 @@ import { SearchInput, PageHeader, LoadingSpinner } from '@/components/ui/Primiti
 import { useToast } from '@/components/ui/Toast';
 import { useAuth } from '@/auth/AuthContext';
 import {
-  fetchStudents, fetchClasses, createStudent, updateStudent, deleteStudent, ensureParentForStudent, generateStudentFees,
+  fetchStudents, fetchClasses, createStudent, updateStudent, deleteStudent, ensureParentForStudent, generateStudentFees, fetchSchool,
 } from '@/services/api';
-import type { Student, Class, Section } from '@/types';
+import type { Student, Class, Section, School } from '@/types';
+import { digitLimitError, exceedsDigitLimit, schoolDigitLimit } from '@/lib/codeDigits';
 import { formatDate, validateEmail, getInitials } from '@/lib/utils';
 import { StatusBadge } from '@/components/ui/Badge';
 import { supabase } from '@/lib/supabase';
@@ -35,6 +36,11 @@ export default function AdminStudents() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [school, setSchool] = useState<School | null>(null);
+  useEffect(() => {
+    if (profile?.school_id) fetchSchool(profile.school_id).then(setSchool).catch(() => {});
+  }, [profile?.school_id]);
+  const admissionLimit = schoolDigitLimit(school, 'admission');
   const [form, setForm] = useState({
     admission_number: '', first_name: '', middle_name: '', last_name: '', father_name: '', mother_name: '', date_of_birth: '', gender: 'male',
     class_id: '', section_id: '', address: '', parent_email: '', emergency_contact: '', admission_date: '',
@@ -114,6 +120,11 @@ export default function AdminStudents() {
   function validate() {
     const e: Record<string, string> = {};
     if (!form.admission_number) e.admission_number = 'Admission number is required';
+    // Only new / changed numbers must fit (older students keep theirs).
+    else if (!editing || form.admission_number !== editing.admission_number) {
+      const digitErr = digitLimitError(form.admission_number, admissionLimit, 'Admission number', school?.admission_prefix);
+      if (digitErr) e.admission_number = digitErr;
+    }
     if (!form.first_name.trim()) e.full_name = 'First name is required';
     if (!form.class_id) e.class_id = 'Class is required';
     if (!form.section_id) e.section_id = 'Section is required';
@@ -372,7 +383,13 @@ export default function AdminStudents() {
               error={errors.full_name}
             />
           </div>
-          <Input label="Admission Number" required value={form.admission_number} onChange={(e) => setForm({ ...form, admission_number: e.target.value })} error={errors.admission_number} placeholder="e.g. 2026051" />
+          <Input label="Admission Number" required value={form.admission_number}
+            onChange={(e) => {
+              const v = e.target.value.replace(/[ ]/g, '');
+              if (!exceedsDigitLimit(v, admissionLimit, school?.admission_prefix)) setForm({ ...form, admission_number: v });
+            }}
+            error={errors.admission_number}
+            placeholder={admissionLimit ? `${admissionLimit.min}–${admissionLimit.max} digits` : 'e.g. 2026051'} />
           <Input label="Father's Name" value={form.father_name} onChange={(e) => setForm({ ...form, father_name: e.target.value })} placeholder="Father's full name" />
           <Input label="Mother's Name" value={form.mother_name} onChange={(e) => setForm({ ...form, mother_name: e.target.value })} placeholder="Mother's full name" />
           <Input label="Date of Birth" type="date" value={form.date_of_birth} onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })} />

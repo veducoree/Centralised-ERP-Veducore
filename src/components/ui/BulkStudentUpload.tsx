@@ -2,9 +2,10 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { Upload, Download, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
-import { createStudent, ensureParentForStudent, fetchStudentByAdmissionNumber, fetchStudents } from '@/services/api';
+import { createStudent, ensureParentForStudent, fetchSchool, fetchStudentByAdmissionNumber, fetchStudents } from '@/services/api';
+import { digitLimitError, schoolDigitLimit } from '@/lib/codeDigits';
 import { joinName, normalizeMobile, splitFullName, tidyNameParts } from '@/lib/parentUtils';
-import type { Class, Section } from '@/types';
+import type { Class, School, Section } from '@/types';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -357,6 +358,9 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
           // the database still rejects duplicates at import time
         }
         const seen = new Map<string, number>();
+        // The school's admission number digit limit (set by Veducore), if any.
+        const school: School | null = await fetchSchool(schoolId).catch(() => null);
+        const admLimit = schoolDigitLimit(school, 'admission');
 
         const parsed: ParsedRow[] = [];
 
@@ -399,6 +403,8 @@ export function BulkStudentUpload({ open, onClose, schoolId, classes, onSuccess 
           else if (existing.has(admKey)) errors.push(`Admission number ${admission_number} already exists in this school`);
           else if (seen.has(admKey)) errors.push(`Admission number ${admission_number} repeated (also row ${seen.get(admKey)})`);
           if (admission_number && !seen.has(admKey)) seen.set(admKey, parsed.length + 1);
+          const admDigitErr = digitLimitError(admission_number, admLimit, `Admission number ${admission_number}`, school?.admission_prefix);
+          if (admDigitErr) errors.push(admDigitErr);
 
           if (!parts.first_name) errors.push('Student first name required');
           // Parent logs in with this number.
