@@ -141,7 +141,7 @@ function OverviewTab({ d }: { d: Detail }) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <Metric icon={<Users className="h-3.5 w-3.5" />} label="Students" value={s.students.toLocaleString('en-IN')} sub={`${s.activeStudents} active`} />
         <Metric icon={<GraduationCap className="h-3.5 w-3.5" />} label="Teachers" value={s.teachers} sub={`${s.classes} classes · ${s.sections} sections`} />
         <Metric icon={<Users className="h-3.5 w-3.5" />} label="Parent accounts" value={s.parents.toLocaleString('en-IN')} />
