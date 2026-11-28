@@ -129,8 +129,12 @@ interface DragState {
   moved: boolean; rect: DOMRect;
 }
 
-export default function ReportCardDesigner({ school, onBack, onSaved }: {
+export default function ReportCardDesigner({ school, onBack, onSaved, embedded = false, onDirtyChange }: {
   school: SchoolRecord; onBack: () => void; onSaved: () => void;
+  /** Shown inside the school panel: no back button. */
+  embedded?: boolean;
+  /** Told whenever unsaved changes appear / are saved, so the panel can warn before closing. */
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [tpl, setTpl] = useState<ReportCardTemplate | null>(null);
   const [savedKey, setSavedKey] = useState('');
@@ -188,6 +192,8 @@ export default function ReportCardDesigner({ school, onBack, onSaved }: {
   const page = pageSize(tpl?.orientation ?? 'portrait');
   const ppm = (Math.min(canvasW, 860) / page.w) * zoom;
   const dirty = !!tpl && persistKey(tpl) !== savedKey;
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty, onDirtyChange]);
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
 
   // ── Editing helpers ──
   const change = useCallback((fn: (t: ReportCardTemplate) => ReportCardTemplate, record = true) => {
@@ -457,9 +463,11 @@ export default function ReportCardDesigner({ school, onBack, onSaved }: {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <button onClick={leave} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50" title="Back to schools">
-            <ArrowLeft className="h-4 w-4" />
-          </button>
+          {!embedded && (
+            <button onClick={leave} className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 hover:bg-slate-50" title="Back to schools">
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+          )}
           <div className="min-w-0">
             <p className="truncate text-base font-bold text-slate-900">{school.name}</p>
             <p className="text-xs text-slate-500">

@@ -326,13 +326,16 @@ export default function IdCardsSection({
   schools,
   onNavigateToSchools,
   onTemplateSaved,
+  schoolId,
 }: {
   schools: SchoolRecord[];
-  onNavigateToSchools: () => void;
+  onNavigateToSchools?: () => void;
   onTemplateSaved?: () => void;
+  /** Open straight into this school's ID card studio (inside the school panel). */
+  schoolId?: string;
 }) {
   // If null, shows the registered schools directory. When selected, enters school's ID Card Studio.
-  const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(null);
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(schoolId ?? null);
   const [schoolSearchQuery, setSchoolSearchQuery] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'batch' | 'template' | 'inspector'>('batch');
 
@@ -697,6 +700,13 @@ export default function IdCardsSection({
           .print-hidden, aside, header, nav, button, input {
             display: none !important;
           }
+          /* Printing from inside the school panel: let it grow so the sheet isn't clipped. */
+          html, body, .sa-panel {
+            position: static !important;
+            overflow: visible !important;
+            height: auto !important;
+            max-height: none !important;
+          }
           @page {
             size: A4 portrait;
             margin: 6mm;
@@ -708,6 +718,7 @@ export default function IdCardsSection({
       <div className="bg-white rounded-3xl border border-slate-100 p-5 shadow-sm space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
+            {!schoolId && (
             <button
               onClick={() => setSelectedSchoolId(null)}
               className="inline-flex items-center gap-1 text-xs font-semibold text-gray-700 hover:text-blue-600 bg-gray-50 hover:bg-blue-50 border border-gray-200 px-3 py-1.5 rounded-lg transition-colors flex-shrink-0"
@@ -715,6 +726,7 @@ export default function IdCardsSection({
               <ChevronLeft className="h-4 w-4" />
               <span>Back to Schools</span>
             </button>
+            )}
 
             <div>
               <div className="flex items-center gap-2">
@@ -1239,6 +1251,7 @@ export default function IdCardsSection({
                     <p className="text-xs text-gray-500 leading-relaxed">
                       {currentSchool.name} me abhi tak koi student admissions add nahi huye hain. Jaise hi student admission record add honge, unke identity cards yahan 10-per-page sheet me automatically show honge.
                     </p>
+                    {onNavigateToSchools && (
                     <button
                       onClick={onNavigateToSchools}
                       className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 shadow-sm transition-colors"
@@ -1246,6 +1259,7 @@ export default function IdCardsSection({
                       <Building2 className="h-3.5 w-3.5" />
                       Schools Directory & Credentials
                     </button>
+                    )}
                   </div>
                 ) : (
                   <>

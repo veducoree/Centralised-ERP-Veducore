@@ -253,9 +253,9 @@ export function Drawer({
   if (!open) return null;
   // Centred panel: full screen on phones, a large card with margins on bigger screens.
   return createPortal(
-    <div className="fixed inset-0 z-40 flex items-center justify-center overscroll-none bg-slate-900/40 backdrop-blur-[2px] sm:p-6" onMouseDown={onClose}>
+    <div className="sa-panel fixed inset-0 z-40 flex items-center justify-center overscroll-none bg-slate-900/40 backdrop-blur-[2px] sm:p-6" onMouseDown={onClose}>
       <div onMouseDown={(e) => e.stopPropagation()}
-        className={cx('flex h-full w-full flex-col overflow-hidden bg-[#f6f7fc] shadow-2xl sm:h-[calc(100vh-3rem)] sm:rounded-3xl', width)}>
+        className={cx('sa-panel flex h-full w-full flex-col overflow-hidden bg-[#f6f7fc] shadow-2xl sm:h-[calc(100vh-3rem)] sm:rounded-3xl', width)}>
         {children}
       </div>
     </div>,

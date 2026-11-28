@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { appLink } from '../../../lib/appUrl';
 import {
   Activity, AlertTriangle, Bell, Building2, Check, ClipboardCheck, Copy, ExternalLink,
@@ -16,6 +16,10 @@ import {
 import { DIGIT_LIMIT_CHOICES } from '../../../lib/codeDigits';
 import { SchoolAvatar } from './Schools';
 
+// Big editors: load only when their tab is opened.
+const IdCardsSection = lazy(() => import('./IdCards'));
+const ReportCardDesigner = lazy(() => import('./ReportCardDesigner'));
+
 interface Detail {
   school: SchoolRecord;
   adminLastSignIn: string | null;
@@ -25,7 +29,7 @@ interface Detail {
   activity: AuditEntry[];
 }
 
-type Tab = 'overview' | 'profile' | 'modules' | 'access' | 'danger';
+type Tab = 'overview' | 'profile' | 'idcards' | 'marksheet' | 'modules' | 'access' | 'danger';
 
 export default function SchoolDrawer({
   schoolId, me, onClose, onChanged, onDeleted,
@@ -58,18 +62,26 @@ export default function SchoolDrawer({
   }, [load]);
 
   const refresh = () => { load(); onChanged(); };
+
+  // Unsaved marksheet design: confirm before leaving the tab or closing the panel.
+  const designDirty = useRef(false);
+  const onDesignDirty = useCallback((d: boolean) => { designDirty.current = d; }, []);
+  const okToLeave = () => !designDirty.current || window.confirm('The marksheet template has unsaved changes. Leave without saving?');
+  const changeTab = (t: Tab) => { if (t !== tab && okToLeave()) { designDirty.current = false; setTab(t); } };
+  const close = () => { if (okToLeave()) { designDirty.current = false; onClose(); } };
   const s = detail?.school;
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'profile', label: 'Profile' },
+    ...(canManage ? [{ id: 'idcards' as Tab, label: 'ID cards' }, { id: 'marksheet' as Tab, label: 'Marksheet' }] : []),
     { id: 'modules', label: 'Modules' },
     { id: 'access', label: 'Admin access' },
     ...(canManage ? [{ id: 'danger' as Tab, label: 'Suspend / delete' }] : []),
   ];
 
   return (
-    <Drawer open={!!schoolId} onClose={onClose}>
+    <Drawer open={!!schoolId} onClose={close}>
       <div className="border-b border-slate-200/70 bg-white px-5 pb-3 pt-5 sm:px-7">
         <div className="flex items-start gap-4">
           {s ? <SchoolAvatar school={s} size="lg" /> : <div className="h-14 w-14 rounded-2xl bg-slate-100" />}
@@ -86,21 +98,31 @@ export default function SchoolDrawer({
             <button onClick={load} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100" aria-label="Reload">
               <RefreshCw className={cx('h-4 w-4', loading && 'animate-spin')} />
             </button>
-            <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100" aria-label="Close">
+            <button onClick={close} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100" aria-label="Close">
               <X className="h-5 w-5" />
             </button>
           </div>
         </div>
-        <div className="mt-4"><Tabs tabs={tabs} value={tab} onChange={setTab} /></div>
+        <div className="mt-4"><Tabs tabs={tabs} value={tab} onChange={changeTab} /></div>
       </div>
 
-      <div className="flex-1 space-y-5 overflow-y-auto overscroll-contain p-5 sm:p-7">
+      <div className="sa-panel flex-1 space-y-5 overflow-y-auto overscroll-contain p-5 sm:p-7">
         {error && <ErrorBanner message={error} onRetry={load} />}
         {!detail && loading && <LoadingBlock rows={6} />}
         {detail && s && (
           <>
             {tab === 'overview' && <OverviewTab d={detail} />}
             {tab === 'profile' && <ProfileTab s={s} canManage={canManage} onSaved={refresh} />}
+            {tab === 'idcards' && canManage && (
+              <Suspense fallback={<LoadingBlock rows={6} />}>
+                <IdCardsSection schools={[s]} schoolId={s.id} onTemplateSaved={refresh} />
+              </Suspense>
+            )}
+            {tab === 'marksheet' && canManage && (
+              <Suspense fallback={<LoadingBlock rows={6} />}>
+                <ReportCardDesigner school={s} embedded onBack={() => {}} onSaved={refresh} onDirtyChange={onDesignDirty} />
+              </Suspense>
+            )}
             {tab === 'modules' && <ModulesTab s={s} canManage={canManage} onSaved={refresh} />}
             {tab === 'access' && <AccessTab d={detail} canManage={canManage} onSaved={refresh} />}
             {tab === 'danger' && canManage && (

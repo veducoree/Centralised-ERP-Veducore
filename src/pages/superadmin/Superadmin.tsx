@@ -1,7 +1,7 @@
 // Veducore superadmin portal: auth gate, layout and section routing.
 import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import {
-  AlertCircle, BarChart3, Building2, Contact2, FileSpreadsheet, Eye, EyeOff, History, LifeBuoy, Loader2, LogOut,
+  AlertCircle, BarChart3, Building2, Eye, EyeOff, History, LifeBuoy, Loader2, LogOut,
   Megaphone, Menu, Plus, Settings, ShieldCheck, Users, X,
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -26,11 +26,9 @@ const SupportSection = lazy(() => import('./sections/Support'));
 const TeamSection = lazy(() => import('./sections/Team'));
 const AuditLogSection = lazy(() => import('./sections/AuditLog'));
 const SettingsSection = lazy(() => import('./sections/Settings'));
-const IdCardsSection = lazy(() => import('./sections/IdCards'));
-const ReportCardsSection = lazy(() => import('./sections/ReportCards'));
 
 type Section =
-  | 'dashboard' | 'schools' | 'add-school' | 'id-cards' | 'report-cards'
+  | 'dashboard' | 'schools' | 'add-school'
   | 'announcements' | 'support' | 'team' | 'audit' | 'settings';
 
 const NAV: { group: string; items: { id: Section; label: string; icon: React.ReactNode; managersOnly?: boolean }[] }[] = [
@@ -39,8 +37,6 @@ const NAV: { group: string; items: { id: Section; label: string; icon: React.Rea
     group: 'Schools', items: [
       { id: 'schools', label: 'All schools', icon: <Building2 className="h-[18px] w-[18px]" /> },
       { id: 'add-school', label: 'Onboard school', icon: <Plus className="h-[18px] w-[18px]" />, managersOnly: true },
-      { id: 'id-cards', label: 'ID cards', icon: <Contact2 className="h-[18px] w-[18px]" />, managersOnly: true },
-      { id: 'report-cards', label: 'Report cards', icon: <FileSpreadsheet className="h-[18px] w-[18px]" />, managersOnly: true },
     ],
   },
   {
@@ -62,8 +58,6 @@ const TITLES: Record<Section, [string, string]> = {
   dashboard: ['Dashboard', 'Platform health and growth at a glance'],
   schools: ['Schools', 'Every school on Veducore — open one to manage it'],
   'add-school': ['Onboard a school', 'Create the school and its owner login in one step'],
-  'id-cards': ['ID cards', 'Design templates and print student ID card sheets'],
-  'report-cards': ['Report cards', "Design each school's annual report card on its own blank card"],
   announcements: ['Announcements', 'Messages to school admins, teachers and parents'],
   support: ['Support desk', 'Tickets raised by school admins'],
   team: ['Team & roles', 'Who can access this portal and what they can do'],
@@ -148,7 +142,7 @@ export default function Superadmin() {
   useEffect(() => { if (me) loadSchools(); }, [me, loadSchools]);
 
   // Support staff can't open manager-only sections: send them to the dashboard URL.
-  const managerOnly = section === 'add-school' || section === 'id-cards' || section === 'report-cards';
+  const managerOnly = section === 'add-school';
   useEffect(() => {
     if (me && me.role === 'support' && managerOnly) navigate(BASE, { replace: true });
   }, [me, managerOnly, navigate]);
@@ -245,10 +239,6 @@ export default function Superadmin() {
           {current === 'add-school' && (
             <AddSchoolSection onCreated={(id) => { loadSchools(); setSection('schools'); setOpenSchool(id); }} />
           )}
-          {current === 'id-cards' && (
-            <IdCardsSection schools={schools} onNavigateToSchools={() => setSection('schools')} onTemplateSaved={loadSchools} />
-          )}
-          {current === 'report-cards' && <ReportCardsSection schools={schools} />}
           {current === 'announcements' && <AnnouncementsSection me={me} schools={schools} />}
           {current === 'support' && <SupportSection me={me} onOpenSchool={setOpenSchool} />}
           {current === 'team' && <TeamSection me={me} />}
