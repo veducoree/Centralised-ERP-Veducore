@@ -1,26 +1,23 @@
 import { useEffect, useState } from 'react';
 import {
-  Activity, AlertTriangle, Building2, CalendarClock, GraduationCap, IndianRupee, LifeBuoy,
-  Plus, RefreshCw, TrendingUp, Users, Wallet,
+  Activity, AlertTriangle, Building2, GraduationCap, LifeBuoy,
+  Plus, RefreshCw, TrendingUp, Users,
 } from 'lucide-react';
 import {
-  actionLabel, callManageSchools, compactRupees, daysUntil, errMsg, fmtDate, rupees, timeAgo,
+  actionLabel, callManageSchools, errMsg, fmtDate, timeAgo,
   type AuditEntry,
 } from '../api';
-import { Badge, Button, Card, EmptyState, ErrorBanner, HEALTH, Skeleton, Stat, SUB_STATUS, cx } from '../ui';
+import { Badge, Button, Card, EmptyState, ErrorBanner, HEALTH, Skeleton, Stat, cx } from '../ui';
 
 interface DashboardData {
   summary: {
-    totalSchools: number; activeSchools: number; suspendedSchools: number; trialSchools: number;
+    totalSchools: number; activeSchools: number; suspendedSchools: number;
     totalStudents: number; totalTeachers: number; totalParents: number;
-    mrr: number; collectedThisYear: number; outstandingAmount: number; overdueInvoices: number;
-    onlineVolume30d: number; onlinePaid30d: number; openTickets: number;
+    openTickets: number;
   };
-  growth: { month: string; newSchools: number; newStudents: number; onlineVolume: number }[];
+  growth: { month: string; newSchools: number; newStudents: number }[];
   health: Record<string, number>;
   atRisk: { id: string; name: string; students: number; lastAttendance: string | null; health: 'at_risk' | 'inactive' }[];
-  renewals: { id: string; name: string; billingCycle: string | null; status: keyof typeof SUB_STATUS; endsOn: string; amount: number }[];
-  subscriptionMix: Record<string, number>;
   topSchools: { id: string; name: string; students: number; teachers: number }[];
   recentActivity: AuditEntry[];
 }
@@ -29,7 +26,7 @@ export default function DashboardSection({
   onOpenSchool, onNavigate,
 }: {
   onOpenSchool: (id: string) => void;
-  onNavigate: (section: 'schools' | 'add-school' | 'billing' | 'support' | 'audit') => void;
+  onNavigate: (section: 'schools' | 'add-school' | 'support' | 'audit') => void;
 }) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -80,7 +77,7 @@ export default function DashboardSection({
               tone="indigo" label="Schools" icon={<Building2 className="h-5 w-5" />}
               value={s.totalSchools}
               onClick={() => onNavigate('schools')}
-              sub={<span>{s.activeSchools} active · {s.trialSchools} on trial · {s.suspendedSchools} suspended</span>}
+              sub={<span>{s.activeSchools} active · {s.suspendedSchools} suspended</span>}
             />
             <Stat
               tone="cyan" label="Students on platform" icon={<Users className="h-5 w-5" />}
@@ -93,32 +90,7 @@ export default function DashboardSection({
               sub={<span>{s.totalTeachers ? (s.totalStudents / s.totalTeachers).toFixed(1) : '0'} students per teacher</span>}
             />
             <Stat
-              tone="emerald" label="Monthly recurring revenue" icon={<TrendingUp className="h-5 w-5" />}
-              value={rupees(s.mrr)}
-              onClick={() => onNavigate('billing')}
-              sub={<span>{rupees(s.mrr * 12)} a year at current plans</span>}
-            />
-            <Stat
-              tone="violet" label="Collected this year" icon={<Wallet className="h-5 w-5" />}
-              value={rupees(s.collectedThisYear)}
-              onClick={() => onNavigate('billing')}
-              sub={<span>Paid Veducore invoices since 1 Jan</span>}
-            />
-            <Stat
-              tone="rose" label="Outstanding invoices" icon={<IndianRupee className="h-5 w-5" />}
-              value={rupees(s.outstandingAmount)}
-              onClick={() => onNavigate('billing')}
-              sub={s.overdueInvoices
-                ? <span className="font-semibold text-rose-600">{s.overdueInvoices} overdue</span>
-                : <span>Nothing overdue</span>}
-            />
-            <Stat
-              tone="cyan" label="Online fee volume (30 days)" icon={<Activity className="h-5 w-5" />}
-              value={rupees(s.onlineVolume30d)}
-              sub={<span>{s.onlinePaid30d} successful parent payments</span>}
-            />
-            <Stat
-              tone="amber" label="Open support tickets" icon={<LifeBuoy className="h-5 w-5" />}
+              tone="rose" label="Open support tickets" icon={<LifeBuoy className="h-5 w-5" />}
               value={s.openTickets}
               onClick={() => onNavigate('support')}
               sub={<span>{s.openTickets ? 'Waiting on Veducore' : 'All caught up'}</span>}
@@ -150,38 +122,7 @@ export default function DashboardSection({
             </Card>
           </div>
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
-            <Card title="Renewals in the next 30 days" icon={<CalendarClock className="h-4 w-4" />}
-              subtitle="Trials ending and subscription periods closing" bodyClassName="p-0">
-              {data.renewals.length === 0 ? (
-                <EmptyState icon={<CalendarClock className="h-5 w-5" />} title="No renewals due" text="Set subscription end dates from Billing to track renewals here." />
-              ) : (
-                <ul className="divide-y divide-slate-100">
-                  {data.renewals.map((r) => {
-                    const d = daysUntil(r.endsOn) ?? 0;
-                    return (
-                      <li key={r.id}>
-                        <button onClick={() => onOpenSchool(r.id)} className="flex w-full items-center justify-between gap-3 px-5 py-3 text-left hover:bg-slate-50">
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-semibold text-slate-800">{r.name}</p>
-                            <p className="text-xs text-slate-500">
-                              {r.billingCycle ? <span className="capitalize">{r.billingCycle} · </span> : null}<Badge tone={SUB_STATUS[r.status]?.tone ?? 'gray'}>{SUB_STATUS[r.status]?.label ?? r.status}</Badge>
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className={cx('text-xs font-bold', d < 0 ? 'text-rose-600' : d <= 7 ? 'text-amber-600' : 'text-slate-700')}>
-                              {d < 0 ? `${-d}d overdue` : d === 0 ? 'Today' : `in ${d}d`}
-                            </p>
-                            <p className="text-[11px] text-slate-400">{fmtDate(r.endsOn)}</p>
-                          </div>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
-            </Card>
-
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
             <Card title="Needs attention" icon={<AlertTriangle className="h-4 w-4" />}
               subtitle="Schools that stopped marking attendance" bodyClassName="p-0">
               {data.atRisk.length === 0 ? (
@@ -203,25 +144,7 @@ export default function DashboardSection({
               )}
             </Card>
 
-            <Card title="Subscription mix" icon={<Wallet className="h-4 w-4" />} subtitle="Schools by subscription status">
-              <div className="space-y-3">
-                {Object.entries(data.subscriptionMix ?? {}).sort((a, b) => b[1] - a[1]).map(([key, count]) => {
-                  const pct = s.totalSchools ? Math.round((count / s.totalSchools) * 100) : 0;
-                  return (
-                    <div key={key}>
-                      <div className="mb-1 flex justify-between text-xs">
-                        <span className="font-medium text-slate-700">{SUB_STATUS[key as keyof typeof SUB_STATUS]?.label ?? 'No subscription'}</span>
-                        <span className="text-slate-500">{count} · {pct}%</span>
-                      </div>
-                      <div className="h-2 overflow-hidden rounded-full bg-slate-100">
-                        <div className="h-full rounded-full bg-indigo-500" style={{ width: `${Math.max(pct, 3)}%` }} />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-6 border-t border-slate-100 pt-4">
-                <p className="mb-2 text-xs font-semibold text-slate-500">Largest schools</p>
+            <Card title="Largest schools" icon={<Building2 className="h-4 w-4" />} subtitle="By number of students">
                 <ul className="space-y-1.5">
                   {data.topSchools.map((t, i) => (
                     <li key={t.id}>
@@ -233,7 +156,6 @@ export default function DashboardSection({
                     </li>
                   ))}
                 </ul>
-              </div>
             </Card>
           </div>
 
@@ -287,12 +209,12 @@ function HealthBar({ health, total }: { health: Record<string, number>; total: n
 
 function GrowthChart({ data }: { data: DashboardData['growth'] }) {
   const [hover, setHover] = useState<number | null>(null);
-  const [metric, setMetric] = useState<'newStudents' | 'newSchools' | 'onlineVolume'>('newStudents');
+  const [metric, setMetric] = useState<'newStudents' | 'newSchools'>('newStudents');
   const values = data.map((d) => d[metric]);
   const max = Math.max(...values, 1);
   const total = values.reduce((a, b) => a + b, 0);
-  const fmt = (v: number) => (metric === 'onlineVolume' ? compactRupees(v) : v.toLocaleString('en-IN'));
-  const label = { newStudents: 'Students added', newSchools: 'Schools onboarded', onlineVolume: 'Online fee volume' }[metric];
+  const fmt = (v: number) => v.toLocaleString('en-IN');
+  const label = { newStudents: 'Students added', newSchools: 'Schools onboarded' }[metric];
 
   return (
     <div>
@@ -302,7 +224,7 @@ function GrowthChart({ data }: { data: DashboardData['growth'] }) {
           <p className="text-xs text-slate-500">{label} in 12 months</p>
         </div>
         <div className="flex gap-1 rounded-xl bg-slate-100 p-1">
-          {([['newStudents', 'Students'], ['newSchools', 'Schools'], ['onlineVolume', 'Fee volume']] as const).map(([k, l]) => (
+          {([['newStudents', 'Students'], ['newSchools', 'Schools']] as const).map(([k, l]) => (
             <button key={k} onClick={() => setMetric(k)}
               className={cx('rounded-lg px-2.5 py-1 text-xs font-semibold', metric === k ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500')}>
               {l}

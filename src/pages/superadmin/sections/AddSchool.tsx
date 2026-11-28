@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { appLink } from '../../../lib/appUrl';
-import { Building2, CheckCircle2, Copy, Eye, EyeOff, Plus, Sparkles, UserRound, Wallet } from 'lucide-react';
+import { Building2, CheckCircle2, Copy, Eye, EyeOff, Plus, Sparkles, UserRound } from 'lucide-react';
 import { callManageSchools, errMsg, generatePassword } from '../api';
 import { Button, Card, ErrorBanner, Field, cx, inputCls, toast } from '../ui';
 import { DIGIT_LIMIT_CHOICES } from '../../../lib/codeDigits';
@@ -8,7 +8,6 @@ import { DIGIT_LIMIT_CHOICES } from '../../../lib/codeDigits';
 const EMPTY = {
   name: '', address: '', city: '', contact_number: '', academic_year: '2026-27', employee_prefix: '', short_name: '', admission_digits: '', employee_digits: '',
   admin_name: '', email: '', admin_password: '',
-  sub_status: 'trial', trial_days: '30', billing_cycle: 'yearly', price: '',
 };
 
 export default function AddSchoolSection({ onCreated }: { onCreated: (schoolId: string) => void }) {
@@ -44,10 +43,10 @@ export default function AddSchoolSection({ onCreated }: { onCreated: (schoolId: 
     try {
       const r = await callManageSchools<{ school_id: string }>({
         action: 'create-school', ...f,
-        trial_days: Number(f.trial_days) || 30,
+        // No billing in the portal: every school simply starts active.
+        sub_status: 'active',
         admission_digits: f.admission_digits ? Number(f.admission_digits) : null,
         employee_digits: f.employee_digits ? Number(f.employee_digits) : null,
-        price: f.price === '' ? null : Math.round(Number(f.price) * 100),
       });
       setDone({ id: r.school_id, name: f.name.trim(), email: f.email.trim().toLowerCase(), password: f.admin_password });
       setF(EMPTY);
@@ -154,30 +153,6 @@ export default function AddSchoolSection({ onCreated }: { onCreated: (schoolId: 
                 Generate
               </Button>
             </div>
-          </Field>
-        </div>
-      </Card>
-
-      <Card title="Subscription" icon={<Wallet className="h-4 w-4" />} subtitle="You can change this any time from the school's Subscription tab">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="Start as">
-            <select className={inputCls} value={f.sub_status} onChange={set('sub_status')}>
-              <option value="trial">Free trial</option>
-              <option value="active">Active (paid)</option>
-            </select>
-          </Field>
-          {f.sub_status === 'trial' && (
-            <Field label="Trial length (days)">
-              <input className={inputCls} type="number" min={1} max={365} value={f.trial_days} onChange={set('trial_days')} />
-            </Field>
-          )}
-          <Field label="Billing cycle">
-            <select className={inputCls} value={f.billing_cycle} onChange={set('billing_cycle')}>
-              <option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option>
-            </select>
-          </Field>
-          <Field label="Price per cycle (₹)" hint="Optional">
-            <input className={inputCls} type="number" min={0} value={f.price} onChange={set('price')} placeholder="0" />
           </Field>
         </div>
       </Card>

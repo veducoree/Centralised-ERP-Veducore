@@ -1,9 +1,7 @@
-// Veducore platform notices inside the school app: Veducore announcements and subscription renewal reminders.
+// Veducore platform notices inside the school app: Veducore announcements.
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, Info, Megaphone, X } from 'lucide-react';
 import { useAuth } from '@/auth/AuthContext';
-import { usePermissions } from '@/auth/PermissionsContext';
 import { fetchPlatformAnnouncements, type PlatformAnnouncement } from '@/services/platformApi';
 
 const TONE = {
@@ -19,17 +17,9 @@ function readDismissed(): string[] {
   try { return JSON.parse(localStorage.getItem(DISMISS_KEY) ?? '[]'); } catch { return []; }
 }
 
-function daysUntil(d: string | null | undefined) {
-  if (!d) return null;
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  return Math.round((new Date(d + 'T00:00:00').getTime() - start.getTime()) / 86_400_000);
-}
-
 /** Shown at the top of admin pages. */
 export function PlatformBanner() {
   const { profile } = useAuth();
-  const { platform, owner } = usePermissions();
   const [items, setItems] = useState<PlatformAnnouncement[]>([]);
   const [dismissed, setDismissed] = useState<string[]>(readDismissed);
 
@@ -46,34 +36,11 @@ export function PlatformBanner() {
     try { localStorage.setItem(DISMISS_KEY, JSON.stringify(next.slice(-50))); } catch { /* ignore */ }
   };
 
-  // Renewal reminder for the school owner only.
-  const sub = platform?.subscription_status;
-  const end = sub === 'trial' ? platform?.trial_ends_at : platform?.current_period_end;
-  const d = daysUntil(end);
-  let renewal: { tone: keyof typeof TONE; text: string } | null = null;
-  if (owner && sub === 'past_due') renewal = { tone: 'critical', text: 'Your Veducore subscription payment is overdue. Please clear it to avoid interruption.' };
-  else if (owner && sub === 'expired') renewal = { tone: 'critical', text: 'Your Veducore subscription has expired. Please renew to keep using Veducore.' };
-  else if (owner && d !== null && d <= 15 && (sub === 'trial' || sub === 'active')) {
-    renewal = {
-      tone: d <= 3 ? 'warning' : 'info',
-      text: sub === 'trial'
-        ? (d < 0 ? 'Your Veducore trial has ended.' : `Your Veducore trial ends ${d === 0 ? 'today' : `in ${d} day${d === 1 ? '' : 's'}`}.`) + ' Contact Veducore to choose a plan.'
-        : (d < 0 ? 'Your Veducore subscription period has ended.' : `Your Veducore subscription renews ${d === 0 ? 'today' : `in ${d} day${d === 1 ? '' : 's'}`}.`),
-    };
-  }
-
   const visible = items.filter((a) => !dismissed.includes(a.id));
-  if (!renewal && !visible.length) return null;
+  if (!visible.length) return null;
 
   return (
     <div className="mb-4 space-y-2">
-      {renewal && (
-        <div className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm ${TONE[renewal.tone].cls}`}>
-          {TONE[renewal.tone].icon}
-          <span className="flex-1">{renewal.text}</span>
-          <Link to="/admin/support" className="whitespace-nowrap text-xs font-semibold underline">Contact Veducore</Link>
-        </div>
-      )}
       {visible.map((a) => (
         <div key={a.id} className={`flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm ${TONE[a.severity].cls}`}>
           <span className="mt-0.5">{TONE[a.severity].icon}</span>

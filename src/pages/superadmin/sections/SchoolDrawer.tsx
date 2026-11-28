@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { appLink } from '../../../lib/appUrl';
 import {
-  Activity, AlertTriangle, Bell, Building2, CalendarDays, Check, ClipboardCheck, Copy, CreditCard, ExternalLink,
-  Eye, EyeOff, GraduationCap, IndianRupee, KeyRound, LifeBuoy, LogIn, Mail, MapPin, Phone, Power,
+  Activity, AlertTriangle, Bell, Building2, Check, ClipboardCheck, Copy, ExternalLink,
+  Eye, EyeOff, GraduationCap, KeyRound, LifeBuoy, LogIn, Mail, MapPin, Phone, Power,
   RefreshCw, Save, ShieldAlert, Sparkles, Trash2, Users, X,
 } from 'lucide-react';
 import {
-  SCHOOL_MODULES, actionLabel, callManageSchools, daysUntil, errMsg, fmtDate, generatePassword,
-  rupees, rupeesFromDecimal, timeAgo, type AuditEntry, type Invoice, type Me, type SchoolRecord,
+  SCHOOL_MODULES, actionLabel, callManageSchools, errMsg, fmtDate, generatePassword,
+  timeAgo, type AuditEntry, type Me, type SchoolRecord,
 } from '../api';
 import {
-  Badge, Button, Card, Drawer, ErrorBanner, Field, HEALTH, KV, LoadingBlock, Modal, SUB_STATUS, Tabs,
+  Badge, Button, Card, Drawer, ErrorBanner, Field, HEALTH, KV, LoadingBlock, Modal, Tabs,
   cx, inputCls, toast,
 } from '../ui';
 import { DIGIT_LIMIT_CHOICES } from '../../../lib/codeDigits';
@@ -21,12 +21,11 @@ interface Detail {
   adminLastSignIn: string | null;
   adminAccounts: { id: string; name: string; email: string; status: string; isOwner: boolean; createdAt: string }[];
   currentSession: { name: string; start_date: string; end_date: string } | null;
-  invoices: Invoice[];
   tickets: { id: string; ticket_number: number; subject: string; status: string; priority: string; last_reply_at: string }[];
   activity: AuditEntry[];
 }
 
-type Tab = 'overview' | 'profile' | 'subscription' | 'modules' | 'access' | 'danger';
+type Tab = 'overview' | 'profile' | 'modules' | 'access' | 'danger';
 
 export default function SchoolDrawer({
   schoolId, me, onClose, onChanged, onDeleted,
@@ -64,7 +63,6 @@ export default function SchoolDrawer({
   const tabs: { id: Tab; label: string }[] = [
     { id: 'overview', label: 'Overview' },
     { id: 'profile', label: 'Profile' },
-    { id: 'subscription', label: 'Subscription' },
     { id: 'modules', label: 'Modules' },
     { id: 'access', label: 'Admin access' },
     ...(canManage ? [{ id: 'danger' as Tab, label: 'Suspend / delete' }] : []),
@@ -81,11 +79,6 @@ export default function SchoolDrawer({
               <div className="mt-1 flex flex-wrap items-center gap-1.5">
                 {s.status === 'Suspended' ? <Badge tone="red" dot>Suspended</Badge> : <Badge tone="green" dot>Active</Badge>}
                 {s.health && <Badge tone={HEALTH[s.health].tone}>{HEALTH[s.health].label}</Badge>}
-                {s.subscription && (
-                  <Badge tone={SUB_STATUS[s.subscription.status].tone}>
-                    {SUB_STATUS[s.subscription.status].label} · {s.subscription.billingCycle}
-                  </Badge>
-                )}
               </div>
             )}
           </div>
@@ -108,7 +101,6 @@ export default function SchoolDrawer({
           <>
             {tab === 'overview' && <OverviewTab d={detail} />}
             {tab === 'profile' && <ProfileTab s={s} canManage={canManage} onSaved={refresh} />}
-            {tab === 'subscription' && <SubscriptionTab s={s} invoices={detail.invoices} canManage={canManage} onSaved={refresh} />}
             {tab === 'modules' && <ModulesTab s={s} canManage={canManage} onSaved={refresh} />}
             {tab === 'access' && <AccessTab d={detail} canManage={canManage} onSaved={refresh} />}
             {tab === 'danger' && canManage && (
@@ -149,14 +141,12 @@ function OverviewTab({ d }: { d: Detail }) {
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <Metric icon={<Users className="h-3.5 w-3.5" />} label="Students" value={s.students.toLocaleString('en-IN')} sub={`${s.activeStudents} active`} />
         <Metric icon={<GraduationCap className="h-3.5 w-3.5" />} label="Teachers" value={s.teachers} sub={`${s.classes} classes · ${s.sections} sections`} />
         <Metric icon={<Users className="h-3.5 w-3.5" />} label="Parent accounts" value={s.parents.toLocaleString('en-IN')} />
         <Metric icon={<ClipboardCheck className="h-3.5 w-3.5" />} label="Attendance (30d)" value={s.attendance30d.toLocaleString('en-IN')}
           sub={s.lastAttendance ? `last ${fmtDate(s.lastAttendance)}` : 'never marked'} />
-        <Metric icon={<IndianRupee className="h-3.5 w-3.5" />} label="Fees recorded (30d)" value={rupeesFromDecimal(s.feesCollected30d)} />
-        <Metric icon={<CreditCard className="h-3.5 w-3.5" />} label="Online payments (30d)" value={rupees(s.onlineVolume30d)} sub={`${s.onlinePaid30d} payments`} />
         <Metric icon={<Bell className="h-3.5 w-3.5" />} label="Notifications (30d)" value={s.notifications30d.toLocaleString('en-IN')} />
         <Metric icon={<LogIn className="h-3.5 w-3.5" />} label="Admin last sign-in" value={timeAgo(d.adminLastSignIn)} />
       </div>
@@ -167,11 +157,6 @@ function OverviewTab({ d }: { d: Detail }) {
           <KV k="Phone" v={s.contactNumber || '—'} />
           <KV k="Email" v={s.email || '—'} />
           <KV k="Academic year" v={d.currentSession?.name ?? s.academicYear ?? '—'} />
-          <KV k="Online payments" v={s.gateway
-            ? <Badge tone={s.gateway.active ? (s.gateway.mode === 'live' ? 'green' : 'amber') : 'gray'}>
-                Razorpay {s.gateway.mode}{s.gateway.active ? '' : ' (off)'}
-              </Badge>
-            : <span className="text-slate-400">Not set up</span>} />
           <KV k="Joined" v={fmtDate(s.createdAt)} />
           <KV k="School ID" v={s.id} mono />
         </Card>
@@ -296,139 +281,6 @@ function ProfileTab({ s, canManage, onSaved }: { s: SchoolRecord; canManage: boo
         </div>
       )}
     </Card>
-  );
-}
-
-// ── Subscription ─────────────────────────────────────────────────────────────
-
-function SubscriptionTab({ s, invoices, canManage, onSaved }: {
-  s: SchoolRecord; invoices: Invoice[]; canManage: boolean; onSaved: () => void;
-}) {
-  const sub = s.subscription;
-  // Price is set per school (no plans). Older schools on a plan start from
-  // what they were billed, so saving doesn't drop their price to zero.
-  const startPrice = sub?.priceOverride ?? (sub?.amount ? sub.amount : null);
-  const [f, setF] = useState({
-    status: sub?.status ?? 'active',
-    billing_cycle: sub?.billingCycle ?? 'yearly',
-    price_override: startPrice != null ? String(startPrice / 100) : '',
-    student_limit: sub?.studentLimit ? String(sub.studentLimit) : '',
-    trial_ends_at: sub?.trialEndsAt ?? '',
-    current_period_start: sub?.currentPeriodStart ?? '',
-    current_period_end: sub?.currentPeriodEnd ?? '',
-    notes: sub?.notes ?? '',
-  });
-  const [saving, setSaving] = useState(false);
-
-  const effective = f.price_override !== '' ? Math.round(Number(f.price_override) * 100) : 0;
-  const limit = Number(f.student_limit) || null;
-  const overLimit = limit !== null && s.students > limit;
-
-  function setPeriodFromToday() {
-    const start = new Date();
-    const end = new Date(start);
-    end.setMonth(end.getMonth() + (f.billing_cycle === 'monthly' ? 1 : f.billing_cycle === 'quarterly' ? 3 : 12));
-    end.setDate(end.getDate() - 1);
-    setF({ ...f, current_period_start: start.toISOString().slice(0, 10), current_period_end: end.toISOString().slice(0, 10) });
-  }
-
-  async function save() {
-    setSaving(true);
-    try {
-      await callManageSchools({
-        action: 'subscription-save', school_id: s.id,
-        subscription: { ...f, price_override: f.price_override === '' ? null : Math.round(Number(f.price_override) * 100) },
-      });
-      toast('Subscription saved');
-      onSaved();
-    } catch (e) {
-      toast(errMsg(e), 'error');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const endDate = f.status === 'trial' ? f.trial_ends_at : f.current_period_end;
-  const d = daysUntil(endDate);
-
-  return (
-    <>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <Metric icon={<CreditCard className="h-3.5 w-3.5" />} label="Billing per cycle" value={rupees(effective)}
-          sub={f.price_override !== '' ? `${f.billing_cycle} price` : 'not set'} />
-        <Metric icon={<CalendarDays className="h-3.5 w-3.5" />} label={f.status === 'trial' ? 'Trial ends' : 'Period ends'}
-          value={fmtDate(endDate || null)} sub={d === null ? 'not set' : d < 0 ? `${-d} days ago` : `in ${d} days`} />
-        <Metric icon={<Users className="h-3.5 w-3.5" />} label="Student limit" value={limit ?? 'Unlimited'}
-          sub={overLimit ? `over by ${s.students - limit!}` : `${s.students} enrolled`} />
-      </div>
-      {overLimit && (
-        <div className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          <AlertTriangle className="h-4 w-4" /> This school has more students than its limit allows. Raise the limit if they are paying for more.
-        </div>
-      )}
-
-      <Card title="Subscription & billing" subtitle="Changes apply immediately; create an invoice from Billing to charge for them">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Status">
-            <select className={inputCls} value={f.status} onChange={(e) => setF({ ...f, status: e.target.value as typeof f.status })} disabled={!canManage}>
-              {Object.entries(SUB_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-            </select>
-          </Field>
-          <Field label="Billing cycle">
-            <select className={inputCls} value={f.billing_cycle} onChange={(e) => setF({ ...f, billing_cycle: e.target.value as typeof f.billing_cycle })} disabled={!canManage}>
-              <option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option>
-            </select>
-          </Field>
-          <Field label="Price per cycle (₹)" hint="What the school pays each billing cycle">
-            <input className={inputCls} type="number" min={0} value={f.price_override} onChange={(e) => setF({ ...f, price_override: e.target.value })} disabled={!canManage} />
-          </Field>
-          <Field label="Student limit" hint="Empty = unlimited">
-            <input className={inputCls} type="number" min={1} value={f.student_limit} onChange={(e) => setF({ ...f, student_limit: e.target.value })} disabled={!canManage} />
-          </Field>
-          {f.status === 'trial' ? (
-            <Field label="Trial ends on">
-              <input className={inputCls} type="date" value={f.trial_ends_at} onChange={(e) => setF({ ...f, trial_ends_at: e.target.value })} disabled={!canManage} />
-            </Field>
-          ) : <div className="hidden sm:block" />}
-          <Field label="Current period start">
-            <input className={inputCls} type="date" value={f.current_period_start} onChange={(e) => setF({ ...f, current_period_start: e.target.value })} disabled={!canManage} />
-          </Field>
-          <Field label="Current period end" hint={canManage ? <button type="button" className="font-semibold text-indigo-600" onClick={setPeriodFromToday}>Start a new period today</button> : undefined}>
-            <input className={inputCls} type="date" value={f.current_period_end} onChange={(e) => setF({ ...f, current_period_end: e.target.value })} disabled={!canManage} />
-          </Field>
-          <Field label="Internal notes" className="sm:col-span-2">
-            <textarea className={cx(inputCls, 'min-h-[70px]')} value={f.notes} onChange={(e) => setF({ ...f, notes: e.target.value })} disabled={!canManage}
-              placeholder="Discount agreed, contact person, payment terms…" />
-          </Field>
-        </div>
-        {canManage && (
-          <div className="mt-5 flex justify-end">
-            <Button onClick={save} loading={saving} icon={<Save className="h-4 w-4" />}>Save subscription</Button>
-          </div>
-        )}
-      </Card>
-
-      <Card title="Invoices" bodyClassName="p-0">
-        {invoices.length === 0 ? (
-          <p className="px-5 py-6 text-center text-sm text-slate-400">No invoices yet. Create one from Billing.</p>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {invoices.map((i) => (
-              <li key={i.id} className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
-                <div className="min-w-0">
-                  <p className="font-medium text-slate-800">{i.invoice_number} · {i.description}</p>
-                  <p className="text-xs text-slate-400">Issued {fmtDate(i.issue_date)}{i.due_date ? ` · due ${fmtDate(i.due_date)}` : ''}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold text-slate-900">{rupees(i.total_amount)}</p>
-                  <Badge tone={i.status === 'paid' ? 'green' : i.status === 'void' ? 'gray' : i.status === 'draft' ? 'blue' : 'amber'}>{i.status}</Badge>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Card>
-    </>
   );
 }
 
@@ -691,7 +543,7 @@ function DangerTab({ s, isOwner, onSaved, onDeleted }: {
           subtitle="Blocks every admin, teacher and parent from signing in or reading data. Nothing is deleted.">
           <Field label="Reason" required hint="Shown to the school on their sign-in screen">
             <textarea className={cx(inputCls, 'min-h-[80px]')} value={reason} onChange={(e) => setReason(e.target.value)}
-              placeholder="e.g. Subscription payment overdue since 1 Nov. Please contact billing@veducore.com." />
+              placeholder="e.g. School asked to pause the account. Please contact Veducore support." />
           </Field>
           <div className="mt-4 flex justify-end">
             <Button variant="danger" onClick={() => setStatus('Inactive')} loading={busy} disabled={!reason.trim()} icon={<Power className="h-4 w-4" />}>

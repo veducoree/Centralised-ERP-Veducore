@@ -1,8 +1,8 @@
 // Veducore superadmin portal: auth gate, layout and section routing.
 import React, { Suspense, lazy, useCallback, useEffect, useState } from 'react';
 import {
-  AlertCircle, BarChart3, Building2, Contact2, CreditCard, FileSpreadsheet, Eye, EyeOff, History, LifeBuoy, Loader2, LogOut,
-  GalleryHorizontal, Megaphone, Menu, Plus, Settings, ShieldCheck, Users, Wallet, X,
+  AlertCircle, BarChart3, Building2, Contact2, FileSpreadsheet, Eye, EyeOff, History, LifeBuoy, Loader2, LogOut,
+  GalleryHorizontal, Megaphone, Menu, Plus, Settings, ShieldCheck, Users, X,
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import veducoreLogo from '@/assets/veducore-logo.png';
@@ -21,8 +21,6 @@ import {
 // Sections load on first open so the portal starts fast.
 const SchoolDrawer = lazy(() => import('./sections/SchoolDrawer'));
 const AddSchoolSection = lazy(() => import('./sections/AddSchool'));
-const BillingSection = lazy(() => import('./sections/Billing'));
-const PaymentsSection = lazy(() => import('./sections/Payments'));
 const AnnouncementsSection = lazy(() => import('./sections/Announcements'));
 const AdsSection = lazy(() => import('./sections/Ads'));
 const SupportSection = lazy(() => import('./sections/Support'));
@@ -33,7 +31,7 @@ const IdCardsSection = lazy(() => import('./sections/IdCards'));
 const ReportCardsSection = lazy(() => import('./sections/ReportCards'));
 
 type Section =
-  | 'dashboard' | 'schools' | 'add-school' | 'id-cards' | 'report-cards' | 'billing' | 'payments'
+  | 'dashboard' | 'schools' | 'add-school' | 'id-cards' | 'report-cards'
   | 'announcements' | 'ads' | 'support' | 'team' | 'audit' | 'settings';
 
 const NAV: { group: string; items: { id: Section; label: string; icon: React.ReactNode; managersOnly?: boolean }[] }[] = [
@@ -44,12 +42,6 @@ const NAV: { group: string; items: { id: Section; label: string; icon: React.Rea
       { id: 'add-school', label: 'Onboard school', icon: <Plus className="h-[18px] w-[18px]" />, managersOnly: true },
       { id: 'id-cards', label: 'ID cards', icon: <Contact2 className="h-[18px] w-[18px]" />, managersOnly: true },
       { id: 'report-cards', label: 'Report cards', icon: <FileSpreadsheet className="h-[18px] w-[18px]" />, managersOnly: true },
-    ],
-  },
-  {
-    group: 'Business', items: [
-      { id: 'billing', label: 'Billing', icon: <Wallet className="h-[18px] w-[18px]" /> },
-      { id: 'payments', label: 'Online payments', icon: <CreditCard className="h-[18px] w-[18px]" /> },
     ],
   },
   {
@@ -69,13 +61,11 @@ const NAV: { group: string; items: { id: Section; label: string; icon: React.Rea
 ];
 
 const TITLES: Record<Section, [string, string]> = {
-  dashboard: ['Dashboard', 'Platform health, revenue and growth at a glance'],
+  dashboard: ['Dashboard', 'Platform health and growth at a glance'],
   schools: ['Schools', 'Every school on Veducore — open one to manage it'],
   'add-school': ['Onboard a school', 'Create the school and its owner login in one step'],
   'id-cards': ['ID cards', 'Design templates and print student ID card sheets'],
   'report-cards': ['Report cards', "Design each school's annual report card on its own blank card"],
-  billing: ['Billing', 'Subscriptions and invoices'],
-  payments: ['Online payments', 'Parent fee payments across all schools'],
   announcements: ['Announcements', 'Messages to school admins, teachers and parents'],
   ads: ['Login page ads', 'Banner ads that rotate at the bottom of the login page'],
   support: ['Support desk', 'Tickets raised by school admins'],
@@ -84,7 +74,7 @@ const TITLES: Record<Section, [string, string]> = {
   settings: ['Account', 'Your profile and password'],
 };
 
-// Sections live at clean paths: /superadmin (dashboard), /superadmin/schools, /superadmin/billing …
+// Sections live at clean paths: /superadmin (dashboard), /superadmin/schools, /superadmin/support …
 const BASE = '/superadmin';
 const isSection = (v: string | undefined): v is Section => !!v && v in TITLES;
 const pathFor = (s: Section) => (s === 'dashboard' ? BASE : `${BASE}/${s}`);
@@ -262,8 +252,6 @@ export default function Superadmin() {
             <IdCardsSection schools={schools} onNavigateToSchools={() => setSection('schools')} onTemplateSaved={loadSchools} />
           )}
           {current === 'report-cards' && <ReportCardsSection schools={schools} />}
-          {current === 'billing' && <BillingSection me={me} schools={schools} onOpenSchool={setOpenSchool} onSchoolsChanged={loadSchools} />}
-          {current === 'payments' && <PaymentsSection />}
           {current === 'announcements' && <AnnouncementsSection me={me} schools={schools} />}
           {current === 'ads' && <AdsSection me={me} />}
           {current === 'support' && <SupportSection me={me} onOpenSchool={setOpenSchool} />}
