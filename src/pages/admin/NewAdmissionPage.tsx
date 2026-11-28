@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   CheckCircle, Copy, X, Lock,
   ArrowLeft, AlertTriangle, IndianRupee, Pencil, Printer,
-  MessageCircle, PlusCircle, Users, Trash2,
+  MessageCircle, PlusCircle, Users, Trash2, UserCheck, KeyRound,
 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Input, Select } from '@/components/ui/Form';
@@ -20,6 +20,9 @@ import {
   payWithCheckout,
   checkOnlinePayment,
   onlineCharges,
+  fetchFamilyByMobile,
+  updateExistingParent,
+  type ExistingFamily,
 } from '@/services/api';
 import type {
   Class, Section, School,
@@ -34,7 +37,8 @@ import { NameFields } from '@/components/ui/NameFields';
 // ─── Wizard persistence key ───────────────────────────────────────────────────
 // v4: one form for the parents + any number of children (siblings).
 // v5: student name split into first / middle / last.
-const WIZARD_KEY = 'veducore_admission_wizard_v5';
+// v6: mobile number first; an existing parent's details can be reused/edited.
+const WIZARD_KEY = 'veducore_admission_wizard_v6';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -77,8 +81,23 @@ interface PaymentForm {
   remarks: string;
 }
 
+/** The existing parent this admission adds children to (details copied). */
+interface LinkedParent {
+  family: ExistingFamily;
+  /** Login mobile when the details were copied. */
+  original_mobile: string;
+  /** Stored password when the details were copied. */
+  original_password: string;
+  /** Parent details at copy time, to tell whether anything was edited. */
+  snapshot: string;
+}
+
 interface FormData {
   // Step 1 — Parents
+  /** Set when the admin chose to reuse an existing parent's details. */
+  linked: LinkedParent | null;
+  /** Login password for a linked parent (editable). */
+  parent_password: string;
   father_name: string;
   mother_name: string;
   parent_email: string;
@@ -133,6 +152,7 @@ const EMPTY_PAYMENT: PaymentForm = {
 
 function initialForm(): FormData {
   return {
+    linked: null, parent_password: '',
     father_name: '', mother_name: '', parent_email: '',
     phone: '', whatsapp: '', same_as_phone: false,
     address_line1: '', address_line2: '', city: '', state: '',
@@ -143,8 +163,49 @@ function initialForm(): FormData {
 }
 
 /** Same parents and address, fresh children and payment ("Admit another child of these parents"). */
-function sameFamilyForm(prev: FormData): FormData {
-  return { ...prev, children: [emptyChild()], payment: { ...EMPTY_PAYMENT, payment_date: today() } };
+function sameFamilyForm(prev: FormData, newStudentIds: string[] = []): FormData {
+  // The edits are saved now: they become the new "original" details.
+  const linked = prev.linked && {
+    family: { ...prev.linked.family, students: [...prev.linked.family.students, ...newStudentIds.map((id) => ({ id } as ExistingFamily['students'][number]))] },
+    original_mobile: normalizeMobile(prev.phone) ?? prev.phone,
+    original_password: prev.parent_password || prev.linked.original_password,
+    snapshot: parentSnapshot(prev),
+  };
+  return { ...prev, linked, children: [emptyChild()], payment: { ...EMPTY_PAYMENT, payment_date: today() } };
+}
+
+const effectiveWhatsapp = (f: FormData) => (f.same_as_phone ? f.phone : f.whatsapp);
+
+/** The shared parent details, for spotting edits to a linked parent. */
+function parentSnapshot(f: FormData) {
+  return JSON.stringify([
+    f.father_name.trim(), f.mother_name.trim(), f.parent_email.trim(), effectiveWhatsapp(f),
+    f.phone, combinedAddress(f),
+  ]);
+}
+
+/** Reverse of combinedAddress: "line1, line2, city, state - pin, country". */
+function parseAddress(a: string): Pick<FormData, 'address_line1' | 'address_line2' | 'city' | 'state' | 'pin_code' | 'country'> {
+  const parts = (a || '').split(',').map((x) => x.trim()).filter(Boolean);
+  const k = parts.findIndex((x) => /^.+ - \d{6}$/.test(x));
+  if (k < 0) return { address_line1: a || '', address_line2: '', city: '', state: '', pin_code: '', country: 'India' };
+  const [, state, pin] = parts[k].match(/^(.+) - (\d{6})$/)!;
+  return {
+    address_line1: k >= 2 ? parts[0] : '',
+    address_line2: k >= 3 ? parts.slice(1, k - 1).join(', ') : '',
+    city: k >= 1 ? parts[k - 1] : '',
+    state: state.trim(),
+    pin_code: pin,
+    country: parts.slice(k + 1).join(', ') || 'India',
+  };
+}
+
+/** Did the admin change a linked parent's details or password? */
+function linkedChanges(f: FormData) {
+  if (!f.linked) return { any: false, mobile: false, password: false };
+  const mobile = (normalizeMobile(f.phone) ?? f.phone) !== f.linked.original_mobile;
+  const password = !!f.parent_password && f.parent_password !== f.linked.original_password;
+  return { any: mobile || password || parentSnapshot(f) !== f.linked.snapshot, mobile, password };
 }
 
 const STEP_LABELS = ['Parents & Children', 'Address', 'Class & School', 'Fees', 'Review'];
@@ -348,6 +409,36 @@ function sendWhatsAppReceipt(params: {
   window.open(`https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`, '_blank');
 }
 
+/** Open WhatsApp with the parent's login details. */
+function sendWhatsAppCredentials(params: {
+  whatsapp: string;
+  schoolName: string;
+  parentName: string;
+  children: string[];
+  username: string;
+  password: string;
+  updated: boolean;
+}) {
+  const phone = params.whatsapp.replace(/\D/g, '');
+  const fullPhone = phone.startsWith('91') && phone.length > 10 ? phone : `91${phone}`;
+  const lines = [
+    `*${params.schoolName} — Parent Login${params.updated ? ' (Updated)' : ''}*`,
+    '',
+    `Dear ${params.parentName || 'Parent'},`,
+    ...(params.children.length ? [`Admission done for: ${params.children.join(', ')}`, ''] : ['']),
+    params.updated ? 'Your login details have been updated:' : 'Your parent portal login:',
+    `Login (Mobile): ${params.username}`,
+    `Password: ${params.password}`,
+    `Login at: ${window.location.origin}`,
+    '',
+    'One login works for all your children. Please change the password after logging in.',
+    '',
+    'Thank you.',
+  ];
+  const msg = lines.join('\n');
+  window.open(`https://wa.me/${fullPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
 // ─── Small shared components ──────────────────────────────────────────────────
 
 function CopyButton({ text }: { text: string }) {
@@ -438,28 +529,120 @@ interface StepProps {
 }
 
 // Step 1: Parents & Children
-function Step1({ formData, errors, update, updateChild }: StepProps) {
+/** Result of looking up the typed mobile number. */
+interface MobileLookup {
+  mobile: string;
+  loading: boolean;
+  family: ExistingFamily | null;
+}
+
+interface Step1Props extends StepProps {
+  lookup: MobileLookup;
+  /** The typed number belongs to a different family than the linked one. */
+  mobileConflict: boolean;
+  onLink: (family: ExistingFamily) => void;
+  onUnlink: () => void;
+}
+
+function familyChildren(f: ExistingFamily) {
+  return f.students
+    .filter((s) => s.full_name)
+    .map((s) => `${s.full_name}${s.class?.name ? ` (${s.class.name}${s.section?.name ? `-${s.section.name}` : ''})` : ''}`)
+    .join(', ');
+}
+
+function Step1({ formData, errors, update, updateChild, lookup, mobileConflict, onLink, onUnlink }: Step1Props) {
   const kids = formData.children;
+  const linked = formData.linked;
+  const typed = normalizeMobile(formData.phone);
+  const found = !linked && typed && lookup.mobile === typed && !lookup.loading ? lookup.family : null;
+  const changes = linkedChanges(formData);
   return (
     <div className="space-y-6">
       <div className="space-y-4">
         <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Parent Details</h3>
+
+        {/* Mobile first: it tells us whether this family is already in the school. */}
+        <div className="max-w-md">
+          <label className="mb-1.5 block text-sm font-medium text-slate-700">Parent Mobile Number <span className="text-red-500">*</span></label>
+          <div className="flex">
+            <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-slate-200 bg-slate-50 text-slate-500 text-sm">+91</span>
+            <input type="tel" maxLength={10} value={formData.phone} autoFocus
+              onChange={(e) => { const d = e.target.value.replace(/\D/g, '').slice(0, 10); update({ phone: d, whatsapp: formData.same_as_phone ? d : formData.whatsapp }); }}
+              className="flex-1 rounded-r-[10px] border border-slate-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
+              placeholder="10-digit mobile number" />
+          </div>
+          {errors.phone
+            ? <p className="mt-1 text-xs text-red-600">{errors.phone}</p>
+            : typed && lookup.loading
+              ? <p className="mt-1 text-xs text-slate-400">Checking this number…</p>
+              : <p className="mt-1 text-xs text-slate-400">Enter this first — parent logs in with this number</p>}
+        </div>
+
+        {found && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <p className="flex items-center gap-2 text-sm font-semibold text-amber-900">
+              <AlertTriangle className="h-4 w-4" /> A parent with this mobile number already exists
+            </p>
+            <p className="mt-1 text-sm text-amber-800">
+              {found.father_name || found.mother_name || found.parent?.full_name}
+              {found.students.length > 0 && <> · Children: {familyChildren(found)}</>}
+            </p>
+            <label className="mt-3 flex cursor-pointer items-center gap-2 text-sm font-medium text-amber-900">
+              <input type="checkbox" className="rounded" checked={false} onChange={() => onLink(found)} />
+              Copy existing parent details (add a new child to this family)
+            </label>
+          </div>
+        )}
+
+        {linked && (
+          <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="flex items-center gap-2 text-sm font-semibold text-emerald-900">
+                  <UserCheck className="h-4 w-4" /> Adding a child to an existing family
+                </p>
+                {linked.family.students.some((s) => s.full_name) && (
+                  <p className="mt-1 text-sm text-emerald-800">Already admitted: {familyChildren(linked.family)}</p>
+                )}
+                <p className="mt-1 text-xs text-emerald-700">
+                  Details are filled in from the existing parent. Anything you change here is saved to the parent, their login and their other children.
+                </p>
+              </div>
+              <label className="flex cursor-pointer items-center gap-2 text-xs font-medium text-emerald-800">
+                <input type="checkbox" className="rounded" checked onChange={onUnlink} /> Copy existing details
+              </label>
+            </div>
+            {mobileConflict && (
+              <p className="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">
+                This mobile number already belongs to another parent. Use a different number, or keep {linked.original_mobile}.
+              </p>
+            )}
+            {!mobileConflict && changes.mobile && (
+              <p className="rounded-lg bg-white/70 px-3 py-2 text-xs text-emerald-800">
+                Login mobile will change from <b>{linked.original_mobile}</b> to <b>{typed ?? formData.phone}</b>.
+              </p>
+            )}
+            {linked.family.parent?.user_id && (
+              <div className="max-w-md">
+                <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-slate-700">
+                  <KeyRound className="h-3.5 w-3.5" /> Parent Login Password
+                </label>
+                <input type="text" value={formData.parent_password}
+                  onChange={(e) => update({ parent_password: e.target.value.trim() })}
+                  className="w-full rounded-[10px] border border-slate-200 bg-white px-3 py-2 font-mono text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
+                  placeholder="Leave blank to keep the current password" />
+                {errors.parent_password
+                  ? <p className="mt-1 text-xs text-red-600">{errors.parent_password}</p>
+                  : <p className="mt-1 text-xs text-slate-500">{changes.password ? 'The new password is saved to their login.' : 'Change it to give the parent a new password.'}</p>}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Input label="Father's Name" required value={formData.father_name} onChange={(e) => update({ father_name: e.target.value })} error={errors.father_name} placeholder="Father's full name" />
           <Input label="Mother's Name" required value={formData.mother_name} onChange={(e) => update({ mother_name: e.target.value })} error={errors.mother_name} placeholder="Mother's full name" />
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">Parent Mobile Number <span className="text-red-500">*</span></label>
-            <div className="flex">
-              <span className="inline-flex items-center px-3 rounded-l-[10px] border border-r-0 border-slate-200 bg-slate-50 text-slate-500 text-sm">+91</span>
-              <input type="tel" maxLength={10} value={formData.phone}
-                onChange={(e) => { const d = e.target.value.replace(/\D/g, '').slice(0, 10); update({ phone: d, whatsapp: formData.same_as_phone ? d : formData.whatsapp }); }}
-                className="flex-1 rounded-r-[10px] border border-slate-200 px-3 py-2 text-sm focus:border-[#5B6EE8] focus:outline-none focus:ring-2 focus:ring-[#5B6EE8]/25"
-                placeholder="10-digit mobile number" />
-            </div>
-            {errors.phone
-              ? <p className="mt-1 text-xs text-red-600">{errors.phone}</p>
-              : <p className="mt-1 text-xs text-slate-400">Parent logs in with this number</p>}
-          </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-slate-700">WhatsApp Number</label>
             <div className="flex">
@@ -934,6 +1117,18 @@ function Step5Review({ formData, credentials, onEditStep }: {
     <div className="space-y-4">
       <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-700">Review & Confirm</h3>
 
+      {formData.linked && (() => {
+        const ch = linkedChanges(formData);
+        return (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+            <b>Existing family</b> — the new child{formData.children.length > 1 ? 'ren are' : ' is'} added to this parent&apos;s login.
+            {ch.any ? ' Edited parent details will be saved to the parent and their other children.' : ''}
+            {ch.mobile && <> Login mobile changes to <b>{formData.phone}</b>.</>}
+            {ch.password && <> Password changes to <b className="font-mono">{formData.parent_password}</b>.</>}
+          </div>
+        );
+      })()}
+
       <ReviewCard title="Parents" onEdit={() => onEditStep(1)}>
         <ReviewRow label="Father's Name" value={formData.father_name} />
         <ReviewRow label="Mother's Name" value={formData.mother_name} />
@@ -1018,6 +1213,8 @@ export default function NewAdmissionPage() {
   // after a partial failure never admits the same child twice.
   const [results, setResults] = useState<Record<number, ChildResult>>({});
   const [resultParentCredentials, setResultParentCredentials] = useState<{ username: string; password: string } | null>(null);
+  /** The linked parent's login mobile or password was changed in this admission. */
+  const [credentialsUpdated, setCredentialsUpdated] = useState(false);
   const idempotencyKeys = useRef<Record<number, string>>({});
 
   const [formData, setFormData] = useState<FormData>(() => {
@@ -1064,6 +1261,62 @@ export default function NewAdmissionPage() {
 
   const academicYear = school?.academic_year ?? '2026-27';
 
+  // ── Existing parent lookup (by mobile number) ───────────────────────────────
+  const [lookup, setLookup] = useState<MobileLookup>({ mobile: '', loading: false, family: null });
+  const [lookupNonce, setLookupNonce] = useState(0);
+  const typedMobile = normalizeMobile(formData.phone);
+  useEffect(() => {
+    if (!typedMobile || !schoolId) { setLookup({ mobile: '', loading: false, family: null }); return; }
+    let live = true;
+    setLookup({ mobile: typedMobile, loading: true, family: null });
+    fetchFamilyByMobile(schoolId, typedMobile)
+      .then((family) => { if (live) setLookup({ mobile: typedMobile, loading: false, family }); })
+      .catch(() => { if (live) setLookup({ mobile: typedMobile, loading: false, family: null }); });
+    return () => { live = false; };
+  }, [typedMobile, schoolId, lookupNonce]);
+
+  // A linked parent moved to a number that already belongs to someone else.
+  const linkedFamily = formData.linked?.family;
+  const mobileConflict = !!(
+    linkedFamily && typedMobile && typedMobile !== formData.linked!.original_mobile
+    && lookup.mobile === typedMobile && lookup.family
+    && !(lookup.family.parent?.id && lookup.family.parent.id === linkedFamily.parent?.id)
+    && !lookup.family.students.some((s) => linkedFamily.students.some((t) => t.id === s.id))
+  );
+
+  function linkFamily(family: ExistingFamily) {
+    setFormData((prev) => {
+      const whatsapp = family.whatsapp || '';
+      const sameAsPhone = !whatsapp || whatsapp === normalizeMobile(prev.phone);
+      const next: FormData = {
+        ...prev,
+        father_name: family.father_name,
+        mother_name: family.mother_name,
+        parent_email: family.parent_email,
+        same_as_phone: sameAsPhone,
+        whatsapp: sameAsPhone ? prev.phone : whatsapp,
+        ...(family.address ? parseAddress(family.address) : {}),
+        parent_password: family.parent?.password || '',
+      };
+      return {
+        ...next,
+        linked: {
+          family,
+          original_mobile: normalizeMobile(prev.phone) ?? prev.phone,
+          original_password: family.parent?.password || '',
+          snapshot: parentSnapshot(next),
+        },
+      };
+    });
+  }
+
+  function unlinkFamily() {
+    // Back to the original number so the "already exists" choice shows again.
+    setFormData((prev) => ({ ...prev, phone: prev.linked?.original_mobile ?? prev.phone, linked: null, parent_password: '' }));
+  }
+  // Set once a linked parent's edits are saved, so a retry doesn't redo it.
+  const parentSaved = useRef(false);
+
 
   // ── Validation ──────────────────────────────────────────────────────────────
 
@@ -1075,6 +1328,10 @@ export default function NewAdmissionPage() {
       if (!formData.father_name.trim()) e.father_name = "Father's name is required";
       if (!formData.mother_name.trim()) e.mother_name = "Mother's name is required";
       if (!normalizeMobile(formData.phone)) e.phone = 'Enter a valid 10-digit mobile number';
+      else if (mobileConflict) e.phone = 'This mobile number already belongs to another parent';
+      if (formData.linked && formData.parent_password && formData.parent_password.length < 6) {
+        e.parent_password = 'Password must be at least 6 characters';
+      }
       if (!formData.same_as_phone && formData.whatsapp && !normalizeMobile(formData.whatsapp)) e.whatsapp = 'Enter a valid 10-digit number';
       if (formData.parent_email.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(formData.parent_email.trim())) {
         e.parent_email = 'Enter a valid email address';
@@ -1161,8 +1418,32 @@ export default function NewAdmissionPage() {
     const address = combinedAddress(formData);
     const done: Record<number, ChildResult> = { ...results };
     let creds = resultParentCredentials;
+    const changes = linkedChanges(formData);
 
     try {
+      // Existing parent edited: save the parent + login first, so each new
+      // child links to the updated login (same mobile = same login).
+      if (formData.linked && changes.any && !parentSaved.current) {
+        try {
+          await updateExistingParent({
+            school_id: schoolId,
+            parent: formData.linked.family.parent,
+            studentIds: formData.linked.family.students.map((s) => s.id),
+            mobile: formData.phone,
+            father_name: formData.father_name,
+            mother_name: formData.mother_name.trim() || null,
+            parent_email: formData.parent_email.trim() || null,
+            whatsapp: effectiveWhatsapp(formData) || null,
+            address,
+            password: changes.password ? formData.parent_password : null,
+          });
+          parentSaved.current = true;
+          setCredentialsUpdated(changes.mobile || changes.password);
+        } catch (err) {
+          throw new Error(`Parent details not saved: ${err instanceof Error ? err.message : 'unknown error'}`);
+        }
+      }
+
       for (let i = 0; i < kids.length; i++) {
         if (done[i]) continue; // already admitted in an earlier attempt
         const c = kids[i];
@@ -1283,6 +1564,9 @@ export default function NewAdmissionPage() {
     setResults({});
     setResultParentCredentials(null);
     idempotencyKeys.current = {};
+    parentSaved.current = false;
+    setCredentialsUpdated(false);
+    setLookupNonce((n) => n + 1);
     setFormData(next);
     setCurrentStep(1);
     setSubmitted(false);
@@ -1292,16 +1576,23 @@ export default function NewAdmissionPage() {
   // Preview of the parent login: their mobile number + a password from the (first) student's name.
   const previewMobile = normalizeMobile(formData.phone);
   const firstChild = formData.children[0] ?? emptyChild();
-  const credentials = school !== null && previewMobile
-    ? (() => {
+  // Existing login (same number): keeps its own password unless changed here.
+  const linkedLogin = formData.linked?.family.parent?.user_id ? formData.linked : null;
+  const unlinkedExisting = !formData.linked && lookup.mobile === previewMobile ? lookup.family?.parent : null;
+  const credentials = school === null || !previewMobile
+    ? null
+    : linkedLogin
+    ? { username: previewMobile, password: formData.parent_password || linkedLogin.original_password || '(unchanged)' }
+    : unlinkedExisting?.user_id
+    ? { username: previewMobile, password: unlinkedExisting.password || '(existing password)' }
+    : (() => {
         const c = generateParentCredentials({
           mobile: previewMobile,
           studentName: firstChild,
           shortName: schoolShortName(school),
         });
         return { username: c.username, password: c.password };
-      })()
-    : null;
+      })();
 
   const savedList = formData.children.map((_, i) => results[i]).filter(Boolean) as ChildResult[];
   const totalPaid = round2(savedList.reduce((s, r) => s + r.paidNow, 0));
@@ -1392,6 +1683,11 @@ export default function NewAdmissionPage() {
 
                 {resultParentCredentials && (
                   <div className="mt-4 w-full">
+                    {credentialsUpdated && (
+                      <p className="mb-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-left text-xs text-emerald-800">
+                        Parent login updated — send the new login details to the parent.
+                      </p>
+                    )}
                     <CredentialsBox username={resultParentCredentials.username} password={resultParentCredentials.password} />
                   </div>
                 )}
@@ -1406,10 +1702,25 @@ export default function NewAdmissionPage() {
                         results: savedList,
                       })}
                       className="flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100">
-                      <MessageCircle className="h-4 w-4" /> Send on WhatsApp
+                      <MessageCircle className="h-4 w-4" /> Send Receipt on WhatsApp
                     </button>
                   )}
-                  <button onClick={() => resetAll(sameFamilyForm(formData))}
+                  {effectiveWhatsapp(formData) && resultParentCredentials && (
+                    <button
+                      onClick={() => sendWhatsAppCredentials({
+                        whatsapp: effectiveWhatsapp(formData),
+                        schoolName: school?.name ?? 'School',
+                        parentName: formData.father_name || formData.mother_name,
+                        children: savedList.map((r) => r.name),
+                        username: resultParentCredentials.username,
+                        password: resultParentCredentials.password,
+                        updated: credentialsUpdated,
+                      })}
+                      className="flex items-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100">
+                      <KeyRound className="h-4 w-4" /> Send Login on WhatsApp
+                    </button>
+                  )}
+                  <button onClick={() => resetAll(sameFamilyForm(formData, savedList.map((r) => r.studentId)))}
                     className="flex items-center gap-2 rounded-xl border border-violet-300 bg-violet-50 px-4 py-2.5 text-sm font-medium text-violet-700 transition-colors hover:bg-violet-100">
                     <Users className="h-4 w-4" /> Another child of same parents
                   </button>
@@ -1472,7 +1783,8 @@ export default function NewAdmissionPage() {
                 </div>
 
                 <div className="px-4 py-6 sm:px-6">
-                  {currentStep === 1 && <Step1 formData={formData} errors={errors} update={update} updateChild={updateChild} />}
+                  {currentStep === 1 && <Step1 formData={formData} errors={errors} update={update} updateChild={updateChild}
+                    lookup={lookup} mobileConflict={mobileConflict} onLink={linkFamily} onUnlink={unlinkFamily} />}
                   {currentStep === 2 && <Step2 formData={formData} errors={errors} update={update} updateChild={updateChild} />}
                   {currentStep === 3 && (
                     <Step3 formData={formData} errors={errors} update={update} updateChild={updateChild} classes={classes} />

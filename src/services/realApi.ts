@@ -3,7 +3,7 @@ import { parseTemplate as parseReportCardTemplate } from '@/lib/reportCard/templ
 export { generateSubjectCode } from '@/lib/subjectUtils';
 import { generateSubjectCode } from '@/lib/subjectUtils';
 import {
-  generateParentCredentials, namePartsOf, normalizeMobile, parentFromStudent, parentLoginId, schoolShortName,
+  generateParentCredentials, namePartsOf, normalizeMobile, parentFromStudent, parentLoginEmail, parentLoginId, schoolShortName,
 } from '@/lib/parentUtils';
 import type {
   Teacher, Parent, Student, Class, Section, Subject,
@@ -340,6 +340,117 @@ export async function resetUserPassword(params: {
   if (!response.ok) throw new Error(result.error || 'Failed to update password');
   invalidateCache(params.role === 'teacher' ? 'teachers:' : 'parents:');
   return result;
+}
+
+/** A family already in the school, found by the parent's mobile number. */
+export interface ExistingFamily {
+  /** Parent record with a login (null when only students carry this number). */
+  parent: (Parent & { password?: string }) | null;
+  /** The children already admitted under this number (newest first). */
+  students: Student[];
+  father_name: string;
+  mother_name: string;
+  parent_email: string;
+  whatsapp: string;
+  address: string;
+}
+
+/**
+ * Looks up the parent login for a mobile number (the auth email is derived from
+ * it) and the children already linked to it — or, if no login exists, students
+ * saved with that number. Used by New Admission to reuse the parent's details.
+ */
+export async function fetchFamilyByMobile(schoolId: string, mobile: string): Promise<ExistingFamily | null> {
+  const m = normalizeMobile(mobile);
+  if (!m) return null;
+  const { data: parentRows, error } = await supabase
+    .from('parents')
+    .select('*, parent_students(student:students(*, class:classes(*), section:sections(*)))')
+    .eq('school_id', schoolId)
+    .ilike('email', parentLoginEmail(m))
+    .limit(1);
+  if (error) throw error;
+  const parent = (parentRows?.[0] ?? null) as (Parent & { password?: string; parent_students?: { student: Student | null }[] }) | null;
+  let students = (parent?.parent_students ?? []).map((l) => l.student).filter(Boolean) as Student[];
+  if (students.length === 0) {
+    const { data: byNumber } = await supabase
+      .from('students')
+      .select('*, class:classes(*), section:sections(*)')
+      .eq('school_id', schoolId)
+      .or(`emergency_contact.eq.${m},parent_phone.eq.${m}`);
+    students = (byNumber ?? []) as Student[];
+  }
+  if (!parent && students.length === 0) return null;
+  students.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  const s = students[0];
+  return {
+    parent: parent ? { ...parent, parent_students: undefined } : null,
+    students,
+    father_name: s?.father_name || parent?.full_name || '',
+    mother_name: s?.mother_name || '',
+    parent_email: s?.parent_email || '',
+    whatsapp: normalizeMobile(s?.whatsapp_number) || '',
+    address: s?.address || parent?.address || '',
+  };
+}
+
+/**
+ * Saves edited details of an existing parent: the parent login (mobile, name,
+ * password — via create-user so Auth stays in sync) and the shared family
+ * details on every child already linked to them.
+ */
+export async function updateExistingParent(params: {
+  school_id: string;
+  parent: Parent | null;
+  studentIds: string[];
+  mobile: string;
+  father_name: string;
+  mother_name: string | null;
+  parent_email: string | null;
+  whatsapp: string | null;
+  address: string;
+  /** New password, or null to keep the current one. */
+  password: string | null;
+}) {
+  const mobile = normalizeMobile(params.mobile);
+  if (!mobile) throw new Error('Enter a valid 10-digit mobile number');
+  if (params.parent?.user_id) {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Not authenticated');
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-user`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({
+        action: 'update_parent_login',
+        user_id: params.parent.user_id,
+        role: 'parent',
+        school_id: params.school_id,
+        email: parentLoginEmail(mobile),
+        full_name: params.father_name.trim() || params.mother_name?.trim() || params.parent.full_name,
+        phone: mobile,
+        password: params.password || undefined,
+        extra: { address: params.address },
+      }),
+    });
+    const result = await response.json().catch(() => ({} as { error?: string }));
+    if (!response.ok) throw new Error(result.error || `Could not update the parent login (HTTP ${response.status})`);
+  }
+  if (params.studentIds.length > 0) {
+    const { error } = await supabase.from('students').update({
+      father_name: params.father_name.trim(),
+      mother_name: params.mother_name,
+      parent_email: params.parent_email,
+      whatsapp_number: params.whatsapp,
+      emergency_contact: mobile,
+      parent_phone: mobile,
+      address: params.address,
+    }).in('id', params.studentIds);
+    if (error) throw new Error(`Parent login saved, but updating the children failed: ${error.message}`);
+  }
+  invalidateCache('parents:');
+  invalidateCache('parentByUser:');
+  invalidateCache('students:');
+  invalidateCache('parentStudents:');
 }
 
 // Teacher + their login, in one DB transaction (migration 057).

@@ -9,7 +9,9 @@ const corsHeaders = {
 
 interface CreateUserBody {
   /** "set_password": admin resets an existing teacher/parent login (needs user_id). */
-  action?: "create" | "set_password";
+  /** "update_parent_login": admin changes an existing parent's login mobile
+   *  (email), name and/or password together (needs user_id). */
+  action?: "create" | "set_password" | "update_parent_login";
   user_id?: string;
   email: string;
   password: string;
@@ -65,6 +67,7 @@ Deno.serve(async (req: Request) => {
     const body: CreateUserBody = await req.json();
     const { action, user_id, email, password, full_name, role, school_id, phone, extra } = body;
     const isSetPassword = action === "set_password";
+    const isUpdateParentLogin = action === "update_parent_login";
     const studentId = (extra?.student_id as string | undefined) ?? null;
 
     if (!profile || profile.role !== "admin" || profile.status !== "active") {
@@ -74,7 +77,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (isSetPassword ? (!user_id || !password || !role || !school_id) : (!email || !password || !full_name || !role || !school_id)) {
+    const missing = isUpdateParentLogin
+      ? (!user_id || !email || !full_name || !school_id)
+      : isSetPassword
+        ? (!user_id || !password || !role || !school_id)
+        : (!email || !password || !full_name || !role || !school_id);
+    if (missing) {
       return new Response(
         JSON.stringify({ error: "Missing required fields" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -126,6 +134,75 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ error: "Cannot create users for another school" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Existing parent's details edited at admission: move the login to the new
+    // mobile (auth email), new name and/or new password, keeping the parents
+    // row, profile and stored password copy in step with Auth.
+    if (isUpdateParentLogin) {
+      if (password && password.length < 6) {
+        return new Response(
+          JSON.stringify({ error: "Password must be at least 6 characters" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const { data: target } = await adminClient
+        .from("parents").select("id, email").eq("user_id", user_id).eq("school_id", school_id).maybeSingle();
+      if (!target) {
+        return new Response(
+          JSON.stringify({ error: "No parent login found in your school" }),
+          { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const newEmail = email.trim().toLowerCase();
+      const emailChanged = newEmail !== String(target.email ?? "").toLowerCase();
+      if (emailChanged) {
+        const { data: taken } = await adminClient
+          .from("profiles").select("id").ilike("email", newEmail).neq("id", user_id).maybeSingle();
+        if (taken) {
+          return new Response(
+            JSON.stringify({ error: "This mobile number is already used by another login" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+      }
+      const { error: authErr } = await adminClient.auth.admin.updateUserById(user_id!, {
+        ...(emailChanged ? { email: newEmail, email_confirm: true } : {}),
+        ...(password ? { password } : {}),
+        user_metadata: { full_name },
+      });
+      if (authErr) {
+        return new Response(
+          JSON.stringify({ error: /already/i.test(authErr.message) ? "This mobile number is already used by another login" : authErr.message }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      await adminClient.from("profiles").update({
+        full_name, email: newEmail, phone: phone || null,
+      }).eq("id", user_id);
+      const { error: parentErr } = await adminClient.from("parents").update({
+        full_name, email: newEmail, phone: phone || null,
+        ...(extra?.address ? { address: extra.address } : {}),
+        ...(password ? { password } : {}),
+      }).eq("id", target.id);
+      if (parentErr) {
+        return new Response(
+          JSON.stringify({ error: "Login updated, but the parent record failed: " + parentErr.message }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      await adminClient.from("audit_logs").insert({
+        school_id,
+        user_id: userData.user.id,
+        action: "parent_login_updated",
+        entity_type: "user",
+        entity_id: user_id,
+        metadata: { email_changed: emailChanged, password_changed: !!password },
+      });
+      return new Response(
+        JSON.stringify({ id: user_id, email: newEmail, message: "Parent login updated" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
